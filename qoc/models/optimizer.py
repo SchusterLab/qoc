@@ -1,5 +1,5 @@
 """
-optimizer.py - a class to define a class to encapsulate gradient based
+optimizer.py - a module to define a class to encapsulate gradient based
 optimizers
 """
 
