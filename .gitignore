@@ -1,0 +1,6 @@
+# python files
+*/__pycache__
+
+# editor files
+*~
+*#
