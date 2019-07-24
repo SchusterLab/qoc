@@ -3,6 +3,7 @@ grape.py - a module to expose optimization methods for the GRAPE
 algorithm
 """
 
+<<<<<<< HEAD
 from copy import deepcopy
 
 import numpy as np
@@ -284,3 +285,12 @@ def _test():
 
 if __name__ == "__main__":
     _test()
+=======
+def grape_schroedinger_discrete():
+    """
+    a method to optimize the evolution of a set of states under the
+    schroedinger equation for time-discrete control parameters
+    """
+    pass
+    
+>>>>>>> 318831567b7dd9196600b9274c11d12a071d3af0
