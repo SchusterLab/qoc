@@ -1,0 +1,8 @@
+# python files
+**/__pycache__/*
+*.pyc
+*.egg-info
+
+# editor files
+*~
+*#
