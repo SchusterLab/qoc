@@ -19,3 +19,12 @@ commutator = lambda a, b: np.matmul(a, b) - np.matmul(b, a)
 krons = lambda *matrices: reduce(np.kron, matrices)
 matmuls = lambda *matrices: reduce(np.matmul, matrices)
 
+# isomorphisms
+
+# A column vector is NOT a row vector np.array([0, 1, 2])
+# A column vector is specified as np.array([[0], [1], [2]])
+column_vector_list_to_matrix = (lambda column_vector_list:
+                                np.hstack(column_vector_list))
+matrix_to_column_vector_list = (lambda matrix:
+                                [matrix[:, i] for i in range(matrix.shape[1])])
+

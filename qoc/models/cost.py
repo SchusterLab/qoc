@@ -23,8 +23,16 @@ class Cost(object):
         super().__init__()
         self.alpha = alpha
 
+
+    def __str__(self):
+        return self.name
+
+    
+    def __repr__(self):
+        return self.__str__()
+
         
-    def compute(step, all_params, states):
+    def compute(step, states, all_params):
         """
         an autograd compatible function (https://github.com/HIPS/autograd)
         to compute the cost at each pulse time step given the pulse time step,
@@ -32,9 +40,9 @@ class Cost(object):
         that time step
         Args:
         step :: int - the pulse time step
-        all_params :: numpy.ndarray - the control parameters for all time steps
         states :: [numpy.ndarray] - a list of the initial states evolved to the
                                     current time step
+        all_params :: numpy.ndarray - the control parameters for all time steps
         Returns:
         cost :: float - the cost for the given time step, parameters, and states
         """

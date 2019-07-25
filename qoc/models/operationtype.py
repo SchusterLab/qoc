@@ -22,3 +22,7 @@ class OperationType(Enum):
             return "operation_type_cpu_sparse"
         else:
             return "operation_type_gpu_sparse"
+
+
+    def __repr__(self):
+        return self.__str__()

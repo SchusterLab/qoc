@@ -15,8 +15,12 @@ class MagnusMethod(Enum):
 
     def __str__(self):
         if self.value == 1:
-            return "magnus_order_two"
+            return "magnus_m2"
         elif self.value == 2:
-            return "magnus_order_four"
+            return "magnus_m4"
         else:
-            return "magnus_order_six"
+            return "magnus_m6"
+
+
+    def __repr__(self):
+        return self.__str__()
