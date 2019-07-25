@@ -7,13 +7,6 @@ class Optimizer(object):
     """
     a class to encapsulate a gradient based optimizer
     Fields: none
-<<<<<<< HEAD
-=======
-    Methods:
-    init :: (*) -> None - see method definition
-    update :: (params :: numpy.ndarray, grads :: numpy.ndarray)
-              -> new_params :: numpy.ndarray - see method definition
->>>>>>> 318831567b7dd9196600b9274c11d12a071d3af0
     """
 
     def __init__(self):

@@ -1,11 +1,7 @@
 # python files
-<<<<<<< HEAD
 **/__pycache__/*
 *.pyc
 *.egg-info
-=======
-*/__pycache__
->>>>>>> 318831567b7dd9196600b9274c11d12a071d3af0
 
 # editor files
 *~
