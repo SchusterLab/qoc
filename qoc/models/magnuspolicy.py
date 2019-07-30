@@ -1,11 +1,11 @@
 """
-magnusmethod.py - a module to define a class to encapsulate the choice
+magnuspolicy.py - a module to define a class to encapsulate the choice
 of the magnus expansion method
 """
 
 from enum import Enum
 
-class MagnusMethod(Enum):
+class MagnusPolicy(Enum):
     """a class to encapsulate the choice of the magnus expansion method,
     see https://arxiv.org/abs/1709.06483
     """

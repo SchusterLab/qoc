@@ -1,11 +1,11 @@
 """
-operationtype.py - a module to define a class to specify the computation
+operationpolicy.py - a module to define a class to specify the computation
 backend
 """
 
 from enum import Enum
 
-class OperationType(Enum):
+class OperationPolicy(Enum):
     """a class to specify the computation backend
     """
     CPU = 1

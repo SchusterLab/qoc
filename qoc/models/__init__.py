@@ -3,12 +3,18 @@ models - a directory for qoc's data models
 """
 
 from qoc.models.cost import Cost
-from qoc.models.grapestate import (GrapeStateDiscrete, GrapeResult, EvolveResult)
-from qoc.models.magnusmethod import MagnusMethod
-from qoc.models.operationtype import OperationType
+from qoc.models.grapepolicy import GrapeSchroedingerPolicy
+from qoc.models.grapestate import (GrapeSchroedingerDiscreteState,
+                                   GrapeResult, EvolveResult)
+from qoc.models.interpolationpolicy import InterpolationPolicy
+from qoc.models.magnuspolicy import MagnusPolicy
+from qoc.models.operationpolicy import OperationPolicy
 from qoc.models.optimizer import Optimizer
-from qoc.models.adam import Adam
 
-__all__ = ["Cost", "GrapeStateDiscrete", "EvolveResult", "GrapeResult",
-           "MagnusMethod", "OperationType", "Optimizer", "Adam"]
+
+__all__ = [
+    "Cost", "GrapeSchroedingerPolicy", "GrapeSchroedingerDiscreteState",
+    "GrapeResult", "EvolveResult", "InterpolationPolicy",
+    "MagnusPolicy", "OperationPolicy", "Optimizer"
+]
 
