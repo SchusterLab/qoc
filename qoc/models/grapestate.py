@@ -3,11 +3,9 @@ grapestate.py - a module for classes to encapsulate the state of a
 GRAPE optimization
 """
 
-from autograd import jacobian, elementwise_grad
-from autograd.core import make_vjp as _make_vjp
-from autograd.wrap_util import unary_to_nary
 import autograd.numpy as anp
 import h5py
+import numpy as np
 
 from qoc.core.maths import (magnus_m2_linear, magnus_m4_linear,
                             magnus_m6_linear,
@@ -17,7 +15,6 @@ from qoc.models.grapepolicy import GrapeSchroedingerPolicy
 from qoc.models.interpolationpolicy import InterpolationPolicy
 from qoc.models.magnuspolicy import MagnusPolicy
 from qoc.models.operationpolicy import OperationPolicy
-
 from qoc.util import ans_jacobian
 
 ### MAIN STRUCTURES ###
@@ -56,7 +53,7 @@ class GrapeState(object):
                  max_param_amplitudes, operation_policy,
                  optimizer, pulse_step_count,
                  pulse_time, save_file_path,
-                 save_iteration_step, step_costs, step_cost_indices):
+                 save_iteration_step, step_costs):
         """
         See class definition for argument specifications not listed here.
         Args:
@@ -93,86 +90,95 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     a class to encapsulate the necessary information to perform a
     schroedinger, discrete GRAPE optimization.
     Fields:
-    magnus :: (params :: numpy.ndarray, time :: float, dt :: float)
-               -> magnus :: numpy.ndarray
-        - the magnus expansion of the hamiltonian
-    dmagnus_dparams :: (params :: numpy.ndarray, time :: float, dt :: float)
-                               -> (magnus :: numpy.ndarray,
-                                   dmagnus_dparams :: numpy.ndarray,
-                                   param_indices :: numpy.ndarray)
-        - a function that evaluates the magnus expansion, the gradient of the magnus
-          expansion with respect to the params argument that keeps all nonzero gradients,
-          and the indices of the params argument that represent the corresponding gradients
-          in dmagnus_dparams
-          argument that 
-    magnus_policy :: qoc.MagnusPolicy - specify how to perform the 
-        magnus expansion
     costs :: [qoc.models.Cost] - the cost functions to guide optimization
-    step_cost_indices :: [int] - the indices into the costs list of the
-        costs that need to be evaluated at every step
+    dmagnus_dparams :: (dt :: float, params :: numpy.ndarray, step :: int, time :: float)
+                               -> (magnus :: numpy.ndarray,
+                                   dmagnus_dparams :: numpy.ndarray)
+        - This function evaluates the magnus expansion and the gradient of the magnus
+          expansion with respect to the params argument. The params argument
+          consists of all params specified by magnus_param_indices.
+    grape_schroedinger_policy :: qoc.GrapeSchroedingerPolicy - specification
+        for how to perform the main integration
+    hilbert_size :: int - the dimension of the hilbert space that the evolving
+        states live in
     interpolation_policy :: qoc.InterpolationPolicy - how parameters
         should be interpolated for intermediate time steps
     iteration_count :: int - the number of iterations to optimize for
-    param_count :: int - the number of control parameters required at each
-         optimization time step
+    log_iteration_step :: the number of iterations at which to print
+        progress to stdout
+    magnus :: (dt :: float, params :: numpy.ndarray, step :: int, time :: float)
+               -> magnus :: numpy.ndarray
+        - This function evaluates the magnus expansion. The params argument
+          consist of all params specified by magnus_param_indices.
+    magnus_param_indices :: (dt :: float, parms :: numpy.ndarray, step :: int, time :: float)
+                            -> magnus_param_indices :: numpy.array
+        - This function returns the param indices that should be included
+        in the params argument to "magnus". The point of this paradigm is
+        to figure out which params should be sent to the magnus expansion
+        to be used for interpolation. That way, we only have to calculate
+        the gradient of the magnus expansion with respect to he params used.
+        In this way, we still keep the abstraction that any number of params
+        may be used for interpolation. In practice, we expect that only a few
+        of the params near the index "step" will be used. Therefore, we expect
+        to save memory and time.
+    magnus_policy :: qoc.MagnusPolicy - specify how to perform the 
+        magnus expansion
     max_param_amplitudes :: the maximum aboslute value at which to clip
         the parameters
-    pulse_time :: float - the duration of the control pulse
+    operation_policy :: qoc.OperationPolicy - how computations should be
+        performed, e.g. CPU, GPU, sparse, etc.
+    optimizer :: qoc.Optimizer - an instance of an optimizer to perform
+        gradient-based-optimization
+    param_count :: int - the number of control parameters required at each
+         optimization time step
     pulse_step_count :: int - the number of time steps at which the pulse
         should be optimized
+    pulse_time :: float - the duration of the control pulse
+    save_file_path :: str - the full path to the save file
+    save_iteration_step :: the number of iterations at which to write
+        progress to the save file
+    step_cost_indices :: [int] - the indices into the costs list of the
+        costs that need to be evaluated at every step
     system_step_multiplier :: int - the multiple of pulse_step_count at which
         the system should evolve, control parameters will be interpolated at
         these steps
-    optimizer :: qoc.Optimizer - an instance of an optimizer to perform
-        gradient-based-optimization
-    operation_policy :: qoc.OperationPolicy - how computations should be
-        performed, e.g. CPU, GPU, sparse, etc.
-    grape_schroedinger_policy :: qoc.GrapeSchroedingerPolicy - specification
-        for how to perform the main integration
-    log_iteration_step :: the number of iterations at which to print
-        progress to stdout
-    save_iteration_step :: the number of iterations at which to write
-        progress to the save file
-    save_file_path :: str - the full path to the save file
     """
     
-    def __init__(self, costs, hilbert_size, iteration_count,
-                 log_iteration_step,
-                 max_param_amplitudes, operation_policy,
-                 optimizer, pulse_step_count,
-                 pulse_time, save_file_path,
-                 save_iteration_step, step_costs, step_cost_indices,
-                 hamiltonian, magnus_policy, param_count,
-                 system_step_multiplier, grape_schroedinger_policy,
-                 interpolation_policy):
+    def __init__(self, costs, grape_schroedinger_policy,
+                 hamiltonian, hilbert_size, interpolation_policy,
+                 iteration_count, log_iteration_step,
+                 magnus_policy, max_param_amplitudes, operation_policy,
+                 optimizer, param_count, pulse_step_count, pulse_time,
+                 save_file_name, save_iteration_step, save_path,
+                 system_step_multiplier):
         """
         See class definition for argument specifications not listed here.
         Args:
-        save_path :: str - the directory to create the save file in,
-            the directory will be created if it does not exist
-        save_file_name :: str - this will identify the save file
         hamiltonian :: (params :: numpy.ndarray, time :: float)
                         -> hamiltonian :: numpy.ndarray
             - an autograd compatible function that returns the system
               hamiltonian for a specified time and optimization parameters
-
+        save_file_name :: str - this will identify the save file
+        save_path :: str - the directory to create the save file in,
+            the directory will be created if it does not exist
         """
-        super().__init__(costs, iteration_count, max_param_amplitudes,
-                         pulse_time, pulse_step_count,
-                         optimizer, operation_policy,
-                         hilbert_size,
-                         log_iteration_step, save_iteration_step, save_path,
-                         save_file_name)
-        self.magnus_policy = magnus_policy
+        super().__init__(costs, hilbert_size, iteration_count,
+                         log_iteration_step, max_param_amplitudes,
+                         operation_policy, optimizer,
+                         pulse_step_count, pulse_time,
+                         save_file_name, save_iteration_step, save_path,)
+        (self.dmagnus_dparams,
+         self.magnus,
+         self.magnus_param_indices) = _choose_magnus(hamiltonian,
+                                                     interpolation_policy,
+                                                     magnus_policy)
+        self.grape_schroedinger_policy = grape_schroedinger_policy
         self.interpolation_policy = interpolation_policy
-        self.magnus, self.dmagnus_dparams = _choose_magnus(hamiltonian,
-                                                           interpolation_policy,
-                                                           magnus_policy)
+        self.magnus_policy = magnus_policy
         self.param_count = param_count
         self.system_step_multiplier = system_step_multiplier
-        self.grape_schroedinger_policy = grape_schroedinger_policy
 
-        
+
     def save_initial(self, initial_states, initial_params):
         """
         save all initial values to the save file
@@ -185,24 +191,25 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             with h5py.File(self.save_file_path, "w") as save_file:
                 save_file.create_dataset("cost_names",
                                          data=["{}".format(cost) for cost in self.costs])
-                save_file.create_dataset("iteration_count", data=self.iteration_count)
-                save_file.create_dataset("param_count", data=self.param_count)
-                save_file.create_dataset("max_param_amplitudes",
-                                         data=self.max_param_amplitudes)
-                
-                save_file.create_dataset("pulse_time", data=self.pulse_time)
-                save_file.create_dataset("pulse_step_count", data=self.pulse_step_count)
-                save_file.create_dataset("system_step_multiplier",
-                                         data=self.system_step_multiplier)
-                save_file.create_dataset("optimizer", data="{}".format(self.optimizer))
-                save_file.create_dataset("magnus_policy",
-                                         data="{}".format(self.magnus_policy))
-                save_file.create_dataset("operation_policy",
-                                         data="{}".format(self.operation_policy))
                 save_file.create_dataset("grape_schroedinger_policy",
                                          data="{}".format(self.grape_schroedinger_policy))
-                save_file.create_dataset("initial_states", data=initial_states)
                 save_file.create_dataset("initial_params", data=initial_params)
+                save_file.create_dataset("initial_states", data=initial_states)
+                save_file.create_dataset("interpolation_policy",
+                                         data="{}".format(self.interpolation_policy))
+                save_file.create_dataset("iteration_count", data=self.iteration_count)
+                save_file.create_dataset("magnus_policy",
+                                         data="{}".format(self.magnus_policy))
+                save_file.create_dataset("max_param_amplitudes",
+                                         data=self.max_param_amplitudes)
+                save_file.create_dataset("operation_policy",
+                                         data="{}".format(self.operation_policy))
+                save_file.create_dataset("optimizer", data="{}".format(self.optimizer))
+                save_file.create_dataset("param_count", data=self.param_count)
+                save_file.create_dataset("pulse_step_count", data=self.pulse_step_count)
+                save_file.create_dataset("pulse_time", data=self.pulse_time)
+                save_file.create_dataset("system_step_multiplier",
+                                         data=self.system_step_multiplier)
         #ENDIF
         
 
@@ -290,68 +297,41 @@ def _choose_magnus(hamiltonian, interpolation_policy, magnus_policy):
     hamiltonian :: (params :: numpy.ndarray, time :: float) -> hamiltonian :: numpy.ndarray
         - the time and parameter dependent hamiltonian
     Returns:
-    magnus :: (dt :: float, params :: np.ndarray, step :: int, time :: float)
-               -> magnus :: numpy.ndarray
-        - the magnus expansion
     dmagnus_dparams :: (dt :: float, params :: np.ndarray, step :: int, time :: float)
                        -> (dmagnus_dparams :: numpy.ndarray, indices :: numpy.ndarray,
                            magnus :: numpy.ndarray)
         - the gradient of the magnus expansion with respect to the parameters--including only
           nonzero gradients, the indices of parameters in the params array with nonzero gradients,
           and the magnus expansion
+    magnus :: (dt :: float, params :: np.ndarray, step :: int, time :: float)
+               -> magnus :: numpy.ndarray
+        - the magnus expansion
+    magnus_param_indices :: (dt :: float, params :: np.ndarray, step :: int, time :: float)
+                             -> magnus_param_indices :: numpy.ndarray
+        - This function returns the indices of params that should be passed to magnus
+          and dmagnus_dparams
     """
     if interpolation_policy == InterpolationPolicy.LINEAR:
         if magnus_policy == MagnusPolicy.M2:
             magnus = lambda *args, **kwargs: magnus_m2_linear(hamiltonian, *args, **kwargs)
-            param_indices = (lambda *args, **kwargs:
-                             magnus_m2_linear_param_indices(hamiltonian, *args, **kwargs))
+            magnus_param_indices = (lambda *args, **kwargs:
+                                    magnus_m2_linear_param_indices(hamiltonian, *args, **kwargs))
         elif magnus_policy == MagnusPolicy.M4:
             magnus = lambda *args, **kwargs: magnus_m4_linear(hamiltonian, *args, **kwargs)
-            param_indices = (lambda *args, **kwargs:
-                             magnus_m4_linear_param_indices(hamiltonian, *args, **kwargs))
+            magnus_param_indices = (lambda *args, **kwargs:
+                                    magnus_m4_linear_param_indices(hamiltonian, *args, **kwargs))
         else:
             magnus = lambda *args, **kwargs: magnus_m6_linear(hamiltonian, *args, **kwargs)
-            param_indices = (lambda *args, **kwargs:
-                             magnus_m6_linear_param_indices(hamiltonian, *args, **kwargs))
+            magnus_param_indices = (lambda *args, **kwargs:
+                                    magnus_m6_linear_param_indices(hamiltonian, *args, **kwargs))
     #ENDIF
-
-    # This mostly follows autograd's definition of the jacobian function
-    # https://github.com/HIPS/autograd/blob/master/autograd/differential_operators.py
-    # but adds reshaping of the gradients and specifying param indices.
-    @unary_to_nary
+    
+    magnus_wrapper = lambda *args, **kwargs: anp.real(magnus(*args, **kwargs))
     def dmagnus_dparams(*args, **kwargs):
-        vjp, _magnus = _make_vjp(magnus, 1)(*args, **kwargs)
-        ans_vspace = vspace(ans)
-        jacobian_shape = ans_vspace.shape + vspace(x).shape
-        _dmagnus_dparams = map(vjp, ans_vspace.standard_basis())
-        old_axes = np.arange(len(grads.shape))
-        new_axes = np.roll(old_axes, -1)
+        _magnus, _dmagnus_dparams = ans_jacobian(magnus_wrapper, 1)(*args, **kwargs)
+        old_axes = np.arange(len(_dmagnus_dparams.shape))
+        new_axes = np.roll(old_axes, -2)
         return (np.moveaxis(_dmagnus_dparams, old_axes, new_axes),
-                param_indices(*args, **kwargs),
                 _magnus)
 
-    return magnus, dmagnus_dparams
-
-
-def _evaluate_dmagnus(magnus, *args, **kwargs):
-    """
-    Get the magnus expansion, its jacobian, and the indices of all parameters in the
-    parameters argument of magnus that have nonzero jacobians.
-    
-    Args:
-    magnus :: (params :: numpy.ndarray, time :: float, dt :: float) -> magnus :: numpy.ndarray
-        - the magnus expansion
-    args :: any - the arguments to magnus
-    kwargs :: any - the keyword arguments to magnus
-    Returns:
-    evalute_dmagnus :: (params :: numpy.ndarray, time :: float, dt :: float)
-                               -> (magnus :: numpy.ndarray,
-                                   dmagnus_dparams :: numpy.ndarray)
-    """
-    vjp, ans = _make_vjp(fun, x)
-    ans_vspace = vspace(ans)
-    jacobian_shape = ans_vspace.shape + vspace(x).shape
-    grads = map(vjp, ans_vspace.standard_basis())
-    old_axes = np.arange(len(grads.shape))
-    new_axes = np.roll(old_axes, -1)
-    return ans, np.moveaxis(grads, old_axes, new_axes)
+    return dmagnus_dparams, magnus, magnus_param_indices

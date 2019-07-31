@@ -75,7 +75,7 @@ class ForbidStates(Cost):
             state = states[i]
             state_cost = 0
             for forbidden_state_dagger in state_forbidden_states_dagger:
-                state_cost = cost + anp.abs(anp.matmul(forbidden_state_dagger, state))
+                state_cost = cost + anp.abs(anp.matmul(forbidden_state_dagger, state)[0,0])
             #ENDFOR
             cost = cost + state_cost * self.state_normalization_constants[i]
         #ENDFOR

@@ -11,6 +11,7 @@ e refers to the control parameters
 
 from copy import copy
 import os
+import time
 
 import autograd.numpy as anp
 from autograd import elementwise_grad
@@ -19,7 +20,8 @@ import numpy as np
 import scipy.linalg as la
 
 from qoc.models import (MagnusPolicy, OperationPolicy, GrapeSchroedingerPolicy,
-                        GrapeSchroedingerDiscreteState, GrapeResult, EvolveResult)
+                        GrapeSchroedingerDiscreteState, GrapeResult, EvolveResult,
+                        InterpolationPolicy)
 from qoc.standard import (Adam, TargetInfidelity, ForbidStates, expm)
 from qoc.util import (PAULI_X, PAULI_Y, conjugate_transpose,
                       matrix_to_column_vector_list, matmuls)
@@ -89,11 +91,12 @@ def grape_schroedinger_discrete(hamiltonian, initial_states,
     result :: qoc.models.grapestate.GrapeResult - the result of the optimization
     """
     # Initialize parameters.
-    params, max_param_amplitudes = _initialize_params(initial_params,
-                                                      max_param_amplitudes,
-                                                      pulse_time,
-                                                      pulse_step_count,
-                                                      param_count)
+    initial_params, max_param_amplitudes = _initialize_params(initial_params,
+                                                              max_param_amplitudes,
+                                                              pulse_time,
+                                                              pulse_step_count,
+                                                              param_count)
+    
     # Initialize optimizer.
     optimizer.initialize((pulse_step_count, param_count))
     
@@ -113,9 +116,13 @@ def grape_schroedinger_discrete(hamiltonian, initial_states,
     gstate.save_initial(initial_states, params)
 
     if gstate.grape_schroedinger_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
-        states, params, error, _ = _grape_schroedinger_discrete_time(gstate, initial_states, params)
+        error, grads, params, states = _grape_schroedinger_discrete_time(gstate,
+                                                                     initial_states,
+                                                                     initial_params,)
     else:
-        states, params, error, _ = _grape_schroedinger_discrete_memory(gstate, initial_states, params)
+        error, grads, params, states = _grape_schroedinger_discrete_memory(gstate,
+                                                                       initial_states,
+                                                                       initial_params)
 
     return GrapeResult(states, params, error)
 
@@ -206,25 +213,27 @@ def _grape_schroedinger_discrete_time(gstate, initial_states, params):
     dt = gstate.pulse_time / final_step_index
     cost_count = len(gstate.costs)
     step_cost_count = len(gstate.step_costs)
-    states_count = len(initial_states)
+    state_count = len(initial_states)
 
     # Allocate memory.
     unitaries = np.zeros((final_step_index + 1, gstate.hilbert_size, gstate.hilbert_size),
                          dtype=np.complex128)
     dunitaries_dmagnus = np.zeros((final_step_index + 1, gstate.hilbert_size, gstate.hilbert_size),
                                   dtype=np.complex128)
-    states_cache = np.zeros((final_step_index + 1, states_count, gstate.hilbert_size, 1),
+    states_cache = np.zeros((final_step_index + 1, state_count, gstate.hilbert_size, 1),
                             dtype=np.complex128)
-    cost_propagators = np.zeros((cost_count, states_count, 1, gstate.hilbert_size),
+    dcosts_dstates = np.zeros((cost_count, state_count, 1, gstate.hilbert_size),
                                 dtype=np.complex128)
-    step_cost_propagators = np.zeros((final_step_index + 1, step_cost_count,
-                                      states_count, 1, gstate.hilbert_size),
+    dstep_costs_dstates = np.zeros((final_step_index + 1, step_cost_count,
+                                      state_count, 1, gstate.hilbert_size),
                                      dtype=np.complex128)
     for i in range(gstate.iteration_count):
         # Reset accumulators.
         states = initial_states
         error = np.zeros(cost_count)
-        grads = np.zeros_like(params)
+        grads = np.zeros_like(params, dtype=np.complex128)
+        # print("grads.shape:{}"
+        #       "".format(grads.shape))
         
         # Evolve states and compute costs.
         for j in range(final_step_index + 1):
@@ -233,8 +242,15 @@ def _grape_schroedinger_discrete_time(gstate, initial_states, params):
             t = j * dt
 
             # Evolve states.
-            h = gstate.magnus(params, j, t, dt)
-            unitaries[j], dunitaries_dmagnus[j] = la.expm_frechet(-1j * h, h)
+            magnus_param_indices = gstate.magnus_param_indices(dt, params, j, t, final_step)
+            magnus_params = np.take(params, magnus_param_indices, axis=0)
+            # If only one set of params was taken, wrap it in another dimension.
+            if magnus_params.ndim == 1:
+                magnus_params = np.expand_dims(magnus_params, axis=0)
+            # print("magnus_params.shape:{}\nmagnus_params:\n{}"
+            #       "".format(magnus_params.shape, magnus_params))
+            magnus = gstate.magnus(dt, magnus_params, j, t, final_step)
+            unitaries[j], dunitaries_dmagnus[j] = la.expm_frechet(-1j * magnus, magnus)
             states = np.matmul(unitaries[j], states)
             states_cache[j] = states
 
@@ -243,12 +259,12 @@ def _grape_schroedinger_discrete_time(gstate, initial_states, params):
             if final_step:
                 for k, cost in enumerate(gstate.costs):
                     error[k] += cost.cost(params, states, j)
-                    cost_propagators[k] = cost.dcost_dstates(params, states, j)
+                    dcosts_dstates[k] = cost.dcost_dstates(params, states, j)
                     grads += cost.dcost_dparams(params, states, j)
             else:
                 for k, step_cost in enumerate(gstate.step_costs):
                     error[gstate.step_cost_indices[k]] += step_cost.cost(params, states, j)
-                    step_cost_propagators[j][k] = step_cost.dcost_dstates(params, states, j)
+                    dstep_costs_dstates[j][k] = step_cost.dcost_dstates(params, states, j)
         #ENDFOR
 
         # Compute gradients and devolve cost propagators.
@@ -256,40 +272,82 @@ def _grape_schroedinger_discrete_time(gstate, initial_states, params):
             first_step = j == 0
             pulse_step_index, pulse_step_remainder = np.divmod(j, gstate.system_step_multiplier)
             t = j * dt
+            # Grab the states that are one step before this step.
             if first_step:
                 states = initial_states
             else:
                 states = states_cache[j - 1]
-            active_step_cost_indices = final_step_index - np.arange(j - final_step_index)
-            
+            # Only step cost propagators that were computed at this time step or a later one
+            # need to be backpropagated and have gradients calculated.
+            active_step_cost_indices = final_step_index - 1 - np.arange(final_step_index - j)
+            dstep_costs_dstates_active = np.take(dstep_costs_dstates,
+                                                 active_step_cost_indices, axis=0)
+            if dstep_costs_dstates_active.ndim == 4:
+                dstep_costs_dstates_active = np.expand_dims(dstep_costs_dstates_active,
+                                                            axis=0)
+
             # Compute gradients.
-            dmagnus_dparams, param_indices, _ = gstate.dmagnus_dparams(t, params, j, dt)
+            dmagnus_dparams, magnus = gstate.dmagnus_dparams(t, magnus_params, j, dt, final_step)
+            # print("magnus.shape:{}\nmagnus:\n{}"
+            #       "".format(magnus.shape, magnus))
+            # print("dmagnus_dparams.shape:{}\ndmagnus_dparams:\n{}"
+            #       "".format(dmagnus_dparams.shape, dmagnus_dparams))
+            # print("dunitary_dmagnus.shape:{}\ndunitary_dmagnus:\n{}"
+            #       "".format(dunitaries_dmagnus[j].shape, dunitaries_dmagnus[j]))
             dunitary_dparams = np.matmul(dunitaries_dmagnus[j], dmagnus_dparams)
-            grads += matmuls()
-            for state_cost_propagators in cost_propagators:
-                for k, state_cost_propagator in enumerate(state_cost_propagators):
-                    grads += matmuls(state_cost_propagator, dunitary_dparams, states[k])
-            #ENDFOR
-            for k in active_step_cost_indices:
-                for state_step_cost_propagators in step_cost_propagators[k]:
-                    for l, state_step_cost_propagator in state_step_cost_propagators:
-                        grads += matmuls(state_step_cost_propagator, dunitary_dparams, states[l])
-            #ENDFOR
+            # print("dunitary_dparams.shape:{}\ndunitary_dparams:\n{}"
+            #       "".format(dunitary_dparams.shape, dunitary_dparams))
+            # print("states.shape:{}\nstates:\n{}"
+            #       "".format(states.shape, states))
+            dstates_dparams = np.stack([np.matmul(dunitary_dparams, state)
+                                        for state in states], axis=0)
+            # print("dstates_dparams.shape:{}\ndstates_dparams:\n{}"
+            #       "".format(dstates_dparams.shape, dstates_dparams))
+
+            # Sum the cost gradients over each state and cost function.
+            dcost_dparams = np.sum(np.stack([np.matmul(dcosts_dstates[k][l],
+                                                       dstates_dparams[l])
+                                             for l in range(state_count)
+                                             for k in range(cost_count)],
+                                            axis=0),
+                                    axis=0)
+            # Get the value out of the inner product.
+            dcost_dparams = dcost_dparams[:,:,0,0]
+            # print("dcost_dparams.shape:{}\ndcost_dparams:\n{}"
+            #       "".format(dcost_dparams.shape, dcost_dparams))
+            # Sum the step cost gradients over each state, step cost function, and active
+            # time step.
+            if active_step_cost_indices.size != 0:
+                dstep_cost_dparams = np.sum(np.stack([np.matmul(dstep_costs_dstates[k][l][m],
+                                                                dstates_dparams[m])
+                                                      for m in range(state_count)
+                                                      for l in range(step_cost_count)
+                                                      for k in active_step_cost_indices],
+                                                     axis=0),
+                                            axis=0)
+                dstep_cost_dparams = dstep_cost_dparams[:,:,0,0]
+                # print("dstep_cost_dparams.shape:{}\ndstep_cost_dparams:\n{}"
+                #       "".format(dstep_cost_dparams.shape, dstep_cost_dparams))
+            for k, param_index in enumerate(magnus_param_indices):
+                # print("k:{}, param_index:{}, dcost_dparams:\n{}"
+                #       "".format(k, param_index, dcost_dparams))
+                grads[param_index] += dcost_dparams[k]
+                if active_step_cost_indices.size != 0:
+                    # print("param_index:{}, k:{}, dstep_dcost_dparams[k]:\n{}"
+                    #       "".format(param_index, k, dstep_cost_dparams[k]))
+                    grads[param_index] += dstep_cost_dparams[k]
 
             # Devolve cost propagators.
-            unitary = unitaries[j]
-            for k, state_cost_propagators in enumerate(cost_propagators):
-                for l, state_cost_propagator in enumerate(state_cost_propagators):
-                    cost_propagators[k][l] = np.matmul(state_cost_propagator, unitary)
-            for k in active_step_cost_indices:
-                for l, state_step_cost_propagators in enumerate(step_cost_propagators[k]):
-                    for m, state_step_cost_propagator in enumerate(state_step_cost_propagators):
-                        step_cost_propagators[k][l][m] = np.matmul(state_step_cost_propagator, unitary)
-            #ENDFOR
+            if not first_step:
+                unitary = unitaries[j]
+                dcosts_dstates = np.matmul(dcosts_dstates, unitary)
+                dstep_costs_dstates[active_step_cost_indices,] = np.matmul(dstep_costs_dstates[active_step_cost_indices,], unitary)
+            #ENDIF
         #ENDFOR
+        #TODO: Log and Save
     #ENDFOR
 
-    return states, error, params, grads
+    return error, grads, params, states_cache[final_step_index]
 
 
 def _grape_schroedinger_discrete_memory(gstate, states, params):
@@ -338,6 +396,7 @@ def _initialize_params(initial_params, max_param_amplitudes,
     if initial_params == None:
         params = _gen_params_cos(pulse_time, pulse_step_count, param_count,
                                  max_param_amplitudes)
+        params = params + 1j * params
     else:
         # If the user specified initial params, check that they conform to
         # max param amplitudes.
@@ -374,6 +433,7 @@ def _gen_params_cos(pulse_time, pulse_step_count, param_count,
     period = np.divide(pulse_step_count, periods)
     b = np.divide(2 * np.pi, period)
     params = np.zeros((pulse_step_count, param_count))
+    
     # Create a wave for each parameter over all time
     # and add it to the parameters.
     for i in range(param_count):
@@ -411,22 +471,28 @@ def _grape_schroedinger_discrete_compute(gstate, states, params):
         t = j * dt
 
         # Evolve.
-        if final_step:
-            h = gstate.magnus(params, pulse_step_index, t, dt, sentinel=True)
-        else:
-            h = gstate.magnus(params, pulse_step_index, t, dt)
+        # print("j: {}"
+        #       "".format(j))
+        magnus_param_indices = gstate.magnus_param_indices(dt, params, j, t, final_step)
+        # print("magnus_param_indices:\n{}"
+        #       "".format(magnus_param_indices))
+        magnus_params = params[magnus_param_indices,]
+        if magnus_params.ndim == 1:
+            magnus_params = np.expand_dims(magnus_params, axis=0)
+        # print("magnus_params:\n{}"
+        #       "".format(magnus_params))
+        h = gstate.magnus(dt, magnus_params, j, t, final_step)
         u = expm(-1j * h)
-        states = [anp.matmul(u, state) for state in states]
+        states = anp.matmul(u, states)
         
         # Compute cost.
         if final_step:
-            for cost in gstate.costs:
-                total_error = total_error + cost.cost(states, j, params)
+            for k, cost in enumerate(gstate.costs):
+                total_error = total_error + cost.cost(params, states, j)
         else:
-            for step_cost in gstate.step_costs:
-                total_error = total_error + step_cost.cost(states, j, params)
+            for k, step_cost in enumerate(gstate.step_costs):
+                total_error = total_error + step_cost.cost(params, states, j)
     #ENDFOR
-
     return total_error
 
 
@@ -445,12 +511,12 @@ def _test():
                                      + anp.conjugate(params[0]) * _hamiltonian_dagger)
     magnus_policy = MagnusPolicy.M2
     hilbert_size = 4
-    states = matrix_to_column_vector_list(np.eye(hilbert_size, dtype=np.complex128))
+    initial_states = matrix_to_column_vector_list(np.eye(hilbert_size, dtype=np.complex128))
     forbidden_states = ([[(1 / np.sqrt(2)) * np.array([[0], [0], [1], [1]], dtype=np.complex128)]]
-                        * len(states))
+                        * len(initial_states))
     target_states = matrix_to_column_vector_list(np.eye(hilbert_size, dtype=np.complex128))
     pulse_time = 10
-    pulse_step_count = 10
+    pulse_step_count = 1000
     system_step_multiplier = 1
     step_count = (pulse_step_count - 1) * system_step_multiplier + 1
     costs = [TargetInfidelity(target_states),
@@ -460,33 +526,52 @@ def _test():
     optimizer = Adam()
     optimizer.initialize((pulse_step_count, param_count))
     operation_policy = OperationPolicy.CPU
+    interpolation_policy = InterpolationPolicy.LINEAR
     log_iteration_step = 0
     save_iteration_step = 0
     save_path = None
     save_file_name = None
     grape_schroedinger_policy = GrapeSchroedingerPolicy.TIME_EFFICIENT
-    params, max_param_amplitudes = _initialize_params(None, None, pulse_time,
-                                                      pulse_step_count, param_count)
-    gstate = GrapeSchroedingerDiscreteState(costs, iteration_count,
-                                                 max_param_amplitudes,
-                                                 pulse_time, pulse_step_count,
-                                                 optimizer, operation_policy,
-                                                 hilbert_size,
-                                                 log_iteration_step,
-                                                 save_iteration_step,
-                                                 save_path, save_file_name,
-                                                 hamiltonian, magnus_policy,
-                                                 param_count, system_step_multiplier,
-                                                 grape_schroedinger_policy)
-    err = grads = None
-    states, params, error, grads =  _grape_schroedinger_discrete_time(gstate, states, params)
+    initial_params, max_param_amplitudes = _initialize_params(None, None, pulse_time,
+                                                              pulse_step_count, param_count)
+    # print("initial_params.shape:{}\ninitial_params:\n{}"
+    #       "".format(initial_params.shape, initial_params))
+    gstate = GrapeSchroedingerDiscreteState(costs, grape_schroedinger_policy,
+                                            hamiltonian, hilbert_size,
+                                            interpolation_policy,
+                                            iteration_count,
+                                            log_iteration_step,
+                                            magnus_policy,
+                                            max_param_amplitudes,
+                                            operation_policy,
+                                            optimizer,
+                                            param_count,
+                                            pulse_step_count,
+                                            pulse_time,
+                                            save_file_name,
+                                            save_iteration_step,
+                                            save_path,
+                                            system_step_multiplier,)
+    g2_start_time = time.perf_counter()
+    g2_error, g2_grads, g2_params, g2_states =  _grape_schroedinger_discrete_time(gstate,
+                                                                                  initial_states,
+                                                                                  initial_params)
+    g2_end_time = time.perf_counter()
+    g2_run_time = g2_end_time - g2_start_time
+    g2_total_error = np.sum(g2_error, axis=0)
+    print("g2_run_time:{}, g2_total_error:{}\ng2_error:\n{}\ng2_grads:\n{}\n"
+          "g2_params:{}\ng2_states:\n{}"
+          "".format(g2_run_time, g2_total_error, g2_error, g2_grads,
+                    g2_params, g2_states))
+    
+    ag_start_time = time.perf_counter()
+    ag_grads = (elementwise_grad(_grape_schroedinger_discrete_compute, 2)
+                (gstate, initial_states, initial_params))
+    ag_end_time = time.perf_counter()
+    ag_run_time = ag_end_time - ag_start_time
+    print("ag_run_time:{}, ag_total_error:\nag_grads:\n{}"
+          "".format(ag_run_time, ag_grads))
 
-    err_compute = _grape_schroedinger_discrete_compute(gstate, states, params)
-    grads_autograd = None
-    grads_autograd = (elementwise_grad(_grape_schroedinger_discrete_compute, 2)
-                      (gstate, states, params))
-    print("err: {}\ngrads:\n{}\nerr_compute: {}\ngrads_autograd:\n{}"
-          "".format(err, grads, err_compute, grads_autograd))
     # assert(np.allclose(grads, grads_autograd))
 
     

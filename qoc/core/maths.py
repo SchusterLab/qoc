@@ -100,6 +100,8 @@ def magnus_m2_linear(hamiltonian, dt, params, step, t, sentinel=False):
                     -> hamiltonian :: np.ndarray
         - the hamiltonian to expand
     params :: numpy.ndarray - time discrete parameters for the hamiltonian
+        which should be those params from the total parameters array with
+        indices specified by magnus_m2_linear_param_indices
     step :: int - an index into the params array about which to expand
                   the hamiltonian
     t :: float - the time at which the hamiltonian is being expanded
@@ -108,16 +110,23 @@ def magnus_m2_linear(hamiltonian, dt, params, step, t, sentinel=False):
     Returns:
     magnus :: numpy.ndarray - the m2 magnus expansion of the sytem hamiltonian
     """
-    return magnus_m2(hamiltonian(params[step], t), dt)
+    return magnus_m2(hamiltonian(params[0], t), dt)
 
 
 def magnus_m2_linear_param_indices(hamiltonian, dt, params, step, t, sentinel=False):
     """
+    The point of this paradigm is to figure out which params should be sent to
+    the magnus expansion to be used for interpolation. That way, we only have to calculate
+    the gradient of the magnus expansion with respect to the params used. However,
+    we still keep the abstraction that any number of params may be used. In practice,
+    we expect that only a few of the params near the step indexed into params will
+    be used. Therefore, we expect to save memory and time.
     Args: see magnus_m2_linear
     Returns:
-    indices :: numpy.ndarray - the indices of params that were used in interpolation
+    indices :: numpy.ndarray - the indices of params that will be
+        used in interpolation
     """
-    return np.array(step)
+    return np.array([step])
 
 
 def magnus_m4_linear(hamiltonian, dt, params, step, t, sentinel=False):
@@ -132,6 +141,8 @@ def magnus_m4_linear(hamiltonian, dt, params, step, t, sentinel=False):
                     -> hamiltonian :: np.ndarray
         - the hamiltonian to expand
     params :: numpy.ndarray - time discrete parameters for the hamiltonian
+        which should be those params from the total parameters array with
+        indices specified by magnus_m4_linear_param_indices
     step :: int - an index into the params array about which to expand
                   the hamiltonian
     t :: float - the time at which the hamiltonian is being expanded
@@ -145,13 +156,13 @@ def magnus_m4_linear(hamiltonian, dt, params, step, t, sentinel=False):
 
     # Interpolate parameters.
     if sentinel:
-        params_left = params[step - 1]
-        params_right = params[step]
+        params_left = params[0] # step - 1
+        params_right = params[1] # step
         params1 = interpolate_linear(params_left, params_right, t - dt, t, t1)
         params2 = interpolate_linear(params_left, params_right, t - dt, t, t2)
     else:
-        params_left = params[step]
-        params_right = params[step + 1]
+        params_left = params[0] # step
+        params_right = params[1] # step + 1
         params1 = interpolate_linear(params_left, params_right, t, t + dt, t1)
         params2 = interpolate_linear(params_left, params_right, t, t + dt, t2)
 
@@ -166,12 +177,13 @@ def magnus_m4_linear_param_indices(hamiltonian, dt, params, step, t, sentinel=Fa
     """
     Args: see magnus_m4_linear
     Returns:
-    indices :: numpy.ndarray - the indices of params that were used in interpolation
+    indices :: numpy.ndarray - the indices of params that will be used
+        in interpolation
     """
     if sentinel:
-        return np.array(step -1, step)
+        return np.array([step - 1, step])
     else:
-        return np.array(step, step + 1)
+        return np.array([step, step + 1])
 
 
 def magnus_m6_linear(hamiltonian, dt, params, step, t, sentinel=False):
@@ -186,6 +198,8 @@ def magnus_m6_linear(hamiltonian, dt, params, step, t, sentinel=False):
                     -> hamiltonian :: np.ndarray
         - the hamiltonian to expand
     params :: numpy.ndarray - time discrete parameters for the hamiltonian
+        which should be those params from the total parameters array with
+        indices specified by magnus_m6_linear_param_indices
     step :: int - an index into the params array about which to expand
                   the hamiltonian
     t :: float - the time at which the hamiltonian is being expanded
@@ -200,14 +214,14 @@ def magnus_m6_linear(hamiltonian, dt, params, step, t, sentinel=False):
 
     # Interpolate parameters.
     if sentinel:
-        params_left = params[step - 1]
-        params_right = params[step]
+        params_left = params[0] # step - 1
+        params_right = params[1] # step
         params1 = interpolate_linear(params_left, params_right, t - dt, t, t1)
         params2 = interpolate_linear(params_left, params_right, t - dt, t, t2)
         params2 = interpolate_linear(params_left, params_right, t - dt, t, t3)
     else:
-        params_left = params[step]
-        params_right = params[step + 1]
+        params_left = params[0] # step
+        params_right = params[1] # step + 1
         params1 = interpolate_linear(params_left, params_right, t, t + dt, t1)
         params2 = interpolate_linear(params_left, params_right, t, t + dt, t2)
         params2 = interpolate_linear(params_left, params_right, t, t + dt, t3)
@@ -224,12 +238,13 @@ def magnus_m6_linear_param_indices(hamiltonian, dt, params, step, t, sentinel=Fa
     """
     Args: see magnus_m6_linear
     Returns:
-    indices :: numpy.ndarray - the indices of params that were used in interpolation
+    indices :: numpy.ndarray - the indices of params that will be used
+        in interpolation
     """
     if sentinel:
-        return np.array(step -1, step)
+        return np.array([step - 1, step])
     else:
-        return np.array(step, step + 1)
+        return np.array([step, step + 1])
 
 
 ### MODULE TESTS ###
