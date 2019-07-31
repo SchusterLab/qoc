@@ -50,13 +50,13 @@ class Adam(Optimizer):
         self.gradient_square_moment = np.zeros(params_shape)
 
 
-    def update(self, params, grads):
+    def update(self, grads, params):
         """Update the learning parameters for the current iteration.
         Args:
-        params :: numpy.ndarray - the learning parameters for the
-            current iteration
         grads :: numpy.ndarray - the gradients of the cost function with
             respect to each learning parameter for the current iteration
+        params :: numpy.ndarray - the learning parameters for the
+            current iteration
         Returns:
         new_params :: numpy.ndarray - the learning parameters to be used
             for the next iteration
@@ -70,9 +70,29 @@ class Adam(Optimizer):
                                         1 - np.power(self.beta_1, self.iteration_count))
         gradient_square_moment_hat = np.divide(self.gradient_square_moment,
                                                1 - np.power(self.beta_2, self.iteration_count))
-        return params - learning_rate * np.divide(gradient_moment_hat,
-                                                  np.sqrt(gradient_square_moment_hat)
-                                                  * self.epsilon)
+        return params - self.learning_rate * np.divide(gradient_moment_hat,
+                                                       np.sqrt(gradient_square_moment_hat)
+                                                       + self.epsilon)
+
+
+### MODULE TESTS ###
+
+def _test():
+    """
+    Run tests on the module.
+    """
+    # These are hand checked tests.
+    adam = Adam()
+    params = np.reshape(np.arange(5), (2, 2))
+    adam.initialize(params.shape)
+    grads = np.ones(params.shape)
+    expected_params = np.array([[],
+                                []])
+    assert(adam.update(grads, params))
+    
+
+if __name__ == "__main__":
+    _test()
         
         
         

@@ -59,6 +59,6 @@ class TargetInfidelity(Cost):
         """
         return (self.alpha
                 * (1 - (anp.sum(anp.abs(anp.matmul(self.target_states_dagger,
-                                                   states)), axis=0)
+                                                   states))[:,0,0], axis=0)
                         / self.state_normalization_constant)))
 

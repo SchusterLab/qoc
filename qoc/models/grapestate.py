@@ -179,37 +179,100 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         self.system_step_multiplier = system_step_multiplier
 
 
-    def save_initial(self, initial_states, initial_params):
+    def log(self, error, grads, iteration):
         """
-        save all initial values to the save file
+        Log to stdout.
         Args:
-        initial_states :: numpy.ndarray - the initial states to propagate
-        initial_params :: numpy.ndarray - the initial parameters of optimization
+        error :: float - the optimization error
+        grads :: numpy.ndarray - the optimization gradients of error
+            with respect to params
+        iteration :: int - the optimization iteration
         Returns: none
         """
-        if self.save_iteration_step != 0:
-            with h5py.File(self.save_file_path, "w") as save_file:
-                save_file.create_dataset("cost_names",
-                                         data=["{}".format(cost) for cost in self.costs])
-                save_file.create_dataset("grape_schroedinger_policy",
-                                         data="{}".format(self.grape_schroedinger_policy))
-                save_file.create_dataset("initial_params", data=initial_params)
-                save_file.create_dataset("initial_states", data=initial_states)
-                save_file.create_dataset("interpolation_policy",
-                                         data="{}".format(self.interpolation_policy))
-                save_file.create_dataset("iteration_count", data=self.iteration_count)
-                save_file.create_dataset("magnus_policy",
-                                         data="{}".format(self.magnus_policy))
-                save_file.create_dataset("max_param_amplitudes",
-                                         data=self.max_param_amplitudes)
-                save_file.create_dataset("operation_policy",
-                                         data="{}".format(self.operation_policy))
-                save_file.create_dataset("optimizer", data="{}".format(self.optimizer))
-                save_file.create_dataset("param_count", data=self.param_count)
-                save_file.create_dataset("pulse_step_count", data=self.pulse_step_count)
-                save_file.create_dataset("pulse_time", data=self.pulse_time)
-                save_file.create_dataset("system_step_multiplier",
-                                         data=self.system_step_multiplier)
+        grads_norm = np.linalg.norm(grads)
+        print("{:05d} {:03.2f} {:03.2f}"
+              "".format(iteration, error, grads_norm))
+
+
+    def log_initial(self):
+        """
+        Log the initial header.
+        Args: none
+        Returns: none
+        """
+        print("iteration | error | grads |")
+
+
+    def save(self, error, grads, iteration, params, states):
+        """
+        Save to the save file.
+        Args:
+        error :: float - the optimization error
+        grads :: numpy.ndarray - the optimization gradients of error
+            with respect to params
+        iteration :: int - the optimization iteration
+        params :: numpy.ndarray - the optimization parameters
+        states :: numpy.ndarray - the evolved states for this
+            optimization iteration
+        Returns: none
+        """
+        save_step, _ = np.divmod(iteration, self.save_iteration_step)
+        
+        with h5py.File(self.save_file_path, "w") as save_file:
+            save_file["error"][save_step,] = error
+            save_file["grads"][save_step,] = grads
+            save_file["params"][save_step,] = params
+            save_file["states"][save_step,] = states
+
+
+    def save_initial(self, initial_params, initial_states):
+        """
+        Save all initial values to the save file.
+        Create necessary data sets.
+        Args:
+        initial_params :: numpy.ndarray - the initial parameters of optimization
+        initial_states :: numpy.ndarray - the initial states to propagate
+        Returns: none
+        """
+        save_count, _ = np.divmod(self.iteration_count, self.save_iteration_step)
+        state_count = len(initial_states)
+        
+        with h5py.File(self.save_file_path, "w") as save_file:
+            save_file.create_dataset("cost_names",
+                                     data=["{}".format(cost) for cost in self.costs])
+            save_file.create_dataset("error", (save_count), dtype=np.float64)
+            save_file.create_dataset("grads", (save_count,
+                                               self.pulse_step_count,
+                                               self.param_count),
+                                     dtype=np.complex128)
+            save_file.create_dataset("grape_schroedinger_policy",
+                                     data="{}".format(self.grape_schroedinger_policy))
+            save_file.create_dataset("initial_params", data=initial_params)
+            save_file.create_dataset("initial_states", data=initial_states)
+
+            save_file.create_dataset("interpolation_policy",
+                                     data="{}".format(self.interpolation_policy))
+            save_file.create_dataset("iteration_count", data=self.iteration_count)
+            save_file.create_dataset("magnus_policy",
+                                     data="{}".format(self.magnus_policy))
+            save_file.create_dataset("max_param_amplitudes",
+                                     data=self.max_param_amplitudes)
+            save_file.create_dataset("operation_policy",
+                                     data="{}".format(self.operation_policy))
+            save_file.create_dataset("optimizer", data="{}".format(self.optimizer))
+            save_file.create_dataset("params", (save_count,
+                                                self.pulse_step_count,
+                                                self.param_count),
+                                     dtype=np.complex128)
+            save_file.create_dataset("param_count", data=self.param_count)
+            save_file.create_dataset("pulse_step_count", data=self.pulse_step_count)
+            save_file.create_dataset("pulse_time", data=self.pulse_time)
+            save_file.create_dataset("states", (save_count,
+                                                state_count, 1,
+                                                self.hilbert_size),
+                                     dtype=np.complex128)
+            save_file.create_dataset("system_step_multiplier",
+                                     data=self.system_step_multiplier)
         #ENDIF
         
 
@@ -217,18 +280,18 @@ class GrapeResult(object):
     """
     a class to encapsulate the results of a GRAPE optimization
     Fields:
-    states :: [numpy.ndarray] - the resultant, evolved final states
+    error :: numpy.ndarray - the final total optimization error
     params :: numpy.ndarray - the resultant, optimized params
-    error :: numpy.ndarray - the final error of each cost function
+    states :: numpy.ndarray - the resultant, evolved final states
     """
-    def __init__(self, _states, params, error):
+    def __init__(self, error, params, states):
         """
         See class definition for argument specifications.
         """
         super().__init__()
-        self.states = states
-        self.params = params
         self.error = error
+        self.params = params
+        self.states = states
 
         
 class EvolveResult(object):
@@ -313,17 +376,22 @@ def _choose_magnus(hamiltonian, interpolation_policy, magnus_policy):
     """
     if interpolation_policy == InterpolationPolicy.LINEAR:
         if magnus_policy == MagnusPolicy.M2:
-            magnus = lambda *args, **kwargs: magnus_m2_linear(hamiltonian, *args, **kwargs)
+            magnus = (lambda *args, **kwargs:
+                      magnus_m2_linear(hamiltonian, *args, **kwargs))
             magnus_param_indices = (lambda *args, **kwargs:
                                     magnus_m2_linear_param_indices(hamiltonian, *args, **kwargs))
         elif magnus_policy == MagnusPolicy.M4:
-            magnus = lambda *args, **kwargs: magnus_m4_linear(hamiltonian, *args, **kwargs)
+            magnus = (lambda *args, **kwargs:
+                      magnus_m4_linear(hamiltonian, *args, **kwargs))
             magnus_param_indices = (lambda *args, **kwargs:
-                                    magnus_m4_linear_param_indices(hamiltonian, *args, **kwargs))
+                                    magnus_m4_linear_param_indices(hamiltonian,
+                                                                   *args, **kwargs))
         else:
-            magnus = lambda *args, **kwargs: magnus_m6_linear(hamiltonian, *args, **kwargs)
+            magnus = (lambda *args, **kwargs:
+                      magnus_m6_linear(hamiltonian, *args, **kwargs))
             magnus_param_indices = (lambda *args, **kwargs:
-                                    magnus_m6_linear_param_indices(hamiltonian, *args, **kwargs))
+                                    magnus_m6_linear_param_indices(hamiltonian,
+                                                                   *args, **kwargs))
     #ENDIF
     
     magnus_wrapper = lambda *args, **kwargs: anp.real(magnus(*args, **kwargs))

@@ -8,7 +8,7 @@ from autograd.extend import vspace
 
 import numpy as np
 
-# autograd extensions
+### AUTOGRAD EXTENSIONS ###
 
 make_vjp = unary_to_nary(_make_vjp)
 

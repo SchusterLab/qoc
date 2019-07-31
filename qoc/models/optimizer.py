@@ -32,14 +32,14 @@ class Optimizer(object):
         pass
 
 
-    def update(self, params, grads):
+    def update(self, grads, params):
         """Update the learning parameters for the current iteration.
         Args:
-        params :: numpy.ndarray - the learning parameters for the current
-                                  iteration
         grads :: numpy.ndarray - the gradients of the cost function with respect
                                  to each learning parameter for the current
                                  iteration
+        params :: numpy.ndarray - the learning parameters for the current
+                                  iteration
         Returns:
         new_params :: numpy.ndarray - the learning parameters to be used for the
                                       next iteration
