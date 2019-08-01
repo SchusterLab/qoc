@@ -4,6 +4,8 @@ main module but should also be exposed to the user
 """
 
 from qoc.util.mathutil import (PAULI_X, PAULI_Y, PAULI_Z,
+                               get_annihilation_operator,
+                               get_creation_operator,
                                commutator, krons, matmuls,
                                conjugate_transpose,
                                column_vector_list_to_matrix,
@@ -14,6 +16,8 @@ from qoc.util.extend import ans_jacobian
 
 __all__ = [
     "PAULI_X", "PAULI_Y", "PAULI_Z",
+    "get_annihilation_operator",
+    "get_creation_operator",
     "commutator", "krons", "matmuls",
     "conjugate_transpose",
     "column_vector_list_to_matrix",

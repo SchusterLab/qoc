@@ -6,6 +6,7 @@ optimization algorithm
 import os
 
 import autograd.numpy as anp
+from autograd.extend import Box
 import numpy as np
 import scipy.linalg as la
 
@@ -160,8 +161,9 @@ def _grape_schroedinger_discrete_time(gstate, params, states):
         # to params.
         total_error, grads = _gsd_compute_ans_jac(gstate, params,
                                                   reporter, states)
-        # Remove states from autograd array box.
-        reporter.states = reporter.states._value
+        # Remove states from autograd box.
+        if isinstance(reporter.states, Box):
+            reporter.states = reporter.states._value
 
         # Log and save progress.
         if (gstate.log_iteration_step != 0
@@ -177,6 +179,7 @@ def _grape_schroedinger_discrete_time(gstate, params, states):
             params = real_imag_to_complex_vec(
                 gstate.optimizer.update(complex_to_real_imag_vec(grads),
                                         complex_to_real_imag_vec(params)))
+            _clip_params(gstate.max_param_amplitudes, params)
     #ENDFOR
     return total_error, grads, params, reporter.states
 
@@ -331,7 +334,23 @@ def _gen_params_cos(pulse_time, pulse_step_count, param_count,
         params[:, i] = _params
     #ENDFOR
 
-    return params
+    return params + 1j * params
+
+
+def _clip_params(max_param_amplitudes, params):
+    """
+    Me: I need a little taken off the top.
+    Barber: Say no more.
+    Args:
+    max_param_amplitudes :: numpy.ndarray - an array, shaped like
+        the params at each axis0 position, that specifies the maximum
+        absolute value of the parameters
+    params :: numpy.ndarray - the parameters to be clipped
+    Returns: none
+    """
+    for i in range(params.shape[1]):
+        max_amp = max_param_amplitudes[i]
+        params[:,i] = np.clip(params[:,i], -max_amp, max_amp)
 
 
 ### MODULE TESTS ###
@@ -380,6 +399,112 @@ def _test():
                                          system_step_multiplier=system_step_multiplier)
     assert(np.allclose(result.error, 0))
     assert(np.allclose(result.states, target_states, atol=1e-03))
+    exit(0)
+
+    # Evolving under the zero hamiltonian should yield no change
+    # in the system. Furthermore, not using parameters should
+    # mean that their gradients are zero.
+    # It is OK if autograd throws a warning here:
+    # "UserWarning: Output seems independent of input."
+    hilbert_size = 4
+    identity_matrix = np.eye(hilbert_size, dtype=np.complex128)
+    _hamiltonian = np.zeros((hilbert_size, hilbert_size))
+    hamiltonian = lambda params, t: _hamiltonian
+    initial_states = matrix_to_column_vector_list(identity_matrix)
+    target_states = matrix_to_column_vector_list(identity_matrix)
+    costs = [TargetInfidelity(target_states)]
+    param_count = 1
+    pulse_time = 10
+    pulse_step_count = 10
+    system_step_multiplier = 1
+    iteration_count = 10
+    initial_params = np.ones((pulse_step_count, param_count), dtype=np.complex128)
+    magnus_policy = MagnusPolicy.M2
+    log_iteration_step = 0
+    result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
+                                         iteration_count, param_count, pulse_step_count,
+                                         pulse_time, initial_params=initial_params,
+                                         log_iteration_step=log_iteration_step,
+                                         system_step_multiplier=system_step_multiplier)
+    assert(result.grads.all() == 0)
+    assert(np.allclose(initial_params, result.params))
+    assert(np.allclose(initial_states, result.states))
+
+    # Some nontrivial gradients should appear at each time step
+    # if we evolve a nontrivial hamiltonian and penalize
+    # a state against itself at each time step. Note that
+    # the hamiltonian is not hermitian here.
+    hilbert_size = 4
+    _hamiltonian = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
+                                     + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian = lambda params, t: (params[0] * _hamiltonian)
+    initial_states = np.array([[[0], [1], [0], [0]]])
+    forbidden_states = np.array([[[[0], [1], [0], [0]]]])
+    param_count = 1
+    pulse_time = 10
+    pulse_step_count = 10
+    initial_params, max_param_amplitudes = _initialize_params(None, None,
+                                                              pulse_time, pulse_step_count,
+                                                              param_count)
+    costs = [ForbidStates(forbidden_states, pulse_step_count)]
+    iteration_count = 100
+    magnus_policy = MagnusPolicy.M2
+    log_iteration_step = 0
+    result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
+                                         iteration_count, param_count, pulse_step_count,
+                                         pulse_time, initial_params=initial_params,
+                                         log_iteration_step=log_iteration_step,
+                                         magnus_policy=magnus_policy,
+                                         max_param_amplitudes=max_param_amplitudes)
+    assert(result.grads.all() != 0)
+    assert(not np.array_equal(result.params, initial_params))
+
+    # If we use complex parameters on a hermitian hamiltonian,
+    # the complex parameters should have no contribution to the
+    # hamiltonian.
+    _hamiltonian_dagger = conjugate_transpose(_hamiltonian)
+    hamiltonian = lambda params, t: (params[0] * _hamiltonian
+                                     + (anp.conjugate(params[0])
+                                        * _hamiltonian_dagger))
+    result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
+                                         iteration_count, param_count, pulse_step_count,
+                                         pulse_time, initial_params=initial_params,
+                                         log_iteration_step=log_iteration_step,
+                                         magnus_policy=magnus_policy,
+                                         max_param_amplitudes=max_param_amplitudes)
+    assert(result.grads.imag.all() == 0)
+
+    # Parameters should be clipped if they grow too large.
+    # You can log result.parameters from the test above
+    # that uses the same hamiltonian to see that
+    # each of result.params is greater than 0.8 + 0.8j.
+    hilbert_size = 4
+    _hamiltonian = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
+                                     + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian = lambda params, t: (params[0] * _hamiltonian)
+    initial_states = np.array([[[0], [1], [0], [0]]])
+    forbidden_states = np.array([[[[0], [1], [0], [0]]]])
+    param_count = 1
+    pulse_time = 10
+    pulse_step_count = 10
+    initial_params, max_param_amplitudes = _initialize_params(None, None,
+                                                              pulse_time, pulse_step_count,
+                                                              param_count)
+    max_param_amplitudes = np.repeat(0.8 + 0.8j, param_count)
+    costs = [ForbidStates(forbidden_states, pulse_step_count)]
+    iteration_count = 100
+    magnus_policy = MagnusPolicy.M2
+    log_iteration_step = 0
+    result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
+                                         iteration_count, param_count, pulse_step_count,
+                                         pulse_time, initial_params=initial_params,
+                                         log_iteration_step=log_iteration_step,
+                                         magnus_policy=magnus_policy,
+                                         max_param_amplitudes=max_param_amplitudes)
+    
+    for i in range(result.params.shape[1]):
+        assert(np.less_equal(np.abs(result.params[:,i]),
+                             np.abs(max_param_amplitudes[i])).all())
 
 
 if __name__ == "__main__":
