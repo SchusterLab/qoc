@@ -5,6 +5,8 @@ adam.py - a module for defining the Adam optimizer
 import numpy as np
 
 from qoc.models import Optimizer
+from qoc.util import (complex_to_real_imag_vec,
+                      real_imag_to_complex_vec)
 
 class Adam(Optimizer):
     """
@@ -12,31 +14,32 @@ class Adam(Optimizer):
     This implementation follows the original algorithm
     https://arxiv.org/abs/1412.6980.
     Fields:
-    learning_rate :: float - the initial step size
     beta_1 :: float - gradient decay bias
     beta_2 :: float - gradient squared decay bias
     epsilon :: float - fuzz factor
+    learning_rate :: float - the initial step size
+    name :: str - identifier for the optimizer
     """
     name = "adam"
 
-    def __init__(self, learning_rate=1e-3, beta_1=0.9, beta_2=0.999,
-                   epsilon=1e-8):
+    def __init__(self, beta_1=0.9, beta_2=0.999, epsilon=1e-8,
+                 learning_rate=1e-3,):
         """
         See class definition for argument specifications.
         Default values are chosen in accordance to those proposed
         in the paper.
         """
         super().__init__()
-        self.learning_rate = learning_rate
         self.beta_1 = beta_1
         self.beta_2 = beta_2
         self.epsilon = epsilon
+        self.learning_rate = learning_rate
 
 
     def __str__(self):
-        return ("{}, lr: {}, beta_1: {}, beta_2: {}, epsilon: {}"
-                "".format(self.name, self.learning_rate, self.beta_1,
-                          self.beta_2, self.epsilon))
+        return ("{}, beta_1: {}, beta_2: {}, epsilon: {}, lr: {}"
+                "".format(self.name, self.beta_1, self.beta_2,
+                          self.epsilon, self.learning_rate,))
 
     
     def initialize(self, params_shape):
@@ -49,7 +52,7 @@ class Adam(Optimizer):
         self.gradient_moment = np.zeros(params_shape)
         self.gradient_square_moment = np.zeros(params_shape)
 
-
+        
     def update(self, grads, params):
         """Update the learning parameters for the current iteration.
         Args:
@@ -83,13 +86,27 @@ def _test():
     """
     # These are hand checked tests.
     adam = Adam()
-    params = np.reshape(np.arange(5), (2, 2))
+    params = np.array([[0, 1],
+                       [2, 3]])
     adam.initialize(params.shape)
-    grads = np.ones(params.shape)
-    expected_params = np.array([[],
-                                []])
-    assert(adam.update(grads, params))
-    
+    grads = np.array([[0, 1],
+                      [2, 3]])
+    params1 = np.array([[0,         0.99988889],
+                        [1.99988889, 2.99988889]])
+    params2 = np.array([[0,          0.99965432],
+                        [1.99965432, 2.99965432]])
+    assert(adam.update(grads, params).all() == params1.all())
+    assert(adam.update(grads, params1).all()
+           == params2.all())
+
+    params = np.array([[1+2j, 3+4j],
+                       [5+6j, 7+8j]])
+    grads = np.array([[1+1j, 0+0j],
+                      [0+0j, -1-1j]])
+    adam.initialize(complex_to_real_imag_vec(params).shape)
+    params1 = real_imag_to_complex_vec(adam.update(complex_to_real_imag_vec(grads),
+                                                   complex_to_real_imag_vec(params)))
+    assert(params1[0][1] == params[0][1] and params[1][0] == params1[1][0])
 
 if __name__ == "__main__":
     _test()

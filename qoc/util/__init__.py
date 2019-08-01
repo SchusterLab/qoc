@@ -7,7 +7,9 @@ from qoc.util.mathutil import (PAULI_X, PAULI_Y, PAULI_Z,
                                commutator, krons, matmuls,
                                conjugate_transpose,
                                column_vector_list_to_matrix,
-                               matrix_to_column_vector_list,)
+                               matrix_to_column_vector_list,
+                               real_imag_to_complex_vec,
+                               complex_to_real_imag_vec)
 from qoc.util.extend import ans_jacobian
 
 __all__ = [
@@ -16,5 +18,6 @@ __all__ = [
     "conjugate_transpose",
     "column_vector_list_to_matrix",
     "matrix_to_column_vector_list",
-    "ans_jacobian"
+    "ans_jacobian", "real_imag_to_complex_vec",
+    "complex_to_real_imag_vec",
 ]

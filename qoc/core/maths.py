@@ -218,13 +218,13 @@ def magnus_m6_linear(hamiltonian, dt, params, step, t, sentinel=False):
         params_right = params[1] # step
         params1 = interpolate_linear(params_left, params_right, t - dt, t, t1)
         params2 = interpolate_linear(params_left, params_right, t - dt, t, t2)
-        params2 = interpolate_linear(params_left, params_right, t - dt, t, t3)
+        params3 = interpolate_linear(params_left, params_right, t - dt, t, t3)
     else:
         params_left = params[0] # step
         params_right = params[1] # step + 1
         params1 = interpolate_linear(params_left, params_right, t, t + dt, t1)
         params2 = interpolate_linear(params_left, params_right, t, t + dt, t2)
-        params2 = interpolate_linear(params_left, params_right, t, t + dt, t3)
+        params3 = interpolate_linear(params_left, params_right, t, t + dt, t3)
     
     # Generate hamiltonians.
     a1 = hamiltonian(params1, t1)

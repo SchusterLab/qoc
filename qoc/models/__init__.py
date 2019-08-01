@@ -10,11 +10,12 @@ from qoc.models.interpolationpolicy import InterpolationPolicy
 from qoc.models.magnuspolicy import MagnusPolicy
 from qoc.models.operationpolicy import OperationPolicy
 from qoc.models.optimizer import Optimizer
+from qoc.models.reporter import Reporter
 
 
 __all__ = [
     "Cost", "GrapeSchroedingerPolicy", "GrapeSchroedingerDiscreteState",
     "GrapeResult", "EvolveResult", "InterpolationPolicy",
-    "MagnusPolicy", "OperationPolicy", "Optimizer"
+    "MagnusPolicy", "OperationPolicy", "Optimizer", "Reporter"
 ]
 

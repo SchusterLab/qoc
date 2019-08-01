@@ -33,3 +33,6 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
+# C -> R^2
+complex_to_real_imag_vec = lambda x: np.stack((np.real(x), np.imag(x)), axis=0)
+real_imag_to_complex_vec = lambda x: x[0] + 1j * x[1]
