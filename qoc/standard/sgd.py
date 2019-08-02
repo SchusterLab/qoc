@@ -23,12 +23,26 @@ class SGD(Optimizer):
         super().__init__()
         self.learning_rate = learning_rate
 
-    def initialize(self, params_shape, params_dtype):
-        """Initialize the optimizer for a new optimization series.
-        Arguments: none
+
+    def run(self, args, function, iteration_count,
+            initial_params, jacobian):
+        """
+        Run a SGD optimization series.
+        Args:
+        args :: any - a tuple of arguments to pass to the function
+            and jacobian
+        function :: any -> float
+            - the function to minimize
+        iteration_count :: int - how many iterations to perform
+        initial_params :: numpy.ndarray - the initial optimization values
+        jacobian :: numpy.ndarray - the jacobian of the function
+            with respect to the params
         Returns: none
         """
-        pass
+        params = initial_params
+        for i in range(iteration_count):
+            grads = jacobian(params, *args)
+            params = self.update(grads, params)
 
 
     def update(self, grads, params):
@@ -58,4 +72,3 @@ def _test():
 
 if __name__ == "__main__":
     _test()
-        

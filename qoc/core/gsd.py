@@ -216,24 +216,25 @@ def _gsd_compute_jacobian_wrap(params, gstate, reporter):
     """
     Do intermediary work before passing control to _gsd_compute_ans_jacobian.
     Args:
-    params :: numpy.ndarray - the control parameters
+    params :: numpy.ndarray - the control parameters in optimizer format
     gstate :: qoc.GrapeSchroedingerDiscreteState - static objects
     reporter :: qoc.Reporter - a reporter for mutable objects
     Returns:
     jac :: numpy.ndarray - the jacobian of the cost function with
-        respect to params
+        respect to params in optimizer format
     """
     params = _slap_params(gstate, params)
     
     total_error, jacobian = _gsd_compute_ans_jacobian(params, gstate, reporter)
 
-    # Report information.
-    reporter.iteration += 1
+
     # Remove states from autograd box.
     if isinstance(reporter.states, Box):
         reporter.states = reporter.states._value
+    # Report information.
     gstate.log_and_save(total_error, jacobian, reporter.iteration,
                         params, reporter.states)
+    reporter.iteration += 1
 
     return _strip_params(gstate, jacobian)
 
@@ -330,7 +331,7 @@ def _gen_params_cos(pulse_time, pulse_step_count, param_count,
         params[:, i] = _params
     #ENDFOR
 
-    return params + 1j * params
+    return params
 
 
 def _clip_params(max_param_amplitudes, params):

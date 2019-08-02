@@ -60,7 +60,25 @@ class TargetInfidelity(Cost):
         fidelity = anp.sum(anp.square(anp.abs(anp.matmul(self.target_states_dagger,
                                                          states)[:,0,0])), axis=0)
         infidelity = 1 - (fidelity / self.state_normalization_constant)
-        print("infidelity:{}"
-              "".format(infidelity))
         return self.alpha * infidelity
 
+
+def _tests():
+    """
+    Run test on the module.
+    """
+    state0 = np.array([[0], [1]])
+    target0 = np.array([[1], [0]])
+    states = np.stack((state0,), axis=0)
+    targets = np.stack((target0,), axis=0)
+    ti = TargetInfidelity(targets)
+    cost = ti.cost(None, states, None)
+    assert(np.allclose(cost, 1))
+
+    ti = TargetInfidelity(states)
+    cost = ti.cost(None, states, None)
+    assert(np.allclose(cost, 0))
+
+
+if __name__ == "__main__":
+    _tests()
