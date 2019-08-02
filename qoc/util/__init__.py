@@ -10,8 +10,8 @@ from qoc.util.mathutil import (PAULI_X, PAULI_Y, PAULI_Z,
                                conjugate_transpose,
                                column_vector_list_to_matrix,
                                matrix_to_column_vector_list,
-                               real_imag_to_complex_vec,
-                               complex_to_real_imag_vec)
+                               real_imag_to_complex_flat,
+                               complex_to_real_imag_flat)
 from qoc.util.extend import ans_jacobian
 
 __all__ = [
@@ -22,6 +22,6 @@ __all__ = [
     "conjugate_transpose",
     "column_vector_list_to_matrix",
     "matrix_to_column_vector_list",
-    "ans_jacobian", "real_imag_to_complex_vec",
-    "complex_to_real_imag_vec",
+    "ans_jacobian", "real_imag_to_complex_flat",
+    "complex_to_real_imag_flat",
 ]

@@ -6,6 +6,7 @@ standard - a directory for standard definitions
 
 from qoc.standard.adam import Adam
 from qoc.standard.forbidstates import ForbidStates
+from qoc.standard.lbfgsb import LBFGSB
 from qoc.standard.sgd import SGD
 from qoc.standard.targetinfidelity import TargetInfidelity
 

@@ -26,10 +26,14 @@ class GrapeState(object):
     a class to encapsulate information to perform
     a GRAPE optimization.
     Fields:
+    complex_params :: bool - whether or not the parameters are complex
     costs :: [qoc.models.Cost] - the cost functions to guide optimization
     cost_count :: int - the number of cost functions
     hilbert_size :: int - the dimension of the hilbert space in which
         states are evolving
+    initial_params :: numpy.ndarray - the parameters for the first
+        optimization iteration
+    initial_states :: numpy.ndarray - the states at the first time step
     iteration_count :: int - the number of iterations to optimize for
     log_iteration_step :: the number of iterations at which to print
         progress to stdout
@@ -39,6 +43,9 @@ class GrapeState(object):
         performed, e.g. CPU, GPU, sparse, etc.
     optimizer :: qoc.Optimizer - an instance of an optimizer to perform
         gradient-based-optimization
+    param_count :: int - the number of parameters that should be supplied
+        to the hamiltonian at each time step
+    params_shape :: int - the shape of the initial parameters
     pulse_step_count :: int - the number of time steps at which the pulse
         should be optimized
     pulse_time :: float - the duration of the control pulse
@@ -52,11 +59,13 @@ class GrapeState(object):
     step_cost_indices :: [int] - the indices into the costs list of the
         costs that need to be evaluated at every step
     """
-
-    def __init__(self, costs, hilbert_size, iteration_count,
+    def __init__(self, costs, hilbert_size,
+                 initial_params,
+                 initial_states,
+                 iteration_count,
                  log_iteration_step,
                  max_param_amplitudes, operation_policy,
-                 optimizer, pulse_step_count,
+                 optimizer, param_count, pulse_step_count,
                  pulse_time, save_file_name,
                  save_iteration_step, save_path):
         """
@@ -67,23 +76,29 @@ class GrapeState(object):
         save_file_name :: str - this will identify the save file
         """
         super().__init__()
+        self.complex_params = initial_params.dtype in (np.complex64, np.complex128)
         self.costs = costs
         self.cost_count = len(costs)
         self.hilbert_size = hilbert_size
+        self.initial_params = initial_params
+        self.initial_states = initial_states
         self.iteration_count = iteration_count
         self.log_iteration_step = log_iteration_step
         self.max_param_amplitudes = max_param_amplitudes
+        self.param_count = param_count
+        self.params_shape = (pulse_step_count, param_count)
         self.pulse_step_count = pulse_step_count
         self.pulse_time = pulse_time
         self.operation_policy = operation_policy
         self.optimizer = optimizer
         if save_iteration_step != 0 and save_path and save_file_name:
             self.save_file_path = _create_save_file_path(save_file_name, save_path)
+            self.should_save = True
         else:
             self.save_file_path = None
+            self.should_save = False
         self.save_iteration_step = save_iteration_step
         self.should_log = log_iteration_step != 0
-        self.should_save = save_iteration_step != 0
         self.step_costs = list()
         self.step_cost_indices = list()
         for i, cost in enumerate(costs):
@@ -98,6 +113,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     a class to encapsulate the necessary information to perform a
     schroedinger, discrete GRAPE optimization.
     Fields:
+    complex_params :: bool - whether or not the optimization parameters
+        are complex
     costs :: [qoc.models.Cost] - the cost functions to guide optimization
     cost_count :: int - the number of cost functions
     dt :: float - the length of a time step 
@@ -107,11 +124,15 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         - This function evaluates the magnus expansion and the gradient of the magnus
           expansion with respect to the params argument. The params argument
           consists of all params specified by magnus_param_indices.
+    final_iteration :: int - the last optimization iteration
     final_time_step :: int - the last evolution time step
     grape_schroedinger_policy :: qoc.GrapeSchroedingerPolicy - specification
         for how to perform the main integration
     hilbert_size :: int - the dimension of the hilbert space that the evolving
         states live in
+    initial_params :: numpy.ndarray - the parameters for the first iteration
+        of optimization
+    initial_states :: numpy.ndarray - the states at the initial time step
     interpolation_policy :: qoc.InterpolationPolicy - how parameters
         should be interpolated for intermediate time steps
     iteration_count :: int - the number of iterations to optimize for
@@ -142,6 +163,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         gradient-based-optimization
     param_count :: int - the number of control parameters required at each
          optimization time step
+    params_shape :: int - the shape of the initial parameters
     pulse_step_count :: int - the number of time steps at which the pulse
         should be optimized
     pulse_time :: float - the duration of the control pulse
@@ -156,7 +178,10 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     """
     
     def __init__(self, costs, grape_schroedinger_policy,
-                 hamiltonian, hilbert_size, interpolation_policy,
+                 hamiltonian, hilbert_size,
+                 initial_params,
+                 initial_states,
+                 interpolation_policy,
                  iteration_count, log_iteration_step,
                  magnus_policy, max_param_amplitudes, operation_policy,
                  optimizer, param_count, pulse_step_count, pulse_time,
@@ -173,9 +198,11 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         save_path :: str - the directory to create the save file in,
             the directory will be created if it does not exist
         """
-        super().__init__(costs, hilbert_size, iteration_count,
+        super().__init__(costs, hilbert_size, initial_params,
+                         initial_states,
+                         iteration_count,
                          log_iteration_step, max_param_amplitudes,
-                         operation_policy, optimizer,
+                         operation_policy, optimizer, param_count,
                          pulse_step_count, pulse_time, 
                          save_file_name, save_iteration_step,
                          save_path)
@@ -185,18 +212,18 @@ class GrapeSchroedingerDiscreteState(GrapeState):
          self.magnus_param_indices) = _choose_magnus(hamiltonian,
                                                      interpolation_policy,
                                                      magnus_policy)
+        self.final_iteration = iteration_count - 1
         self.final_time_step = (pulse_step_count - 1) * system_step_multiplier
         self.dt = pulse_time / self.final_time_step
         self.grape_schroedinger_policy = grape_schroedinger_policy
         self.interpolation_policy = interpolation_policy
         self.magnus_policy = magnus_policy
-        self.param_count = param_count
         self.system_step_multiplier = system_step_multiplier
 
 
-    def log(self, error, grads, iteration, params, states):
+    def log_and_save(self, error, grads, iteration, params, states):
         """
-        Log to stdout.
+        If necessary, log to stdout and save to the save file.
         Args:
         error :: numpy.ndarray - the total error at the last time step
             of evolution
@@ -208,91 +235,83 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             of evolution
         Returns: none
         """
-        grads_norm = np.linalg.norm(grads)
-        print("{:^6d} | {:^1.8e} | {:^1.8e}"
-              "".format(iteration, error,
-                        grads_norm))
+        # Don't log if the iteration number is invalid.
+        if iteration > self.final_iteration:
+            return
 
-
-    def log_initial(self):
-        """
-        Log the initial header.
-        Args: none
-        Returns: none
-        """
-        print("iter   |   total error  |    grads_l2   \n"
-              "=========================================")
-
-
-    def save(self, error, grads, iteration, params, states):
-        """
-        Save to the save file.
-        Args:
-        error :: numpy.ndarray - the total error at the last time step
-            of evolution
-        grads :: numpy.ndarray - the current gradients of the cost function
-            with resepct to params
-        iteration :: int - the optimization iteration
-        params :: numpy.ndarray - the optimization parameters
-        states :: numpy.ndarray - the states at the last time step
-            of evolution
-        Returns: none
-        """
-        save_step, _ = np.divmod(iteration,
-                                 self.save_iteration_step)
-        with h5py.File(self.save_file_path, "a") as save_file:
-            save_file["error"][save_step,] = error
-            save_file["grads"][save_step,] = grads
-            save_file["params"][save_step,] = params
-            save_file["states"][save_step,] = states
-
-
-    def save_initial(self, initial_params, initial_states):
-        """
-        Save all initial values to the save file.
-        Create necessary data sets.
-        Args:
-        initial_params :: numpy.ndarray - the initial parameters of optimization
-        initial_states :: numpy.ndarray - the initial states to propagate
-        Returns: none
-        """
-        # Notify the user where the file is being saved.
-        print("QOC is saving this optimization run to {}."
-              "".format(self.save_file_path))
+        # Determine if it is the final iteration.
+        is_final_iteration = iteration == self.final_iteration
         
-        save_count, save_count_remainder = np.divmod(self.iteration_count, self.save_iteration_step)
-        # If the final iteration doesn't fall on a save step, add a save step.
-        if save_count_remainder != 0:
-            save_count += 1
-        state_count = len(initial_states)
-        
-        with h5py.File(self.save_file_path, "w") as save_file:
-            save_file["cost_names"] = np.array([np.string_("{}".format(cost))
-                                                for cost in self.costs])
-            save_file["error"] = np.zeros((save_count, self.cost_count),
-                                          dtype=np.float64)
-            save_file["grads"] = np.zeros((save_count, self.pulse_step_count,
-                                           self.param_count), dtype=initial_params.dtype)
-            save_file["grape_schroedinger_policy"] = "{}".format(self.grape_schroedinger_policy)
-            save_file["initial_params"] = initial_params
-            save_file["initial_states"] = initial_states
-            save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
-            save_file["magnus_policy"] = "{}".format(self.magnus_policy)
-            save_file["max_param_amplitudes"] = "{}".format(self.magnus_policy)
-            save_file["operation_policy"] = "{}".format(self.operation_policy)
-            save_file["optimizer"] = "{}".format(self.optimizer)
-            save_file["params"] = np.zeros((save_count, self.pulse_step_count,
-                                            self.param_count,), dtype=initial_params.dtype)
-            save_file["param_count"] = self.param_count
-            save_file["pulse_step_count"] = self.pulse_step_count
-            save_file["pulse_time"]= self.pulse_time
-            save_file["states"] = np.zeros((save_count, state_count,
-                                            self.hilbert_size, 1),
-                                           dtype=np.complex128)
-            save_file["system_step_multiplier"] = self.system_step_multiplier
-            save_file.close()
+        if (self.should_log
+            and (np.mod(iteration, self.log_iteration_step) == 0
+                 or is_final_iteration)):
+            grads_norm = np.linalg.norm(grads)
+            print("{:^6d} | {:^1.8e} | {:^1.8e}"
+                  "".format(iteration, error,
+                            grads_norm))
+
+        # The one-liner here is jank but it saves doing another
+        # integer division. If the iteration is a multiple of save_iteration_step,
+        # the long one-liner condition will succeed and save_step will be
+        # the nth save step.
+        if (self.should_save
+            and (np.mod(iteration, self.save_iteration_step) == 0
+                 or is_final_iteration)):
+            save_step, _ = np.divmod(iteration, self.save_iteration_step)
+            with h5py.File(self.save_file_path, "a") as save_file:
+                save_file["error"][save_step,] = error
+                save_file["grads"][save_step,] = grads
+                save_file["params"][save_step,] = params
+                save_file["states"][save_step,] = states
+
+
+    def log_and_save_initial(self):
+        """
+        Perform the initial log and save.
+        """
+        if self.should_save:
+            # Notify the user where the file is being saved.
+            print("QOC is saving this optimization run to {}."
+                  "".format(self.save_file_path))
+
+            save_count, save_count_remainder = np.divmod(self.iteration_count,
+                                                         self.save_iteration_step)
+            state_count = len(self.initial_states)
+            # If the final iteration doesn't fall on a save step, add a save step.
+            if save_count_remainder != 0:
+                save_count += 1
+
+            with h5py.File(self.save_file_path, "w") as save_file:
+                save_file["cost_names"] = np.array([np.string_("{}".format(cost))
+                                                    for cost in self.costs])
+                save_file["error"] = np.zeros((save_count, self.cost_count),
+                                              dtype=np.float64)
+                save_file["grads"] = np.zeros((save_count, self.pulse_step_count,
+                                               self.param_count), dtype=self.initial_params.dtype)
+                save_file["grape_schroedinger_policy"] = "{}".format(self.grape_schroedinger_policy)
+                save_file["initial_params"] = self.initial_params
+                save_file["initial_states"] = self.initial_states
+                save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
+                save_file["magnus_policy"] = "{}".format(self.magnus_policy)
+                save_file["max_param_amplitudes"] = "{}".format(self.magnus_policy)
+                save_file["operation_policy"] = "{}".format(self.operation_policy)
+                save_file["optimizer"] = "{}".format(self.optimizer)
+                save_file["params"] = np.zeros((save_count, self.pulse_step_count,
+                                                self.param_count,), dtype=self.initial_params.dtype)
+                save_file["param_count"] = self.param_count
+                save_file["pulse_step_count"] = self.pulse_step_count
+                save_file["pulse_time"]= self.pulse_time
+                save_file["states"] = np.zeros((save_count, state_count,
+                                                self.hilbert_size, 1),
+                                               dtype=np.complex128)
+                save_file["system_step_multiplier"] = self.system_step_multiplier
+            #ENDWITH
         #ENDIF
-        
+
+        if self.should_log:
+            print("iter   |   total error  |    grads_l2   \n"
+                  "=========================================")
+
 
 class GrapeResult(object):
     """

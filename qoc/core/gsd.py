@@ -5,6 +5,7 @@ optimization algorithm
 
 import os
 
+from autograd import jacobian
 import autograd.numpy as anp
 from autograd.extend import Box
 import numpy as np
@@ -16,8 +17,8 @@ from qoc.models import (MagnusPolicy, OperationPolicy, GrapeSchroedingerDiscrete
 from qoc.standard import (Adam, ForbidStates, TargetInfidelity, expm)
 from qoc.util import (PAULI_X, PAULI_Y, conjugate_transpose,
                       matrix_to_column_vector_list, matmuls, ans_jacobian,
-                      complex_to_real_imag_vec,
-                      real_imag_to_complex_vec)
+                      complex_to_real_imag_flat,
+                      real_imag_to_complex_flat)
 
 
 ### MAIN METHODS ###
@@ -94,104 +95,74 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
                                                               pulse_step_count,
                                                               param_count)
     
-    # Initialize optimizer.
-    optimizer.initialize(initial_params.shape, initial_params.dtype)
-    
     # Construct the grape state.
     hilbert_size = initial_states[0].shape[0]
     gstate = GrapeSchroedingerDiscreteState(costs, grape_schroedinger_policy,
                                             hamiltonian, hilbert_size,
+                                            initial_params,
+                                            initial_states,
                                             interpolation_policy, iteration_count,
                                             log_iteration_step, magnus_policy,
                                             max_param_amplitudes, operation_policy,
                                             optimizer, param_count, pulse_step_count,
                                             pulse_time, save_file_name, save_iteration_step,
                                             save_path, system_step_multiplier)
+    gstate.log_and_save_initial()
 
-    # Perform initial log and save.
-    if gstate.should_save:
-        gstate.save_initial(initial_params, initial_states)
-    if gstate.should_log:
-        gstate.log_initial()
-
-    # Switch on GRAPE implementation method.
+    # Transform the initial parameters to their optimizer
+    # friendly form.
+    initial_params = _strip_params(gstate, initial_params)
+    
+    # Switch on the GRAPE implementation method.
     if gstate.grape_schroedinger_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
-        error, grads, params, states = _grape_schroedinger_discrete_time(gstate,
-                                                                         initial_params,
-                                                                         initial_states,)
+        _grape_schroedinger_discrete_time(gstate, initial_params)
     else:
-        error, grads, params, states = _grape_schroedinger_discrete_memory(gstate,
-                                                                           initial_params,
-                                                                           initial_states,)
+        pass
+        # _grape_schroedinger_discrete_memory(gstate, initial_params)
 
-    return GrapeResult(error, grads, params, states)
+    # return GrapeResult(reporter.error, reporter.grads,
+    #                    reporter.params, reporter.states)
 
 
 ### HELPER METHODS ###
 
-def _grape_schroedinger_discrete_time(gstate, params, states):
+def _grape_schroedinger_discrete_time(gstate, initial_params):
     """
     Perform GRAPE for the schroedinger equation with time discrete parameters.
     Use autograd to compute evolution gradients.
     Args:
     gstate :: qoc.GrapeSchroedingerDiscreteState - information required to
          perform the optimization
-    params :: numpy.ndarray - the initial params
-    states :: numpy.ndarray - the initial states
-    Returns:
-    error :: numpy.ndarray - the total cost error at the final time step of
-        the last iteration,
-    grads :: numpy.ndarray - the gradients at the final time step of the last iteration,
-                             same shape as params
-    params :: numpy.ndarray - the parameters at the final time step of the last iteration
-    states :: numpy.ndarray - the states at the final time step of the last iteration
+    initial_params :: numpy.ndarray - the transformed initial_params
     Returns: none
     """
-    # Track mutable objects using a reporter.
     # Autograd does not allow multiple return values from
     # a differentiable function.
+    # Scipy's minimization algorithms require us to provide
+    # functions that they evaluate on their own schedule.
+    # The best solution to track mutable objects, that I can think of,
+    # is to use a reporter object.
     reporter = Reporter()
+    reporter.iteration = 0
 
-    # Determine optimization constants.
-    final_iteration = gstate.iteration_count - 1
-            
-    # Run optimization for the given number of iterations.
-    for iteration in range(gstate.iteration_count):
-        is_final_iteration = iteration == final_iteration
-        # Compute the gradient of the costs with respect
-        # to params.
-        total_error, grads = _gsd_compute_ans_jac(gstate, params,
-                                                  reporter, states)
-        # Remove states from autograd box.
-        if isinstance(reporter.states, Box):
-            reporter.states = reporter.states._value
-
-        # Log and save progress.
-        _log_and_save(error, grads, gstate, iteration, params, states)
-
-        # Update params.
-        if not is_final_iteration:
-            params = gstate.optimizer.update(grads, params)
-            _clip_params(gstate.max_param_amplitudes, params)
-    #ENDFOR
-    return total_error, grads, params, reporter.states
+    result = gstate.optimizer.run((gstate, reporter), _gsd_compute_wrap,
+                                  gstate.iteration_count, initial_params,
+                                  _gsd_compute_jacobian_wrap)
 
 
-def _grape_schroedinger_discrete_compute(gstate, params, reporter,
-                                         states):
+def _gsd_compute(params, gstate, reporter):
     """
-    Compute the costs for one evolution cycle.
+    Compute the value of the total cost function for one evolution.
     Args:
-    dt :: float - the time step between evolution steps
-    gstate :: qoc.GrapeSchroedingerDiscreteState - static objects
     params :: numpy.ndarray - the control parameters
+    gstate :: qoc.GrapeSchroedingerDiscreteState - static objects
     reporter :: qoc.Reporter - a reporter for mutable objects
-    states :: numpy.ndarray - the initial states to evolve
     Returns:
     total_error :: numpy.ndarray - total error of the evolution
     """
+    # Compute the total error for this evolution.
     total_error = 0
-    
+    states = gstate.initial_states
     for time_step in range(gstate.final_time_step + 1):
         pulse_step, _ = anp.divmod(time_step, gstate.system_step_multiplier)
         is_final_step = time_step == gstate.final_time_step
@@ -232,41 +203,39 @@ def _grape_schroedinger_discrete_compute(gstate, params, reporter,
     return total_error
 
 
-# Real wrapper for gsd_compute.
-_gsd_compute_real = (lambda *args, **kwargs:
-                     anp.real(_grape_schroedinger_discrete_compute(*args,
-                                                                   **kwargs)))
-
+# Wrapper to do intermediary work before passing control to _gsd_compute.
+_gsd_compute_wrap = (lambda params, gstate, reporter:
+                     _gsd_compute(_slap_params(gstate, params),
+                                  gstate, reporter))
 
 # Value and jacobian of gsd_compute.
-_gsd_compute_ans_jac = ans_jacobian(_gsd_compute_real, 1)
-# Jacobian of gsd_compute.
-_gsd_compute_jac = jacobian(_gsd_compute_real, 1)
+_gsd_compute_ans_jacobian = ans_jacobian(_gsd_compute, 0)
 
 
-def _log_and_save(error, grads, gstate, iteration,
-                  params, states):
+def _gsd_compute_jacobian_wrap(params, gstate, reporter):
     """
-    Log/save information if the user wants information logged/saved
-    and it is a log/save step or it is the final step.
-    error :: float - the current optimization error
-    grads :: numpy.ndarray - the current gradients of the cost
-        function with respect to the optimization parameters
-    gstate :: qoc.GrapeSchroedingerDiscreteState - information required to
-         perform the optimization
-    iteration :: int - the current optimization iteration
-    params :: numpy.ndarray - the current optimization parameters
-    states :: numpy.ndarray - the initial states
+    Do intermediary work before passing control to _gsd_compute_ans_jacobian.
+    Args:
+    params :: numpy.ndarray - the control parameters
+    gstate :: qoc.GrapeSchroedingerDiscreteState - static objects
+    reporter :: qoc.Reporter - a reporter for mutable objects
+    Returns:
+    jac :: numpy.ndarray - the jacobian of the cost function with
+        respect to params
     """
-    if (gstate.should_log
-        and (np.mod(iteration, gstate.log_iteration_step) == 0
-             or is_final_iteration)):
-        gstate.log(total_error, grads, iteration, params, states)
-            
-    if (gstate.should_save
-        and (np.mod(iteration, gstate.save_iteration_step) == 0
-             or is_final_iteration)):
-        gstate.save(total_error, grads, iteration, params, states)
+    params = _slap_params(gstate, params)
+    
+    total_error, jacobian = _gsd_compute_ans_jacobian(params, gstate, reporter)
+
+    # Report information.
+    reporter.iteration += 1
+    # Remove states from autograd box.
+    if isinstance(reporter.states, Box):
+        reporter.states = reporter.states._value
+    gstate.log_and_save(total_error, jacobian, reporter.iteration,
+                        params, reporter.states)
+
+    return _strip_params(gstate, jacobian)
 
 
 def _grape_schroedinger_discrete_memory(gstate, params, states):
@@ -378,6 +347,45 @@ def _clip_params(max_param_amplitudes, params):
     for i in range(params.shape[1]):
         max_amp = max_param_amplitudes[i]
         params[:,i] = np.clip(params[:,i], -max_amp, max_amp)
+
+
+def _strip_params(gstate, params):
+    """
+    Reshape and transform parameters understood by the cost
+    function to parameters understood by the optimizer.
+    gstate :: qoc.GrapeState - information about the optimization
+    params :: numpy.ndarray - the params in question
+    Returns:
+    new_params :: numpy.ndarray - the reshapen, transformed params
+    """
+    # Flatten the parameters.
+    params = params.flatten()
+    # Transform the parameters to C if they are complex.
+    if gstate.complex_params:
+        params = complex_to_real_imag_flat(params)
+
+    return params
+
+
+def _slap_params(gstate, params):
+    """
+    Reshape and transform parameters displayed to the optimizer
+    to parameters understood by the cost function.
+    Args:
+    gstate :: qoc.GrapeState - information about the optimization
+    params :: numpy.ndarray - the params in question
+    Returns:
+    new_params :: numpy.ndarray - the reshapen, transformed params
+    """
+    # Transform the parameters to C if they are complex.
+    if gstate.complex_params:
+        params = real_imag_to_complex_flat(params)
+    # Reshape the parameters.
+    params = np.reshape(params, gstate.params_shape)
+    # Clip the parameters.
+    _clip_params(gstate.max_param_amplitudes, params)
+    
+    return params
 
 
 ### MODULE TESTS ###
