@@ -45,6 +45,8 @@ class GrapeState(object):
     save_file_path :: str - the full path to the save file
     save_iteration_step :: the number of iterations at which to write
         progress to the save file
+    should_log :: bool - whether or not to log progress
+    should_save :: bool - whether or not to save progress
     step_costs :: [qoc.models.Cost] - the cost functions to guide optimization
         that need to be evaluated at each step
     step_cost_indices :: [int] - the indices into the costs list of the
@@ -80,6 +82,8 @@ class GrapeState(object):
         else:
             self.save_file_path = None
         self.save_iteration_step = save_iteration_step
+        self.should_log = log_iteration_step != 0
+        self.should_save = save_iteration_step != 0
         self.step_costs = list()
         self.step_cost_indices = list()
         for i, cost in enumerate(costs):
@@ -103,6 +107,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         - This function evaluates the magnus expansion and the gradient of the magnus
           expansion with respect to the params argument. The params argument
           consists of all params specified by magnus_param_indices.
+    final_time_step :: int - the last evolution time step
     grape_schroedinger_policy :: qoc.GrapeSchroedingerPolicy - specification
         for how to perform the main integration
     hilbert_size :: int - the dimension of the hilbert space that the evolving
@@ -251,7 +256,14 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         initial_states :: numpy.ndarray - the initial states to propagate
         Returns: none
         """
-        save_count, _ = np.divmod(self.iteration_count, self.save_iteration_step)
+        # Notify the user where the file is being saved.
+        print("QOC is saving this optimization run to {}."
+              "".format(self.save_file_path))
+        
+        save_count, save_count_remainder = np.divmod(self.iteration_count, self.save_iteration_step)
+        # If the final iteration doesn't fall on a save step, add a save step.
+        if save_count_remainder != 0:
+            save_count += 1
         state_count = len(initial_states)
         
         with h5py.File(self.save_file_path, "w") as save_file:
@@ -260,7 +272,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             save_file["error"] = np.zeros((save_count, self.cost_count),
                                           dtype=np.float64)
             save_file["grads"] = np.zeros((save_count, self.pulse_step_count,
-                                           self.param_count), dtype=np.complex128)
+                                           self.param_count), dtype=initial_params.dtype)
             save_file["grape_schroedinger_policy"] = "{}".format(self.grape_schroedinger_policy)
             save_file["initial_params"] = initial_params
             save_file["initial_states"] = initial_states
@@ -270,7 +282,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             save_file["operation_policy"] = "{}".format(self.operation_policy)
             save_file["optimizer"] = "{}".format(self.optimizer)
             save_file["params"] = np.zeros((save_count, self.pulse_step_count,
-                                            self.param_count,), dtype=np.complex128)
+                                            self.param_count,), dtype=initial_params.dtype)
             save_file["param_count"] = self.param_count
             save_file["pulse_step_count"] = self.pulse_step_count
             save_file["pulse_time"]= self.pulse_time

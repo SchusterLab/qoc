@@ -16,7 +16,12 @@ class Adam(Optimizer):
     Fields:
     beta_1 :: float - gradient decay bias
     beta_2 :: float - gradient squared decay bias
+    complex_params :: bool - whether or not the parameters require
+        a transformation on updating
     epsilon :: float - fuzz factor
+    gradient_moment :: numpy.ndarray - running optimization variable
+    gradient_square_moment :: numpy.ndarray - running optimization variable
+    iteration_count :: int - the current count of iterations performed
     learning_rate :: float - the initial step size
     name :: str - identifier for the optimizer
     """
@@ -32,7 +37,10 @@ class Adam(Optimizer):
         super().__init__()
         self.beta_1 = beta_1
         self.beta_2 = beta_2
+        self.complex_params = False
         self.epsilon = epsilon
+        self.gradient_moment = None
+        self.gradient_square_moment = None
         self.learning_rate = learning_rate
 
 
@@ -42,12 +50,17 @@ class Adam(Optimizer):
                           self.epsilon, self.learning_rate,))
 
     
-    def initialize(self, params_shape):
+    def initialize(self, params_shape, params_dtype):
         """Initialize the optimizer for a new optimization series.
         Arguments:
         params_shape :: tuple(int) - the shape of the learning parameters
         Returns: none
         """
+        # Double the shape of the parameters if they are complex.
+        # A C -> R2 transformation will be applied.
+        if params_dtype in (np.complex64, np.complex128):
+            self.complex_params = True
+            params_shape = (2, *params_shape)
         self.iteration_count = 0
         self.gradient_moment = np.zeros(params_shape)
         self.gradient_square_moment = np.zeros(params_shape)
@@ -64,6 +77,10 @@ class Adam(Optimizer):
         new_params :: numpy.ndarray - the learning parameters to be used
             for the next iteration
         """
+        if self.complex_params:
+            grads = complex_to_real_imag_vec(grads)
+            params = complex_to_real_imag_vec(params)
+        
         self.iteration_count += 1
         self.gradient_moment = (self.beta_1 * self.gradient_moment
                                 + (1 - self.beta_1) * grads)
@@ -73,9 +90,14 @@ class Adam(Optimizer):
                                         1 - np.power(self.beta_1, self.iteration_count))
         gradient_square_moment_hat = np.divide(self.gradient_square_moment,
                                                1 - np.power(self.beta_2, self.iteration_count))
-        return params - self.learning_rate * np.divide(gradient_moment_hat,
+        params = params - self.learning_rate * np.divide(gradient_moment_hat,
                                                        np.sqrt(gradient_square_moment_hat)
                                                        + self.epsilon)
+        
+        if self.complex_params:
+            params = real_imag_to_complex_vec(params)
+
+        return params
 
 
 ### MODULE TESTS ###
@@ -88,7 +110,7 @@ def _test():
     adam = Adam()
     params = np.array([[0, 1],
                        [2, 3]])
-    adam.initialize(params.shape)
+    adam.initialize(params.shape, params.dtype)
     grads = np.array([[0, 1],
                       [2, 3]])
     params1 = np.array([[0,         0.99988889],
@@ -103,9 +125,8 @@ def _test():
                        [5+6j, 7+8j]])
     grads = np.array([[1+1j, 0+0j],
                       [0+0j, -1-1j]])
-    adam.initialize(complex_to_real_imag_vec(params).shape)
-    params1 = real_imag_to_complex_vec(adam.update(complex_to_real_imag_vec(grads),
-                                                   complex_to_real_imag_vec(params)))
+    adam.initialize(params.shape, params.dtype)
+    params1 = adam.update(grads, params)
     assert(params1[0][1] == params[0][1] and params[1][0] == params1[1][0])
 
 if __name__ == "__main__":

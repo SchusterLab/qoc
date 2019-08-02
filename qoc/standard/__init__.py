@@ -5,8 +5,10 @@ standard - a directory for standard definitions
 # exports
 
 from qoc.standard.adam import Adam
-from qoc.standard.targetinfidelity import TargetInfidelity
 from qoc.standard.forbidstates import ForbidStates
+from qoc.standard.sgd import SGD
+from qoc.standard.targetinfidelity import TargetInfidelity
+
 
 # autograd definitions
 from autograd.extend import defvjp, primitive

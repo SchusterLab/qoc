@@ -95,7 +95,7 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
                                                               param_count)
     
     # Initialize optimizer.
-    optimizer.initialize(complex_to_real_imag_vec(initial_params).shape)
+    optimizer.initialize(initial_params.shape, initial_params.dtype)
     
     # Construct the grape state.
     hilbert_size = initial_states[0].shape[0]
@@ -107,12 +107,12 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
                                             optimizer, param_count, pulse_step_count,
                                             pulse_time, save_file_name, save_iteration_step,
                                             save_path, system_step_multiplier)
-    
+
     # Perform initial log and save.
-    if gstate.log_iteration_step != 0:
-        gstate.log_initial()
-    if gstate.save_iteration_step != 0:
+    if gstate.should_save:
         gstate.save_initial(initial_params, initial_states)
+    if gstate.should_log:
+        gstate.log_initial()
 
     # Switch on GRAPE implementation method.
     if gstate.grape_schroedinger_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
@@ -157,6 +157,7 @@ def _grape_schroedinger_discrete_time(gstate, params, states):
             
     # Run optimization for the given number of iterations.
     for iteration in range(gstate.iteration_count):
+        is_final_iteration = iteration == final_iteration
         # Compute the gradient of the costs with respect
         # to params.
         total_error, grads = _gsd_compute_ans_jac(gstate, params,
@@ -166,19 +167,11 @@ def _grape_schroedinger_discrete_time(gstate, params, states):
             reporter.states = reporter.states._value
 
         # Log and save progress.
-        if (gstate.log_iteration_step != 0
-              and np.mod(iteration, gstate.log_iteration_step) == 0):
-            gstate.log(total_error, grads, iteration, params, reporter.states)
-            
-        if (gstate.save_iteration_step != 0
-              and np.mod(iteration, gstate.save_iteration_step) == 0):
-            gstate.save(total_error, grads, iteration, params, reporter.states)
+        _log_and_save(error, grads, gstate, iteration, params, states)
 
         # Update params.
-        if iteration != final_iteration:
-            params = real_imag_to_complex_vec(
-                gstate.optimizer.update(complex_to_real_imag_vec(grads),
-                                        complex_to_real_imag_vec(params)))
+        if not is_final_iteration:
+            params = gstate.optimizer.update(grads, params)
             _clip_params(gstate.max_param_amplitudes, params)
     #ENDFOR
     return total_error, grads, params, reporter.states
@@ -198,6 +191,7 @@ def _grape_schroedinger_discrete_compute(gstate, params, reporter,
     total_error :: numpy.ndarray - total error of the evolution
     """
     total_error = 0
+    
     for time_step in range(gstate.final_time_step + 1):
         pulse_step, _ = anp.divmod(time_step, gstate.system_step_multiplier)
         is_final_step = time_step == gstate.final_time_step
@@ -215,6 +209,9 @@ def _grape_schroedinger_discrete_compute(gstate, params, reporter,
             magnus_params = anp.expand_dims(magnus_params, axis=0)
         magnus = gstate.magnus(gstate.dt, magnus_params, pulse_step, t, is_final_step)
         unitary = expm(-1j * magnus)
+        u_u_dagger = anp.matmul(unitary, conjugate_transpose(unitary))
+        identity = anp.eye(gstate.hilbert_size)
+        assert(anp.allclose(u_u_dagger, identity))
         states = anp.matmul(unitary, states)
         
         # Compute cost.
@@ -223,11 +220,14 @@ def _grape_schroedinger_discrete_compute(gstate, params, reporter,
                 error = cost.cost(params, states, time_step)
                 total_error = total_error + error
             #ENDFOR
+
+            # Report information.
             reporter.states = states
         else:
             for i, step_cost in enumerate(gstate.step_costs):
                 error = step_cost.cost(params, states, time_step)
                 total_error = total_error + error
+
     #ENDFOR
     return total_error
 
@@ -240,6 +240,33 @@ _gsd_compute_real = (lambda *args, **kwargs:
 
 # Value and jacobian of gsd_compute.
 _gsd_compute_ans_jac = ans_jacobian(_gsd_compute_real, 1)
+# Jacobian of gsd_compute.
+_gsd_compute_jac = jacobian(_gsd_compute_real, 1)
+
+
+def _log_and_save(error, grads, gstate, iteration,
+                  params, states):
+    """
+    Log/save information if the user wants information logged/saved
+    and it is a log/save step or it is the final step.
+    error :: float - the current optimization error
+    grads :: numpy.ndarray - the current gradients of the cost
+        function with respect to the optimization parameters
+    gstate :: qoc.GrapeSchroedingerDiscreteState - information required to
+         perform the optimization
+    iteration :: int - the current optimization iteration
+    params :: numpy.ndarray - the current optimization parameters
+    states :: numpy.ndarray - the initial states
+    """
+    if (gstate.should_log
+        and (np.mod(iteration, gstate.log_iteration_step) == 0
+             or is_final_iteration)):
+        gstate.log(total_error, grads, iteration, params, states)
+            
+    if (gstate.should_save
+        and (np.mod(iteration, gstate.save_iteration_step) == 0
+             or is_final_iteration)):
+        gstate.save(total_error, grads, iteration, params, states)
 
 
 def _grape_schroedinger_discrete_memory(gstate, params, states):

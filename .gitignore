@@ -10,3 +10,6 @@
 
 # private
 _test/*
+
+# binary
+*.h5

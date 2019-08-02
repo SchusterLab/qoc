@@ -4,7 +4,7 @@
 
 import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (Adam, TargetInfidelity)
+from qoc.standard import (Adam, SGD, TargetInfidelity)
 from qoc.util import (conjugate_transpose,
                       get_annihilation_operator,
                       get_creation_operator,
@@ -34,13 +34,14 @@ COSTS = [TargetInfidelity(TARGET_STATES)]
 PARAM_COUNT = 1
 PULSE_TIME = 100
 PULSE_STEP_COUNT = 100
-ITERATION_COUNT = 1000
+ITERATION_COUNT = 10
 INITIAL_PARAMS = anp.ones((PULSE_STEP_COUNT, PARAM_COUNT))
-OPTIMIZER = Adam(learning_rate=1e-6)
+MAX_PARAM_AMPLITUDES = anp.ones(PARAM_COUNT) * 100000
+OPTIMIZER = Adam(learning_rate=1e-03)
 
 # Define output.
-LOG_ITERATION_STEP = 10
-SAVE_ITERATION_STEP = 10
+LOG_ITERATION_STEP = 1
+SAVE_ITERATION_STEP = 1
 SAVE_PATH = "."
 SAVE_FILE_NAME = "test"
 
@@ -51,6 +52,8 @@ def main():
                                          PULSE_STEP_COUNT, PULSE_TIME,
                                          initial_params=INITIAL_PARAMS,
                                          log_iteration_step=LOG_ITERATION_STEP,
+                                         max_param_amplitudes=MAX_PARAM_AMPLITUDES,
+                                         optimizer=OPTIMIZER,
                                          save_file_name=SAVE_FILE_NAME,
                                          save_iteration_step=SAVE_ITERATION_STEP,
                                          save_path=SAVE_PATH,)
