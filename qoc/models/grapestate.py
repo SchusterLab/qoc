@@ -213,8 +213,9 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                                      interpolation_policy,
                                                      magnus_policy)
         self.final_iteration = iteration_count - 1
-        self.final_time_step = (pulse_step_count - 1) * system_step_multiplier
-        self.dt = pulse_time / self.final_time_step
+        system_step_count = pulse_step_count * system_step_multiplier
+        self.final_time_step = system_step_count - 1
+        self.dt = pulse_time / system_step_count
         self.grape_schroedinger_policy = grape_schroedinger_policy
         self.interpolation_policy = interpolation_policy
         self.magnus_policy = magnus_policy
@@ -317,23 +318,46 @@ class GrapeResult(object):
     """
     This class encapsulates useful information about a GRAPE optimization.
     Fields:
-    error :: numpy.ndarray - the total optimization error at the final time step
+    best_error :: numpy.ndarray - the total optimization error at the final time step
+        of the iteration that achieved the lowest error
+    best_grads :: numpy.ndarray - the gradients of the cost function with respect
+        to the params at the iteration that achieved the lowest error
+    best_params :: numpy.ndarray - the parameters at the iteration that achieved
+        the lowest error
+    best_states :: numpy.ndarray - the states at the final time step of the iteration
+        that achieved the lowest error
+    iteration :: int - the current iteration
+    last_error :: numpy.ndarray - the total optimization error at the final time step
         of the last iteration
-    grads :: numpy.ndarray - the gradients of the cost function with respect
+    last_grads :: numpy.ndarray - the gradients of the cost function with respect
         to the params at the last iteration
-    params :: numpy.ndarray - the parameters at the last iteration
-    states :: numpy.ndarray - the states at the final time step of the last iteration
+    last_params :: numpy.ndarray - the parameters at the last iteration
+    last_states :: numpy.ndarray - the states at the final time step of the last iteration
     """
-    def __init__(self, error, grads,
-                 params, states):
+    def __init__(self, best_error=np.finfo(float).max, best_params=None,
+                 best_grads=None, best_states=None, iteration=0,
+                 last_error=None,
+                 last_grads=None, last_params=None, last_states=None):
         """
         See class definition for argument specifications.
         """
         super().__init__()
-        self.error = error
-        self.grads = grads
-        self.params = params
-        self.states = states
+        self.best_error = best_error
+        self.best_params = best_params
+        self.best_grads = best_grads
+        self.best_states = best_states
+        self.iteration = 0
+        self.last_error = last_error
+        self.last_grads = last_grads
+        self.last_params = last_params
+        self.last_states = last_states
+
+
+    def __str__(self):
+        return ("best_error:{},\nbest_grads:\n{}\nbest_params:\n{}\nbest_states:\n{}\n"
+                "last_error:{},\nlast_grads:\n{}\nlast_params:\n{}\nlast_states:\n{}"
+                "".format(self.best_error, self.best_grads, self.best_params, self.best_states,
+                          self.last_error, self.last_grads, self.last_params, self.last_states))
 
 
 class EvolveResult(object):

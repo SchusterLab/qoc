@@ -1,11 +1,11 @@
 """
-report.py - a module to define the reporter class
+dummy.py - a module to define a dummy class
 """
 
-class Reporter(object):
+class Dummy(object):
     """
     This is a dummy class to keep track of
-    mutable objects that are passed by object reference.
+    what have you.
     Fields: indeterminate
     """
 

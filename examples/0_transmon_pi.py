@@ -4,7 +4,7 @@
 
 import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (Adam, LBFGSB, Newton, SGD, TargetInfidelity)
+from qoc.standard import (Adam, LBFGSB, SGD, TargetInfidelity)
 from qoc.util import (conjugate_transpose,
                       get_annihilation_operator,
                       get_creation_operator,
@@ -30,14 +30,14 @@ COSTS = [TargetInfidelity(TARGET_STATES)]
 
 # Define the optimization.
 PARAM_COUNT = 1
-PULSE_TIME = 100
-PULSE_STEP_COUNT = 100
-ITERATION_COUNT = 100
+PULSE_TIME = 10
+PULSE_STEP_COUNT = 50
+ITERATION_COUNT = 1000
 OPTIMIZER = Adam()
 
 # Define output.
 LOG_ITERATION_STEP = 1
-SAVE_ITERATION_STEP = 10
+SAVE_ITERATION_STEP = 1
 SAVE_PATH = "./out"
 SAVE_FILE_NAME = "test"
 

@@ -95,6 +95,7 @@ class Adam(Optimizer):
         self.iteration_count = 0
         self.gradient_moment = np.zeros_like(initial_params)
         self.gradient_square_moment = np.zeros_like(initial_params)
+        # self.gradient_square_moment_hat = np.zeros_like(initial_params)
         
         params = initial_params
         for i in range(iteration_count):
@@ -153,6 +154,11 @@ class Adam(Optimizer):
         return params + self.learning_rate * np.divide(gradient_moment_hat,
                                                   np.sqrt(gradient_square_moment_hat)
                                                   + self.epsilon)
+        # self.gradient_square_moment_hat = np.maximum(self.gradient_square_moment_hat,
+        #                                              self.gradient_square_moment)
+        # return params + self.learning_rate * np.divide(self.gradient_moment,
+        #                                                np.sqrt(self.gradient_square_moment_hat)
+        #                                                + self.epsilon)
 
 
 ### MODULE TESTS ###

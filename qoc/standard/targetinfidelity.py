@@ -57,8 +57,8 @@ class TargetInfidelity(Cost):
         Returns:
         cost :: float - the penalty
         """
-        fidelity = anp.sum(anp.square(anp.abs(anp.matmul(self.target_states_dagger,
-                                                         states)[:,0,0])), axis=0)
+        fidelity = anp.square(anp.abs(anp.sum(anp.matmul(self.target_states_dagger,
+                                                         states)[:,0,0], axis=0)))
         infidelity = 1 - (fidelity / self.state_normalization_constant)
         return self.alpha * infidelity
 
