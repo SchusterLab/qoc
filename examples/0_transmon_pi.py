@@ -4,7 +4,7 @@
 
 import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (Adam, SGD, LBFGSB, TargetInfidelity)
+from qoc.standard import (Adam, LBFGSB, Newton, SGD, TargetInfidelity)
 from qoc.util import (conjugate_transpose,
                       get_annihilation_operator,
                       get_creation_operator,
@@ -16,9 +16,10 @@ ANNIHILATION_OPERATOR = get_annihilation_operator(HILBERT_SIZE)
 CREATION_OPERATOR = get_creation_operator(HILBERT_SIZE)
 # E.q. 19 (p. 6) of https://arxiv.org/abs/1904.06560.
 H_SYSTEM_0 = PAULI_Z / 2
+# Use a + a^{dagger} as the drive term to control.
 hamiltonian = lambda params, t: (H_SYSTEM_0
                                  + params[0] * ANNIHILATION_OPERATOR
-                                 + anp.conjugate(params[0]) * CREATION_OPERATOR) 
+                                 + anp.conjugate(params[0]) * CREATION_OPERATOR)
 
 # Define the problem.
 INITIAL_STATE_0 = anp.array([[1], [0]])
@@ -30,14 +31,14 @@ COSTS = [TargetInfidelity(TARGET_STATES)]
 # Define the optimization.
 PARAM_COUNT = 1
 PULSE_TIME = 100
-PULSE_STEP_COUNT = 1000
-ITERATION_COUNT = 2000
+PULSE_STEP_COUNT = 100
+ITERATION_COUNT = 100
 OPTIMIZER = Adam()
 
 # Define output.
-LOG_ITERATION_STEP = 10
+LOG_ITERATION_STEP = 1
 SAVE_ITERATION_STEP = 10
-SAVE_PATH = "."
+SAVE_PATH = "./out"
 SAVE_FILE_NAME = "test"
 
 
