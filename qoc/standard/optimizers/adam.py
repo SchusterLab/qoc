@@ -4,7 +4,9 @@ adam.py - a module for defining the Adam optimizer
 
 import numpy as np
 
-from qoc.models import Optimizer
+from qoc.models.optimizer import Optimizer
+from qoc.standard import (complex_to_real_imag_flat,
+                          real_imag_to_complex_flat)
 
 
 class Adam(Optimizer):
@@ -13,13 +15,14 @@ class Adam(Optimizer):
     This implementation follows the original algorithm
     https://arxiv.org/abs/1412.6980.
     Fields:
-    apply_clip_grads :: bool
-    apply_learning_rate_decay :: bool
-    apply_scale_grads :: bool
+    apply_clip_grads :: bool - see clip_grads
+    apply_learning_rate_decay :: bool - see learning_rate_decay
+    apply_scale_grads :: bool - see scale_grads
     beta_1 :: float - gradient decay bias
     beta_2 :: float - gradient squared decay bias
     clip_grads :: float - the maximum absolute value at which the gradients
-        should be element-wise clipped
+        should be element-wise clipped, if not set, the gradients will
+        not be clipped
     epsilon :: float - fuzz factor
     gradient_moment :: numpy.ndarray - running optimization variable
     gradient_square_moment :: numpy.ndarray - running optimization variable
@@ -27,10 +30,11 @@ class Adam(Optimizer):
     iteration_count :: int - the current count of iterations performed
     learning_rate :: float - the current step size
     learning_rate_decay :: float - the number of iterations it takes for
-        the learning rate to decay by 1/e, if not specified, no decay is
+        the learning rate to decay by 1/e, if not set, no decay is
         applied
     name :: str - identifier for the optimizer
-    scale_grads :: float - the value to scale the norm of the gradients to
+    scale_grads :: float - the value to scale the norm of the gradients to,
+        if not set, the gradients will not be scaled
     """
     name = "adam"
 
@@ -95,7 +99,6 @@ class Adam(Optimizer):
         self.iteration_count = 0
         self.gradient_moment = np.zeros_like(initial_params)
         self.gradient_square_moment = np.zeros_like(initial_params)
-        # self.gradient_square_moment_hat = np.zeros_like(initial_params)
         
         params = initial_params
         for i in range(iteration_count):
@@ -106,20 +109,20 @@ class Adam(Optimizer):
     def update(self, grads, params):
         """Update the learning parameters for the current iteration.
         
-        Implementation Note: I believe it is faster to check the modification
+        IMPLEMENTATION NOTE: I believe it is faster to check the modification
         conditionals each iteration than it would be to define seperate
         functions to do the same work and then call update_vanilla with
         modified parameters. Namely, because each function call requires a
         stack context change. It would be faster altogether if there was a
         seperate update function for each combination of modifications,
         but that would create duplicate code, which I want to avoid.
-        If we really cared that much about performance we wouldn't be
-        using python.
+
         Args:
         grads :: numpy.ndarray - the gradients of the cost function with
             respect to each learning parameter for the current iteration
         params :: numpy.ndarray - the learning parameters for the
             current iteration
+
         Returns:
         new_params :: numpy.ndarray - the learning parameters to be used
             for the next iteration
@@ -132,33 +135,33 @@ class Adam(Optimizer):
         else:
             learning_rate = self.initial_learning_rate
 
-        # Apply gradient clipping.
-        if self.apply_clip_grads:
-            grads = np.clip(grads, -self.clip_grads, self.clip_grads)
-
-        # Apply gradient scaling.
+        # Apply gradient scaling (before clipping).
         if self.apply_scale_grads:
             grads_norm = np.linalg.norm(grads)
             grads = (grads / grads_norm) * self.scale_grads
 
-        # Vanilla update procedure.
+        # Apply gradient clipping.
+        if self.apply_clip_grads:
+            grads = np.clip(grads, -self.clip_grads, self.clip_grads)
+
+
+        # Do the vanilla update procedure.
         self.iteration_count += 1
-        self.gradient_moment = (self.beta_1 * self.gradient_moment
-                                + (1 - self.beta_1) * grads)
-        self.gradient_square_moment = (self.beta_2 * self.gradient_square_moment
-                                       + (1 - self.beta_2) * np.square(grads))
+        beta_1 = self.beta_1
+        beta_2 = self.beta_2
+        iteration_count = self.iteration_count
+        self.gradient_moment = (beta_1 * self.gradient_moment
+                                + (1 - beta_1) * grads)
+        self.gradient_square_moment = (beta_2 * self.gradient_square_moment
+                                       + (1 - beta_2) * np.square(grads))
         gradient_moment_hat = np.divide(self.gradient_moment,
-                                        1 - np.power(self.beta_1, self.iteration_count))
+                                        1 - np.power(beta_1, iteration_count))
         gradient_square_moment_hat = np.divide(self.gradient_square_moment,
-                                               1 - np.power(self.beta_2, self.iteration_count))
-        return params + self.learning_rate * np.divide(gradient_moment_hat,
+                                               1 - np.power(beta_2, iteration_count))
+        
+        return params - learning_rate * np.divide(gradient_moment_hat,
                                                   np.sqrt(gradient_square_moment_hat)
                                                   + self.epsilon)
-        # self.gradient_square_moment_hat = np.maximum(self.gradient_square_moment_hat,
-        #                                              self.gradient_square_moment)
-        # return params + self.learning_rate * np.divide(self.gradient_moment,
-        #                                                np.sqrt(self.gradient_square_moment_hat)
-        #                                                + self.epsilon)
 
 
 ### MODULE TESTS ###
@@ -167,31 +170,43 @@ def _test():
     """
     Run tests on the module.
     """
-    # These are hand checked tests.
+    # Check that the update method was implemented correctly
+    # using hand-checked values.
     adam = Adam()
-    params = np.array([[0, 1],
-                       [2, 3]])
     grads = np.array([[0, 1],
                       [2, 3]])
-    params1 = np.array([[0,         0.99988889],
-                        [1.99988889, 2.99988889]])
-    params2 = np.array([[0,          0.99965432],
-                        [1.99965432, 2.99965432]])
-    # assert(adam.update(grads, params).all() == params1.all())
-    # assert(adam.update(grads, params1).all()
-    #        == params2.all())
+    params = np.array([[0, 1],
+                       [2, 3]], dtype=np.float64)
+    params1 = np.array([[0,         0.999],
+                        [1.999, 2.999]])
+    params2 = np.array([[0,          0.99900003],
+                        [1.99900001, 2.99900001]])
+    
+    adam.run(None, None, 0, params, None)
+    params1_test = adam.update(params, grads)
+    params2_test = adam.update(params1, grads)
+    
+    assert(np.allclose(params1_test, params1))
+    assert(np.allclose(params2_test, params2))
 
-    # TOOD: rewrite test to map params.
+    # Check that complex mapping works and params
+    # without gradients are unaffected.
     params = np.array([[1+2j, 3+4j],
                        [5+6j, 7+8j]])
+    params_shape = params.shape
+    params_r_i = complex_to_real_imag_flat(params.flatten())
     grads = np.array([[1+1j, 0+0j],
                       [0+0j, -1-1j]])
-    params1 = adam.update(grads, params)
-    # assert(params1[0][1] == params[0][1] and params[1][0] == params1[1][0])
+    grads_r_i = complex_to_real_imag_flat(grads.flatten())
+    
+    adam.run(None, None, 0, params_r_i, None)
+    params1_test_r_i = adam.update(grads_r_i, params_r_i)
+    params1_test = np.reshape(real_imag_to_complex_flat(params1_test_r_i),
+                              params_shape)
+    
+    assert(np.allclose(params1_test[0][1], params[0][1]))
+    assert(np.allclose(params1_test[1][0], params[1][0]))
+
 
 if __name__ == "__main__":
     _test()
-        
-        
-        
-        

@@ -6,12 +6,12 @@ import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import Cost
-from qoc.util import conjugate_transpose
+from qoc.standard.functions import conjugate_transpose
 
 class ForbidStates(Cost):
     """a class to encapsulate the forbid states cost function
     Fields:
-    alpha :: float - the wieght factor for this cost
+    cost_multiplier :: float - the wieght factor for this cost
     dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
                       -> dcost_dparams :: numpy.ndarray
         - the gradient of the cost function with respect to the parameters
@@ -37,7 +37,7 @@ class ForbidStates(Cost):
     requires_step_evaluation = True
 
 
-    def __init__(self, forbidden_states, step_count, alpha=1.):
+    def __init__(self, forbidden_states, step_count, cost_multiplier=1.):
         """
         See class definition for parameter specification.
         Args:
@@ -47,7 +47,7 @@ class ForbidStates(Cost):
             state has its own list of forbidden states
         step_count :: int - the total number of steps in an evolution
         """
-        super().__init__(alpha)
+        super().__init__(cost_multiplier=cost_multiplier)
         # This cost function does not make use of parameter penalties.
         self.dcost_dparams = (lambda params, states, step:
                               np.zeros_like(params))
@@ -75,7 +75,8 @@ class ForbidStates(Cost):
             state = states[i]
             state_cost = 0
             for forbidden_state_dagger in state_forbidden_states_dagger:
-                state_cost = cost + anp.abs(anp.matmul(forbidden_state_dagger, state)[0,0])
+                state_cost = cost + anp.square(anp.abs(anp.matmul(forbidden_state_dagger,
+                                                                  state)[0,0]))
             #ENDFOR
             cost = cost + state_cost * self.state_normalization_constants[i]
         #ENDFOR
@@ -85,4 +86,28 @@ class ForbidStates(Cost):
         cost = (cost / (self.total_state_normalization_constant
                         * self.step_normalization_constant))
         
-        return self.alpha * cost
+        return self.cost_multiplier * cost
+
+
+def _test():
+    """
+    Run test on the module.
+    """
+    step_count = 10
+    state0 = np.array([[0], [1]])
+    state1 = np.divide(np.array([[1], [1]]), np.sqrt(2))
+    forbid0 = np.array([[1], [0]])
+    forbid1 = np.array([[1], [0]])
+    states = np.stack((state0, state1,))
+    forbidden_states0 = np.stack((forbid0,))
+    forbidden_states1 = np.stack((forbid1,))
+    forbidden_states = np.stack((forbidden_states0, forbidden_states1,))
+    fs = ForbidStates(forbidden_states, step_count)
+    
+    cost = fs.cost(None, states, None)
+    expected_cost = 0.025
+    assert(np.allclose(cost, expected_cost))
+
+
+if __name__ == "__main__":
+    _test()

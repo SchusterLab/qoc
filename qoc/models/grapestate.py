@@ -17,7 +17,7 @@ from qoc.models.grapepolicy import GrapeSchroedingerPolicy
 from qoc.models.interpolationpolicy import InterpolationPolicy
 from qoc.models.magnuspolicy import MagnusPolicy
 from qoc.models.operationpolicy import OperationPolicy
-from qoc.util import ans_jacobian
+from qoc.standard.autograd_extensions import ans_jacobian
 
 ### MAIN STRUCTURES ###
 
@@ -461,11 +461,12 @@ def _choose_magnus(hamiltonian, interpolation_policy, magnus_policy):
     #ENDIF
     
     magnus_wrapper = lambda *args, **kwargs: anp.real(magnus(*args, **kwargs))
-    def dmagnus_dparams(*args, **kwargs):
-        _magnus, _dmagnus_dparams = ans_jacobian(magnus_wrapper, 1)(*args, **kwargs)
-        old_axes = np.arange(len(_dmagnus_dparams.shape))
-        new_axes = np.roll(old_axes, -2)
-        return (np.moveaxis(_dmagnus_dparams, old_axes, new_axes),
-                _magnus)
+    # def dmagnus_dparams(*args, **kwargs):
+    #     _magnus, _dmagnus_dparams = ans_jacobian(magnus_wrapper, 1)(*args, **kwargs)
+    #     old_axes = np.arange(len(_dmagnus_dparams.shape))
+    #     new_axes = np.roll(old_axes, -2)
+    #     return (np.moveaxis(_dmagnus_dparams, old_axes, new_axes),
+    #             _magnus)
+    dmagnus_dparams = None
 
     return dmagnus_dparams, magnus, magnus_param_indices

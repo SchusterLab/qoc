@@ -6,12 +6,12 @@ import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import Cost
-from qoc.util import conjugate_transpose
+from qoc.standard.functions import conjugate_transpose
 
 class TargetInfidelity(Cost):
     """a class to encapsulate the target infidelity cost function
     Fields:
-    alpha :: float - the wieght factor for this cost
+    cost_multiplier :: float - the wieght factor for this cost
     dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
                       -> dcost_dparams :: numpy.ndarray
         - the gradient of the cost function with respect to the parameters
@@ -32,14 +32,14 @@ class TargetInfidelity(Cost):
     requires_step_evaluation = False
 
 
-    def __init__(self, target_states, alpha=1.):
+    def __init__(self, target_states, cost_multiplier=1.):
         """
         See class definition for parameter specification.
         target_states :: numpy.ndarray - an array of states
             that correspond to the target state for each of the initial states
             used in optimization
         """
-        super().__init__(alpha)
+        super().__init__(cost_multiplier=cost_multiplier)
         self.target_states_dagger = conjugate_transpose(anp.stack(target_states))
         self.state_normalization_constant = len(target_states)
         # This cost function does not make use of parameter penalties.
@@ -60,7 +60,7 @@ class TargetInfidelity(Cost):
         fidelity = anp.square(anp.abs(anp.sum(anp.matmul(self.target_states_dagger,
                                                          states)[:,0,0], axis=0)))
         infidelity = 1 - (fidelity / self.state_normalization_constant)
-        return self.alpha * infidelity
+        return self.cost_multiplier * infidelity
 
 
 def _tests():

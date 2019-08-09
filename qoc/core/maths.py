@@ -5,9 +5,9 @@ maths.py - a module for math methods
 import autograd.numpy as anp
 import numpy as np
 
-from qoc.util import commutator
+from qoc.standard import commutator
 
-# interpolation methods
+### INTERPOLATION METHODS ###
 
 def interpolate_linear(y1, y2, x1, x2, x3):
     """
@@ -27,7 +27,7 @@ def interpolate_linear(y1, y2, x1, x2, x3):
     return y1 + anp.divide(y2 - y1, x2 - x1) * (x3 - x1)
 
 
-# magnus expansion methods
+### MAGNUS EXPANSION METHODS ###
 
 def magnus_m2(a1, dt):
     """
@@ -79,7 +79,7 @@ def magnus_m6(a1, a2, a3, dt):
                          * commutator(b1, 2 * b3 + b1_b2_commutator)))
 
 
-# magnus expansion hamiltonian evaluations
+### MAGNUS EXPANSION HAMILTONIAN EVALUATIONS ###
 
 _MAGNUS_M4_C1 = anp.divide(1, 2) - anp.divide(anp.sqrt(3), 6)
 _MAGNUS_M4_C2 = anp.divide(1, 2) + anp.divide(anp.sqrt(3), 6)

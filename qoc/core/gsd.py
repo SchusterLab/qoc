@@ -14,13 +14,14 @@ import scipy.linalg as la
 from qoc.models import (MagnusPolicy, OperationPolicy, GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerPolicy, GrapeResult,
                         InterpolationPolicy, Dummy)
-from qoc.standard import (Adam, ForbidStates, TargetInfidelity, expm)
-from qoc.util import (PAULI_X, PAULI_Y, PAULI_Z, conjugate_transpose,
-                      matrix_to_column_vector_list, matmuls, ans_jacobian,
-                      complex_to_real_imag_flat,
-                      real_imag_to_complex_flat,
-                      get_annihilation_operator,
-                      get_creation_operator)
+from qoc.standard import (Adam, ForbidStates, TargetInfidelity, expm,
+                          PAULI_X, PAULI_Y, PAULI_Z, conjugate_transpose,
+                          matrix_to_column_vector_list, matmuls,
+                          complex_to_real_imag_flat,
+                          real_imag_to_complex_flat,
+                          get_annihilation_operator,
+                          get_creation_operator)
+from qoc.standard.autograd_extensions import ans_jacobian
 
 
 ### MAIN METHODS ###

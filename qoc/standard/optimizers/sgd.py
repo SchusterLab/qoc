@@ -4,7 +4,7 @@ sgd.py - a module for defining the Stochastic Gradient Descent optimizer
 
 import numpy as np
 
-from qoc.models import Optimizer
+from qoc.models.optimizer import Optimizer
 
 
 class SGD(Optimizer):

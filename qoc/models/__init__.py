@@ -2,15 +2,15 @@
 models - a directory for qoc's data models 
 """
 
-from qoc.models.cost import Cost
-from qoc.models.dummy import Dummy
-from qoc.models.grapepolicy import GrapeSchroedingerPolicy
-from qoc.models.grapestate import (GrapeSchroedingerDiscreteState,
+from .cost import Cost
+from .dummy import Dummy
+from .grapepolicy import GrapeSchroedingerPolicy
+from .grapestate import (GrapeSchroedingerDiscreteState,
                                    GrapeResult, EvolveResult)
-from qoc.models.interpolationpolicy import InterpolationPolicy
-from qoc.models.magnuspolicy import MagnusPolicy
-from qoc.models.operationpolicy import OperationPolicy
-from qoc.models.optimizer import Optimizer
+from .interpolationpolicy import InterpolationPolicy
+from .magnuspolicy import MagnusPolicy
+from .operationpolicy import OperationPolicy
+from .optimizer import Optimizer
 
 
 __all__ = [

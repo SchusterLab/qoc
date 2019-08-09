@@ -9,7 +9,7 @@ import numpy as np
 class Cost(object):
     """a class to encapsulate a cost function
     Fields:
-    alpha :: float - the weight factor for this cost
+    cost_multiplier :: float - the weight factor for this cost
     dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
                       -> dcost_dparams :: numpy.ndarray
         - the gradient of the cost function with respect to the parameters
@@ -25,12 +25,12 @@ class Cost(object):
     name = "parent_cost"
     requires_step_evaluation = False
     
-    def __init__(self, alpha=1.):
+    def __init__(self, cost_multiplier=1.):
         """
         See class definition for parameter specification.
         """
         super().__init__()
-        self.alpha = alpha
+        self.cost_multiplier = cost_multiplier
 
         # Define the gradient of the cost function.
         cost_wrapper = (lambda *args, **kwargs:

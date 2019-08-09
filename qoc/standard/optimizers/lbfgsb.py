@@ -3,7 +3,7 @@ lbfgsb.py - a module to expose the L-BFGS-B optimization algorithm
 """
 
 from scipy.optimize import minimize
-from qoc.models import Optimizer
+from qoc.models.optimizer import Optimizer
 
 class LBFGSB(Optimizer):
     """

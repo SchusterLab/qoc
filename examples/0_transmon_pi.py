@@ -4,11 +4,11 @@
 
 import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (Adam, LBFGSB, SGD, TargetInfidelity)
-from qoc.util import (conjugate_transpose,
-                      get_annihilation_operator,
-                      get_creation_operator,
-                      PAULI_Z,)
+from qoc.standard import (Adam, LBFGSB, SGD, TargetInfidelity,
+                          conjugate_transpose,
+                          get_annihilation_operator,
+                          get_creation_operator,
+                          PAULI_Z,)
 
 # Define the system.
 HILBERT_SIZE = 2
@@ -33,7 +33,6 @@ PARAM_COUNT = 1
 PULSE_TIME = 10
 PULSE_STEP_COUNT = 50
 ITERATION_COUNT = 1000
-OPTIMIZER = Adam()
 
 # Define output.
 LOG_ITERATION_STEP = 1
@@ -47,7 +46,6 @@ def main():
                                          ITERATION_COUNT, PARAM_COUNT,
                                          PULSE_STEP_COUNT, PULSE_TIME,
                                          log_iteration_step=LOG_ITERATION_STEP,
-                                         optimizer=OPTIMIZER,
                                          save_file_name=SAVE_FILE_NAME,
                                          save_iteration_step=SAVE_ITERATION_STEP,
                                          save_path=SAVE_PATH,)
