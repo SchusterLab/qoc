@@ -48,7 +48,8 @@ def conjugate_transpose(matrix, operation_policy=OperationPolicy.CPU):
         of matrix
     """
     if operation_policy == OperationPolicy.CPU:
-        _conjugate_transpose = anp.conjugate(anp.swapaxes(matrix, -1, -2))
+        _conjugate_transpose = anp.conjugate(transpose(matrix,
+                                                       operation_policy))
     else:
         pass
     
@@ -87,6 +88,66 @@ def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
         pass
 
     return _matmuls
+
+
+def mult_cols(matrix, vector, operation_policy=OperationPolicy.CPU):
+    """
+    Multiply each column vector in `matrix` by the corresponding
+    element in `vector`.
+    Args:
+    matrix :: numpy.ndarray - an N x N matrix
+    vector :: numpy.ndarray - an N vector
+    operation_policy :: qoc.OperationPolicy - what data type is
+        used to perform the operation and with which method
+    Returns:
+    _matrix :: numpy.ndarray - the requested matrix
+    """
+    if operation_policy == OperationPolicy.CPU:
+        _matrix = matrix * vector
+    else:
+        pass
+
+    return _matrix
+
+
+def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
+    """
+    Multiply each row vector in `matrix` by the corresponding element
+    in `vector`.
+    Args:
+    matrix :: numpy.ndarray - an N x N matrix
+    vector :: numpy.ndarray - an N vector
+    operation_policy :: qoc.OperationPolicy - what data type is
+        used to perform the operation and with which method
+    Returns:
+    _matrix :: numpy.ndarray - the requested matrix
+    """
+    if operation_policy == OperationPolicy.CPU:
+        _matrix = transpose(transpose(matrix, operation_policy)
+                            * vector, operation_policy)
+    else:
+        pass
+
+    return _matrix
+
+
+def transpose(matrix, operation_policy=OperationPolicy.CPU):
+    """
+    Obtain the transpose of the matrix.
+    Args:
+    matrix :: numpy.ndarray - an N x M matrix
+    operation_policy :: qoc.OperationPolicy - what data type is
+        used to perform the operation and with which method
+    Returns:
+    matrix_transpose :: numpy.ndarray - an M x N matrix that is the
+        transpose of `matrix`
+    """
+    if operation_policy == OperationPolicy.CPU:
+        matrix_transpose = anp.swapaxes(matrix, -1, -2)
+    else:
+        pass
+
+    return matrix_transpose
 
 
 ### ISOMORPHISMS ###

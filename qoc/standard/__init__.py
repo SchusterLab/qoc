@@ -12,6 +12,7 @@ from .costs import (ForbidStates,
 
 from .functions import (commutator, conjugate_transpose,
                         expm, krons, matmuls,
+                        mult_cols, mult_rows, transpose,
                         column_vector_list_to_matrix,
                         matrix_to_column_vector_list,
                         complex_to_real_imag_flat,
