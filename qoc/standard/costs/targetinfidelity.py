@@ -79,6 +79,16 @@ def _tests():
     cost = ti.cost(None, states, None)
     assert(np.allclose(cost, 0))
 
+    state0 = np.array([[0], [1]])
+    state1 = (np.array([[1], [1]]) / np.sqrt(2))
+    target0 = np.array([[1], [0]])
+    target1 = np.array([[1], [0]])
+    states = np.stack((state0, state1,), axis=0)
+    targets = np.stack((target0, target1,), axis=0)
+    ti = TargetInfidelity(targets)
+    cost = ti.cost(None, states, None)
+    assert(np.allclose(cost, .75))
+
 
 if __name__ == "__main__":
     _tests()

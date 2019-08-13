@@ -39,14 +39,19 @@ def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
     Construct the left-multiplying vector jacobian product function
     for the matrix exponential.
 
-    IMPLEMENTATION NOTE: The dexpm_dmij line could be moved out
-    of the inner i, j loop and instead stored in the jacobian
-    dexpm_dm. However, dexpm_dm is (n x n) x (n x n) and would
-    take up considerable memory. Because we do not expect
-    to compute the jacobian dexpm_dm and instead expect
-    to compute the intermediate vector-jacobian-product where
-    the final function has a scalar output (e.g. GRAPE) we
-    choose to leave the dexpm_dmij line in the inner i, j loop.
+    Intuition:
+    `dfinal_dexpm` is the jacobian of `final` with respect to each element `expmij`
+    of `exp_matrix`. `final` is the output of the first function in the
+    backward differentiation series. It is also the output of the last
+    function evaluated in the chain of functions that is being differentiated,
+    i.e. the final cost function. The goal of `vjp_function` is to take
+    `dfinal_dexpm` and yield `dfinal_dmatrix` which is the jacobian of
+    `final` with respect to each element `mij` of `matrix`.
+    To compute the frechet derivative of the matrix exponential with respect
+    to each element `mij`, we use the approximation that
+    dexpm_dmij = np.matmul(Eij, exp_matrix). Since Eij has a specific
+    structure we don't need to do the full matrix multiplication and instead
+    use some indexing tricks.
 
     Args:
     exp_matrix :: numpy.ndarray - the matrix exponential of matrix
@@ -60,22 +65,17 @@ def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
         to the gradient of the final function with respect to "matrix"
     """
     if operation_policy == OperationPolicy.CPU:
-        # matrix_size is equivalent to dfinal_dmatrix_size,
-        # exp_matrix_size, or dfinal_dexpm_size.
         matrix_size = matrix.shape[0]
-        expmfn_state = ExpmFrechetNormalState(matrix)
         
         def _expm_vjp_cpu(dfinal_dexpm):
             dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
+
+            # Compute a first order approximation of the frechet derivative of the matrix
+            # exponential in every unit direction Eij.
             for i in range(matrix_size):
                 for j in range(matrix_size):
-                    # dexpm_dmij is the jacobian of `exp_matrix` with respect to the mij element
-                    # of `matrix`.
-                    dexpm_dmij = expmfn_state.expm_frechet_eij(i, j)
-                    # The contribution of the mij element of the matrix to the final function
-                    # is the sum of the contributions of mij to each element expmij
-                    # of exp_matrix.
-                    dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm, dexpm_dmij))
+                    dexpm_dmij_rowi = exp_matrix[j,:]
+                    dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
                 #ENDFOR
             #ENDFOR
 
@@ -102,6 +102,10 @@ PADE_ORDER_13 = 13
 
 class ExpmFrechetNormalState(object):
     """
+    NOTE: This code is deprecated in favor of an approximation to the frechet derivative.
+    This code is kept here because I worked hard on it and do not want to remove it from
+    the repository.
+
     This class encapsulates necessary information to obtain the
     frechet derivative of the matrix
     exponential at a normal matrix A in the direction of a unit matrix Eij.
@@ -367,6 +371,7 @@ class ExpmFrechetNormalState(object):
 ### MODULE TESTS ###
 
 _BIG = 30
+_TEST_DEPRECATED = False
 
 def _get_skew_hermitian_matrix(matrix_size):
     matrix = (np.random.rand(matrix_size, matrix_size)
@@ -395,26 +400,30 @@ def _tests():
 
     assert(np.allclose(dexpm_dm, dexpm_dm_expected))
 
-    # Test that the frechet derivative of the normal matrix exponential
-    # matches scipy's implementation.
-    # A random scale factor is introduced to ensure that all pades get
-    # evaluated.
-    for matrix_size in range(2, _BIG):
-        scale = np.random.randint(-7, 7)
-        shm = _get_skew_hermitian_matrix(matrix_size) * 10 ** scale
-        dexpm_state = ExpmFrechetNormalState(shm)
-        for i in range(matrix_size):
-            for j in range(matrix_size):
-                i = np.random.randint(0, matrix_size)
-                j = np.random.randint(0, matrix_size)
-                eij = get_eij(i, j, matrix_size)
-                
-                expm_frechet_normal = dexpm_state.expm_frechet_eij(i, j)
-                expm_frechet = la.expm_frechet(shm, eij, compute_expm=False)
-                
-                assert(np.allclose(expm_frechet_normal, expm_frechet))
+    # These functions are not currently used by the package and do not
+    # need to be tested.
+    if _TEST_DEPRECATED:
+        # Test that the frechet derivative of the normal matrix exponential
+        # matches scipy's implementation.
+        # A random scale factor is introduced to ensure that all pades get
+        # evaluated.
+        for matrix_size in range(2, _BIG):
+            scale = np.random.randint(-7, 7)
+            shm = _get_skew_hermitian_matrix(matrix_size) * 10 ** scale
+            dexpm_state = ExpmFrechetNormalState(shm)
+            for i in range(matrix_size):
+                for j in range(matrix_size):
+                    i = np.random.randint(0, matrix_size)
+                    j = np.random.randint(0, matrix_size)
+                    eij = get_eij(i, j, matrix_size)
+
+                    expm_frechet_normal = dexpm_state.expm_frechet_eij(i, j)
+                    expm_frechet = la.expm_frechet(shm, eij, compute_expm=False)
+
+                    assert(np.allclose(expm_frechet_normal, expm_frechet))
+                #ENDFOR
+            #ENDFOR
         #ENDFOR
-    #ENDFOR
 
 
 if __name__ == "__main__":
