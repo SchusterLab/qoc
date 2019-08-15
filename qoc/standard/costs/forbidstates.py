@@ -78,7 +78,7 @@ class ForbidStates(Cost):
                 state_cost = cost + anp.square(anp.abs(anp.matmul(forbidden_state_dagger,
                                                                   state)[0,0]))
             #ENDFOR
-            cost = cost + state_cost * self.state_normalization_constants[i]
+            cost = cost + anp.divide(state_cost, self.state_normalization_constants[i])
         #ENDFOR
         
         # Normalize the cost for the number of evolving states
@@ -94,19 +94,21 @@ def _test():
     Run test on the module.
     """
     step_count = 10
-    state0 = np.array([[0], [1]])
-    state1 = np.divide(np.array([[1], [1]]), np.sqrt(2))
-    forbid0 = np.array([[1], [0]])
-    forbid1 = np.array([[1], [0]])
+    state0 = np.array([[1], [0]])
+    forbid0_0 = np.array([[1], [0]])
+    forbid0_1 = np.divide(np.array([[1], [1]]), np.sqrt(2))
+    state1 = np.array([[0], [1]])
+    forbid1_0 = np.divide(np.array([[1], [1]]), np.sqrt(2))
+    forbid1_1 = np.divide(np.array([[1j], [1j]]), np.sqrt(2))
     states = np.stack((state0, state1,))
-    forbidden_states0 = np.stack((forbid0,))
-    forbidden_states1 = np.stack((forbid1,))
+    forbidden_states0 = np.stack((forbid0_0, forbid0_1,))
+    forbidden_states1 = np.stack((forbid1_0, forbid1_1,))
     forbidden_states = np.stack((forbidden_states0, forbidden_states1,))
     fs = ForbidStates(forbidden_states, step_count)
     
     cost = fs.cost(None, states, None)
-    expected_cost = 0.025
-    assert(np.allclose(cost, expected_cost))
+    expected_cost = np.divide(5, 160)
+    assert(np.allclose(cost, expected_cost,))
 
 
 if __name__ == "__main__":

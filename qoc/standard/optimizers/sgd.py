@@ -67,7 +67,7 @@ def _test():
     params = np.ones(5)
     grads = np.ones(5)
     params = sgd.update(grads, params)
-    assert(params.all() == 0)
+    assert(np.allclose(params, np.zeros_like(params)))
 
 
 if __name__ == "__main__":

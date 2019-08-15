@@ -36,10 +36,11 @@ class Cost(object):
         cost_wrapper = (lambda *args, **kwargs:
                         anp.real(self.cost(*args, **kwargs)))
         self.dcost_dparams = (lambda *args, **kwargs:
-                              elementwise_grad(cost_wrapper, 0)(*args, **kwargs))
+                              jacobian(cost_wrapper, 0)
+                              (*args, **kwargs))
         self.dcost_dstates = (lambda *args, **kwargs:
-                              reshape_cost_jacobian(jacobian(cost_wrapper, 1)
-                                                    (*args, **kwargs)))
+                              jacobian(cost_wrapper, 1)
+                              (*args, **kwargs))
 
 
     def __str__(self):
@@ -65,10 +66,3 @@ class Cost(object):
         cost :: float - the cost for the given parameters, states, and time step
         """
         return 0.
-    
-
-### HELPER FUNCTIONS ###
-
-# For cost functions dependent upon state inputs, the gradient
-# typically has the transpose shape of the state.
-reshape_cost_jacobian = lambda grads: np.moveaxis(grads, -1, -2)

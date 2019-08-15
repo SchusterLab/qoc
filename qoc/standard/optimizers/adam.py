@@ -4,6 +4,7 @@ adam.py - a module for defining the Adam optimizer
 
 import numpy as np
 
+from qoc.models import Dummy
 from qoc.models.optimizer import Optimizer
 from qoc.standard import (complex_to_real_imag_flat,
                           real_imag_to_complex_flat)
@@ -170,6 +171,9 @@ def _test():
     """
     Run tests on the module.
     """
+    # Use the functions that are used in the core module.
+    from qoc.core.common import (strip_params, slap_params)
+    
     # Check that the update method was implemented correctly
     # using hand-checked values.
     adam = Adam()
@@ -191,21 +195,24 @@ def _test():
 
     # Check that complex mapping works and params
     # without gradients are unaffected.
-    params = np.array([[1+2j, 3+4j],
-                       [5+6j, 7+8j]])
-    params_shape = params.shape
-    params_r_i = complex_to_real_imag_flat(params.flatten())
+    gstate = Dummy()
+    gstate.complex_params = True
     grads = np.array([[1+1j, 0+0j],
                       [0+0j, -1-1j]])
-    grads_r_i = complex_to_real_imag_flat(grads.flatten())
+    params = np.array([[1+2j, 3+4j],
+                       [5+6j, 7+8j]])
+    gstate.params_shape = params.shape
+    gstate.max_param_norms = np.ones(gstate.params_shape[0]) * 10
     
-    adam.run(None, None, 0, params_r_i, None)
-    params1_test_r_i = adam.update(grads_r_i, params_r_i)
-    params1_test = np.reshape(real_imag_to_complex_flat(params1_test_r_i),
-                              params_shape)
+    flat_params = strip_params(gstate, params)
+    flat_grads = strip_params(gstate, grads)
     
-    assert(np.allclose(params1_test[0][1], params[0][1]))
-    assert(np.allclose(params1_test[1][0], params[1][0]))
+    adam.run(None, None, 0, flat_params, None)
+    params1 = adam.update(flat_grads, flat_params)
+    params1 = slap_params(gstate, params1)
+    
+    assert(np.allclose(params1[0][1], params[0][1]))
+    assert(np.allclose(params1[1][0], params[1][0]))
 
 
 if __name__ == "__main__":

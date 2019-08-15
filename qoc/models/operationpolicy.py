@@ -15,13 +15,13 @@ class OperationPolicy(Enum):
 
     def __str__(self):
         if self.value == 1:
-            return "operation_type_cpu"
+            return "operation_policy_cpu"
         elif self.value == 2:
-            return "operation_type_gpu"
+            return "operation_policy_gpu"
         elif self.value == 3:
-            return "operation_type_cpu_sparse"
+            return "operation_policy_cpu_sparse"
         else:
-            return "operation_type_gpu_sparse"
+            return "operation_policy_gpu_sparse"
 
 
     def __repr__(self):

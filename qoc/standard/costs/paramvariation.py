@@ -13,7 +13,7 @@ class ParamVariation(Cost):
     a cost to penalize variations of control parameters
     Fields:
     cost_multiplier :: float - the weight factor for this cost
-    max_param_amplitudes :: numpy.ndarray - the maximum values for
+    max_param_norms :: numpy.ndarray - the maximum absolute values for
         each param, the array's shape should be (param_count,)
     name :: str - a unique identifier for this cost
     order :: int - the order with which to take the differences
@@ -26,14 +26,14 @@ class ParamVariation(Cost):
     name = "param_variation"
     requires_step_evaluation = False
 
-    def __init__(self, max_param_amplitudes,
+    def __init__(self, max_param_norms,
                  param_count, pulse_step_count, cost_multiplier=1.,
                  order=1):
         """
         See class fields for argument information.
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.max_param_amplitudes = max_param_amplitudes
+        self.max_param_norms = max_param_norms
         self.order = order
         self.param_count = param_count
         self.pulse_step_count = pulse_step_count
@@ -50,22 +50,20 @@ class ParamVariation(Cost):
         cost :: float - the penalty
         """
         # Heap -> Stack.
-        max_param_amplitudes = self.max_param_amplitudes
+        max_param_norms = self.max_param_norms
         order = self.order
         param_count = self.param_count
 
         # Normalize the parameters.
-        normalized_params = anp.zeros_like(params)
-        for i in range(param_count):
-            normalized_params[:,i] = (params[:,i]
-                                       / max_param_amplitudes[i])
+        normalized_params = anp.divide(params, max_param_norms)
 
         # Penalize the difference in variations from the value of a parameter
         # at one step to the next step.
         diffs = anp.diff(normalized_params, axis=0, n=order)
         diffs_total = anp.sum(anp.square(anp.abs(diffs)))
-        diffs_total_normalized = anp.divide(anp.divide(diffs_total, param_count),
-                                            self.pulse_step_count - order)
+        diffs_total_normalized = anp.divide(diffs_total,
+                                            param_count * (self.pulse_step_count - order))
+
         return self.cost_multiplier * diffs_total_normalized
 
 
@@ -73,23 +71,23 @@ def _test():
     """
     Run test on the module.
     """
-    max_param_amplitudes = np.array([1, 2])
-    params = np.array([[1, 1], [.5, 1.5], [0, 2]])
+    max_param_norms = np.array((np.sqrt(265), np.sqrt(181),))
+    params = np.array(((1+2j, 7+8j,), (3+4j, 9+10j,), (11+12j, 5+6j,),))
     param_count = params.shape[1]
     pulse_step_count = params.shape[0]
     
-    pvo1 = ParamVariation(max_param_amplitudes, param_count,
+    pvo1 = ParamVariation(max_param_norms, param_count,
                           pulse_step_count, order=1)
     cost = pvo1.cost(params, None, None)
-    expected_cost = np.divide(np.divide((0.5 + 0.25) + (0.5 + 0.25),
-                                        param_count),
-                              pulse_step_count - 1)
+    expected_cost = 0.18355050557698324
+
     assert(np.allclose(cost, expected_cost))
 
-    pvo2 = ParamVariation(max_param_amplitudes, param_count,
+    pvo2 = ParamVariation(max_param_norms, param_count,
                           pulse_step_count, order=2)
     cost = pvo2.cost(params, None, None)
-    expected_cost = 0
+    expected_cost = 0.33474408422808305
+    
     assert(np.allclose(cost, expected_cost))
 
 

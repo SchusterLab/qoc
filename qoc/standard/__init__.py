@@ -8,7 +8,10 @@ from .constants import (PAULI_X, PAULI_Y, PAULI_Z,
                         get_eij,)
 
 from .costs import (ForbidStates,
-                    TargetInfidelity,)
+                    ParamValue,
+                    ParamVariation,
+                    TargetInfidelity,
+                    TargetInfidelityTime,)
 
 from .functions import (commutator, conjugate_transpose,
                         expm, krons, matmuls,
@@ -24,7 +27,8 @@ __all__ = [
     "PAULI_X", "PAULI_Y", "PAULI_Z", "get_creation_operator",
     "get_annihilation_operator", "get_eij",
     
-    "ForbidStates", "TargetInfidelity",
+    "ParamValue", "ParamVariation", "ForbidStates",
+    "TargetInfidelity", "TargetInfidelityTime",
     
     "commutator", "conjugate_transpose", "expm", "krons",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",

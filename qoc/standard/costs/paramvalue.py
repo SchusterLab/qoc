@@ -12,9 +12,10 @@ class ParamValue(Cost):
     a cost to penalize high parameter values
     Fields:
     cost_multiplier :: float - the weight factor for this cost
-    max_param_amplitudes :: numpy.ndarray - the maximum values for
+    max_param_norms :: numpy.ndarray - the maximum absolute values for
         each param, the array's shape should be (param_count,)
     name :: str - a unique identifier for this cost
+    nomalization_constant :: int - param_count * pulse_step_count
     param_count :: int - the number of parameters at each
         time step
     pulse_step_count :: int - the number of time steps
@@ -22,13 +23,14 @@ class ParamValue(Cost):
     name = "param_variation"
     requires_step_evaluation = False
 
-    def __init__(self, max_param_amplitudes,
+    def __init__(self, max_param_norms,
                  param_count, pulse_step_count, cost_multiplier=1.,):
         """
         See class fields for argument information.
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.max_param_amplitudes = max_param_amplitudes
+        self.max_param_norms = max_param_norms
+        self.normalization_constant = param_count * pulse_step_count
         self.param_count = param_count
         self.pulse_step_count = pulse_step_count
 
@@ -43,20 +45,13 @@ class ParamValue(Cost):
         Returns:
         cost :: float - the penalty
         """
-        # Heap -> Stack.
-        max_param_amplitudes = self.max_param_amplitudes
-        param_count = self.param_count
-
         # Normalize the parameters.
-        normalized_params = anp.zeros_like(params)
-        for i in range(param_count):
-            normalized_params[:,i] = (params[:,i]
-                                       / max_param_amplitudes[i])
+        normalized_params = anp.divide(params, self.max_param_norms)
 
         # Penalize the sum of the square of the absolute value of the parameters.
         cost = anp.sum(anp.square(anp.abs(normalized_params)))
-        cost_normalized = anp.divide(anp.divide(cost, param_count),
-                                     self.pulse_step_count)
+        cost_normalized = anp.divide(cost, self.normalization_constant)
+        
         return self.cost_multiplier * cost_normalized
 
 
@@ -64,18 +59,18 @@ def _test():
     """
     Run test on the module.
     """
-    max_param_amplitudes = np.array([1, 2])
-    params = np.array([[1, 2], [.5, 1.5], [0, 1]])
+    max_param_norms = np.array((np.sqrt(181), np.sqrt(265),))
+    params = np.array(((1+2j, 3-4j), (5-6j, 7+8j), (9+10j, 11+12j),))
     param_count = params.shape[1]
     pulse_step_count = params.shape[0]
-    
-    pv = ParamValue(max_param_amplitudes, param_count,
+    pv = ParamValue(max_param_norms, param_count,
                     pulse_step_count)
+    
     cost = pv.cost(params, None, None)
-    expected_cost = 0.5104166666666666
+    expected_cost = 0.48089926682650547
+    
     assert(np.allclose(cost, expected_cost))
 
 
 if __name__ == "__main__":
     _test()
-            

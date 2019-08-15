@@ -37,7 +37,7 @@ class GrapeState(object):
     iteration_count :: int - the number of iterations to optimize for
     log_iteration_step :: the number of iterations at which to print
         progress to stdout
-    max_param_amplitudes :: the maximum aboslute value at which to clip
+    max_param_norms :: the maximum aboslute value at which to clip
         the parameters
     operation_policy :: qoc.OperationPolicy - how computations should be
         performed, e.g. CPU, GPU, sparse, etc.
@@ -64,7 +64,7 @@ class GrapeState(object):
                  initial_states,
                  iteration_count,
                  log_iteration_step,
-                 max_param_amplitudes, operation_policy,
+                 max_param_norms, operation_policy,
                  optimizer, param_count, pulse_step_count,
                  pulse_time, save_file_name,
                  save_iteration_step, save_path):
@@ -84,7 +84,7 @@ class GrapeState(object):
         self.initial_states = initial_states
         self.iteration_count = iteration_count
         self.log_iteration_step = log_iteration_step
-        self.max_param_amplitudes = max_param_amplitudes
+        self.max_param_norms = max_param_norms
         self.param_count = param_count
         self.params_shape = (pulse_step_count, param_count)
         self.pulse_step_count = pulse_step_count
@@ -125,6 +125,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
           expansion with respect to the params argument. The params argument
           consists of all params specified by magnus_param_indices.
     final_iteration :: int - the last optimization iteration
+    final_time_step :: int - the last pulse step, i.e. point where
+        parameters are updated
     final_time_step :: int - the last evolution time step
     grape_schroedinger_policy :: qoc.GrapeSchroedingerPolicy - specification
         for how to perform the main integration
@@ -155,7 +157,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         to save memory and time.
     magnus_policy :: qoc.MagnusPolicy - specify how to perform the 
         magnus expansion
-    max_param_amplitudes :: the maximum aboslute value at which to clip
+    max_param_norms :: the maximum aboslute value at which to clip
         the parameters
     operation_policy :: qoc.OperationPolicy - how computations should be
         performed, e.g. CPU, GPU, sparse, etc.
@@ -183,7 +185,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                  initial_states,
                  interpolation_policy,
                  iteration_count, log_iteration_step,
-                 magnus_policy, max_param_amplitudes, operation_policy,
+                 magnus_policy, max_param_norms, operation_policy,
                  optimizer, param_count, pulse_step_count, pulse_time,
                  save_file_name, save_iteration_step, save_path,
                  system_step_multiplier):
@@ -201,7 +203,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         super().__init__(costs, hilbert_size, initial_params,
                          initial_states,
                          iteration_count,
-                         log_iteration_step, max_param_amplitudes,
+                         log_iteration_step, max_param_norms,
                          operation_policy, optimizer, param_count,
                          pulse_step_count, pulse_time, 
                          save_file_name, save_iteration_step,
@@ -213,6 +215,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                                      interpolation_policy,
                                                      magnus_policy)
         self.final_iteration = iteration_count - 1
+        self.final_pulse_step = pulse_step_count - 1
         system_step_count = pulse_step_count * system_step_multiplier
         self.final_time_step = system_step_count - 1
         self.dt = pulse_time / system_step_count
@@ -294,7 +297,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                 save_file["initial_states"] = self.initial_states
                 save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
                 save_file["magnus_policy"] = "{}".format(self.magnus_policy)
-                save_file["max_param_amplitudes"] = "{}".format(self.magnus_policy)
+                save_file["max_param_norms"] = self.max_param_norms
                 save_file["operation_policy"] = "{}".format(self.operation_policy)
                 save_file["optimizer"] = "{}".format(self.optimizer)
                 save_file["params"] = np.zeros((save_count, self.pulse_step_count,

@@ -22,6 +22,7 @@ class LBFGSB(Optimizer):
             initial_params, jacobian):
         """
         Run the L-BFGS-B method.
+
         Args:
         args :: any - a tuple of arguments to pass to the function
             and jacobian
@@ -29,8 +30,9 @@ class LBFGSB(Optimizer):
             - the function to minimize
         iteration_count :: int - how many iterations to perform
         initial_params :: numpy.ndarray - the initial optimization values
-        jacobian :: numpy.ndarray - the jacobian of the function with respect
-            to the params
+        jacobian :: any -> numpy.ndarray - a function that returns the jacobian
+            of `function`
+
         Returns:
         result :: scipy.optimize.OptimizeResult
         """
@@ -40,5 +42,3 @@ class LBFGSB(Optimizer):
         return minimize(function, initial_params, args=args,
                         method="L-BFGS-B", jac=jacobian,
                         options=options)
-        
-        

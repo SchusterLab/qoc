@@ -116,11 +116,12 @@ def _tests():
     m = np.array([[1., 0.],
                   [0., 1.]])
     m_len = m.shape[0]
+    exp_m = np.exp(m)
     dexpm_dm_expected = np.zeros((m_len, m_len, m_len, m_len), dtype=m.dtype)
-    dexpm_dm_expected[0, 0, 0, 0] = np.exp(m)[0, 0]
-    dexpm_dm_expected[0, 1, 0, 1] = np.exp(m)[0, 0]
-    dexpm_dm_expected[1, 0, 1, 0] = np.exp(m)[1, 1]
-    dexpm_dm_expected[1, 1, 1, 1] = np.exp(m)[1, 1]
+    dexpm_dm_expected[0, 0, 0, 0] = exp_m[0, 0]
+    dexpm_dm_expected[0, 1, 0, 1] = exp_m[0, 0]
+    dexpm_dm_expected[1, 0, 1, 0] = exp_m[1, 1]
+    dexpm_dm_expected[1, 1, 1, 1] = exp_m[1, 1]
     
     dexpm_dm = jacobian(expm, 0)(m)
 

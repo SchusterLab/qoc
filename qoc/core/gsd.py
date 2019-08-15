@@ -11,6 +11,8 @@ from autograd.extend import Box
 import numpy as np
 import scipy.linalg as la
 
+from qoc.core.common import (gen_params_cos, initialize_params,
+                             slap_params, strip_params,)
 from qoc.models import (MagnusPolicy, OperationPolicy, GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerPolicy, GrapeResult,
                         InterpolationPolicy, Dummy)
@@ -34,7 +36,7 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
                                 interpolation_policy=InterpolationPolicy.LINEAR,
                                 log_iteration_step=100,
                                 magnus_policy=MagnusPolicy.M2,
-                                max_param_amplitudes=None,
+                                max_param_norms=None,
                                 operation_policy=OperationPolicy.CPU,
                                 optimizer=Adam(),
                                 save_file_name=None, save_iteration_step=0,
@@ -65,7 +67,7 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
         set 0 to disable logging
     magnus_policy :: qoc.MagnusPolicy - the method to use for the magnus
         expansion
-    max_param_amplitudes :: numpy.ndarray - These are the absolute values at
+    max_param_norms :: numpy.ndarray - These are the absolute values at
         which to clip the parameters if they achieve +max_amplitude
         or -max_amplitude. This array should have shape
         (parameter_count). The default maximum amplitudes will
@@ -92,8 +94,8 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
     result :: qoc.GrapeResult - useful information about the optimization
     """
     # Initialize parameters.
-    initial_params, max_param_amplitudes = _initialize_params(initial_params,
-                                                              max_param_amplitudes,
+    initial_params, max_param_norms = initialize_params(initial_params,
+                                                              max_param_norms,
                                                               pulse_time,
                                                               pulse_step_count,
                                                               param_count)
@@ -106,7 +108,7 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
                                             initial_states,
                                             interpolation_policy, iteration_count,
                                             log_iteration_step, magnus_policy,
-                                            max_param_amplitudes, operation_policy,
+                                            max_param_norms, operation_policy,
                                             optimizer, param_count, pulse_step_count,
                                             pulse_time, save_file_name, save_iteration_step,
                                             save_path, system_step_multiplier)
@@ -114,14 +116,13 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
 
     # Transform the initial parameters to their optimizer
     # friendly form.
-    initial_params = _strip_params(gstate, initial_params)
+    initial_params = strip_params(gstate, initial_params)
     
     # Switch on the GRAPE implementation method.
     if gstate.grape_schroedinger_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
         result = _grape_schroedinger_discrete_time(gstate, initial_params)
     else:
-        pass
-        # _grape_schroedinger_discrete_memory(gstate, initial_params)
+        result = _grape_schroedinger_discrete_memory(gstate, initial_params)
 
     return result
 
@@ -147,14 +148,11 @@ def _grape_schroedinger_discrete_time(gstate, initial_params):
     # The best solution to track mutable objects, that I can think of,
     # is to use a reporter object.
     reporter = GrapeResult()
-
     gstate.optimizer.run((gstate, reporter), _gsd_compute_wrap,
                          gstate.iteration_count, initial_params,
                          _gsd_compute_jacobian_wrap)
 
     return reporter
-
-
 
 
 def _gsd_compute(params, gstate, reporter):
@@ -164,6 +162,7 @@ def _gsd_compute(params, gstate, reporter):
     params :: numpy.ndarray - the control parameters
     gstate :: qoc.GrapeSchroedingerDiscreteState - static objects
     reporter :: qoc.Dummy - a reporter for mutable objects
+
     Returns:
     total_error :: numpy.ndarray - total error of the evolution
     """
@@ -172,28 +171,30 @@ def _gsd_compute(params, gstate, reporter):
     states = gstate.initial_states
     for time_step in range(gstate.final_time_step + 1):
         pulse_step, _ = anp.divmod(time_step, gstate.system_step_multiplier)
-        is_final_step = time_step == gstate.final_time_step
+        is_final_pulse_step = pulse_step == gstate.final_pulse_step
+        is_final_time_step = time_step == gstate.final_time_step
         t = time_step * gstate.dt
         
         # Evolve.
         # Get the parameters to use for magnus expansion interpolation.
+        # New parameters are used every pulse step.
         magnus_param_indices = gstate.magnus_param_indices(gstate.dt, params,
                                                            pulse_step, t,
-                                                           is_final_step)
+                                                           is_final_pulse_step)
         magnus_params = params[magnus_param_indices,]
         # If magnus_params includes only one parameter array,
         # wrap it in another dimension.
         if magnus_params.ndim == 1:
             magnus_params = anp.expand_dims(magnus_params, axis=0)
-        magnus = gstate.magnus(gstate.dt, magnus_params, pulse_step, t, is_final_step)
+        magnus = gstate.magnus(gstate.dt, magnus_params, pulse_step, t,
+                               is_final_pulse_step)
         unitary = expm(-1j * magnus)
-        # u_u_dagger = anp.matmul(unitary, conjugate_transpose(unitary))
-        # identity = anp.eye(gstate.hilbert_size)
-        # assert(anp.allclose(u_u_dagger, identity))
+        # assert(anp.allclose(anp.matmul(unitary, conjugate_transpose(unitary)),
+        #                    anp.eye(gstate.hilbert_size)))
         states = anp.matmul(unitary, states)
         
-        # Compute cost.
-        if is_final_step:
+        # Compute cost every time step.
+        if is_final_time_step:
             for i, cost in enumerate(gstate.costs):
                 error = cost.cost(params, states, time_step)
                 total_error = total_error + error
@@ -212,7 +213,7 @@ def _gsd_compute(params, gstate, reporter):
 
 # Wrapper to do intermediary work before passing control to _gsd_compute.
 _gsd_compute_wrap = (lambda params, gstate, reporter:
-                     _gsd_compute(_slap_params(gstate, params),
+                     _gsd_compute(slap_params(gstate, params),
                                   gstate, reporter))
 
 # Value and jacobian of gsd_compute.
@@ -230,14 +231,13 @@ def _gsd_compute_jacobian_wrap(params, gstate, reporter):
     jac :: numpy.ndarray - the jacobian of the cost function with
         respect to params in optimizer format
     """
-    params = _slap_params(gstate, params)
-    
+    params = slap_params(gstate, params)
     total_error, jacobian = _gsd_compute_ans_jacobian(params, gstate, reporter)
-
 
     # Remove states from autograd box.
     if isinstance(reporter.last_states, Box):
         reporter.last_states = reporter.last_states._value
+    
     # Report information.
     gstate.log_and_save(total_error, jacobian, reporter.iteration,
                         params, reporter.last_states)
@@ -255,10 +255,10 @@ def _gsd_compute_jacobian_wrap(params, gstate, reporter):
         reporter.best_params = params
         reporter.best_states = reporter.last_states
 
-    return _strip_params(gstate, jacobian)
+    return strip_params(gstate, jacobian)
 
 
-def _grape_schroedinger_discrete_memory(gstate, params, states):
+def _grape_schroedinger_discrete_memory(gstate, params):
     """
     Perform GRAPE for the schroedinger equation with time discrete parameters.
     Use the memory efficient method.
@@ -266,161 +266,18 @@ def _grape_schroedinger_discrete_memory(gstate, params, states):
     gstate :: qoc.GrapeSchroedingerDiscreteState - information required to
          perform the optimization
     params :: numpy.ndarray - the initial params
-    states :: numpy.ndarray - the initial states
+
     Returns:
-    error :: numpy.ndarray - the errors at the final time step of the last iteration,
-                             same shape as the cost function list
-    grads :: numpy.ndarray - the gradients at the final time step of the last iteration,
-                             same shape as params
-    params :: numpy.ndarray - the parameters at the final time step of the last iteration
-    states :: numpy.ndarray - the states at the final time step of the last iteration
+    result :: qoc.GrapeResult - the optimization result
     """
     pass
-
-
-def _initialize_params(initial_params, max_param_amplitudes,
-                       pulse_time,
-                       pulse_step_count, param_count):
-    """
-    Sanitize the initial_params and max_param_amplitudes.
-    Generate both if either was not specified.
-    Args:
-    initial_params :: numpy.ndarray - the user specified initial parameters
-    max_param_amplitudes :: numpy.ndarray - the user specified max
-        param amplitudes
-    pulse_time :: float - the duration of the pulse
-    pulse_step_count :: int - number of pulse steps
-    param_count :: int - number of parameters per pulse step
-
-    Returns:
-    params :: numpy.ndarray - the initial parameters
-    max_param_amplitudes :: numpy.ndarray - the maximum parameter
-        amplitudes
-    """
-    if max_param_amplitudes is None:
-        max_param_amplitudes = np.ones(param_count)
-        
-    if initial_params is None:
-        params = _gen_params_cos(pulse_time, pulse_step_count, param_count,
-                                 max_param_amplitudes)
-    else:
-        # If the user specified initial params, check that they conform to
-        # max param amplitudes.
-        for i, step_params in enumerate(initial_params):
-            if not np.less_equal(step_params, max_param_amplitudes).all():
-                raise ValueError("Expected that initial_params specified by "
-                                 "user conformed to max_param_amplitudes, but "
-                                 "found conflict at step {} with {} and {}"
-                                 "".format(i, step_params, max_param_amplitudes))
-        #ENDFOR
-        params = initial_params
-
-    return params, max_param_amplitudes
-            
-
-def _gen_params_cos(pulse_time, pulse_step_count, param_count,
-                    max_param_amplitudes, periods=10.):
-    """
-    Create a parameter set using a cosine function.
-    Args:
-    pulse_time :: float - the duration of the pulse
-    pulse_step_count :: int - the number of time steps at which
-        parameters are discretized
-    param_count :: int - how many parameters are at each time step
-    max_param_amplitudes :: numpy.ndarray - an array of shape
-        (parameter_count) that,
-        at each point, specifies the +/- value at which the parameter
-        should be clipped
-    periods :: float - the number of periods that the wave should complete
-    Returns:
-    params :: np.ndarray(pulse_step_count, param_count) - paramters for
-        the specified pulse_step_count and param_count with a cosine fit
-    """
-    period = np.divide(pulse_step_count, periods)
-    b = np.divide(2 * np.pi, period)
-    params = np.zeros((pulse_step_count, param_count))
-    
-    # Create a wave for each parameter over all time
-    # and add it to the parameters.
-    for i in range(param_count):
-        max_amplitude = max_param_amplitudes[i]
-        _params = (np.divide(max_amplitude, 4)
-                   * np.cos(b * np.arange(pulse_step_count))
-                   + np.divide(max_amplitude, 2))
-        params[:, i] = _params
-    #ENDFOR
-
-    return params
-
-
-def _clip_params(max_param_amplitudes, params):
-    """
-    Me: I need a little taken off the top.
-    Barber: Say no more.
-    Args:
-    max_param_amplitudes :: numpy.ndarray - an array, shaped like
-        the params at each axis0 position, that specifies the maximum
-        absolute value of the parameters
-    params :: numpy.ndarray - the parameters to be clipped
-    Returns: none
-    """
-    for i in range(params.shape[1]):
-        max_amp = max_param_amplitudes[i]
-        params[:,i] = np.clip(params[:,i], -max_amp, max_amp)
-
-
-def _strip_params(gstate, params):
-    """
-    Reshape and transform parameters understood by the cost
-    function to parameters understood by the optimizer.
-    gstate :: qoc.GrapeState - information about the optimization
-    params :: numpy.ndarray - the params in question
-    Returns:
-    new_params :: numpy.ndarray - the reshapen, transformed params
-    """
-    # Flatten the parameters.
-    params = params.flatten()
-    # Transform the parameters to R2 if they are complex.
-    if gstate.complex_params:
-        params = complex_to_real_imag_flat(params)
-
-    return params
-
-
-def _slap_params(gstate, params):
-    """
-    Reshape and transform parameters displayed to the optimizer
-    to parameters understood by the cost function.
-    Args:
-    gstate :: qoc.GrapeState - information about the optimization
-    params :: numpy.ndarray - the params in question
-    Returns:
-    new_params :: numpy.ndarray - the reshapen, transformed params
-    """
-    # Transform the parameters to C if they are complex.
-    if gstate.complex_params:
-        params = real_imag_to_complex_flat(params)
-    # Reshape the parameters.
-    params = np.reshape(params, gstate.params_shape)
-    # Clip the parameters.
-    _clip_params(gstate.max_param_amplitudes, params)
-    
-    return params
 
 
 ### MODULE TESTS ###
 
 _BIG = 100
 
-def _test():
-    """
-    Run tests on the module.
-    """
-    # _test_helper_functions()
-    _test_grads()
-    # _test_grape_schroedinger_discrete()
-
-
+# TOOD: implement grad tests
 def _test_grads():
     """
     Ensure derivatives are being computed properly.
@@ -461,63 +318,12 @@ def _test_grads():
           "".format(dc_de, result.last_grads))
 
 
-def _test_helper_functions():
-    """
-    Run test on the module's helper functions.
-    """
-    # Test parameter optimizer transformations.
-    gstate = Dummy()
-    gstate.complex_params = True
-    shape_range = np.arange(_BIG) + 1
-    for step_count in shape_range:
-        for param_count in shape_range:
-            gstate.params_shape = params_shape = (step_count, param_count)
-            gstate.max_param_amplitudes = np.ones(param_count)
-            params = np.random.rand(*params_shape) + 1j * np.random.rand(*params_shape)
-            stripped_params = _strip_params(gstate, params)
-            assert(stripped_params.ndim == 1)
-            assert(not stripped_params.dtype in (np.complex64, np.complex128))
-            transformed_params = _slap_params(gstate, stripped_params)
-            assert(np.array_equal(params, transformed_params))
-            assert(params.shape == transformed_params.shape)
-    #ENDFOR
-
-    gstate.complex_params = False
-    for step_count in shape_range:
-        for param_count in shape_range:
-            gstate.params_shape = params_shape = (step_count, param_count)
-            gstate.max_param_amplitudes = np.ones(param_count)
-            params = np.random.rand(*params_shape)
-            stripped_params = _strip_params(gstate, params)
-            assert(stripped_params.ndim == 1)
-            assert(not stripped_params.dtype in (np.complex64, np.complex128))
-            transformed_params = _slap_params(gstate, stripped_params)
-            assert(np.array_equal(params, transformed_params))
-            assert(params.shape == transformed_params.shape)
-    #ENDFOR
-
-    # Test parameter clipping.
-    for step_count in shape_range:
-        for param_count in shape_range:
-            params_shape = (step_count, param_count)
-            max_param_amplitudes = np.ones(param_count)
-            params = np.random.rand(*params_shape) * 2
-            _clip_params(max_param_amplitudes, params)
-            for step_params in params:
-                assert(np.less_equal(step_params, max_param_amplitudes).all())
-            params = np.random.rand(*params_shape) * -2
-            _clip_params(max_param_amplitudes, params)
-            for step_params in params:
-                assert(np.less_equal(-max_param_amplitudes, step_params).all())
-        #ENDFOR
-    #ENDFOR
-
-
 def _test_grape_schroedinger_discrete():
     """
     Run end-to-end test on grape_schroedinger_discrete.
     """
-    # Test grape schroedinger discrete.
+    ## Test grape schroedinger discrete. ##
+    
     # Evolving the state under this hamiltonian for this time should
     # perform an iSWAP. See p. 31, e.q. 109 of
     # https://arxiv.org/abs/1904.06560.
@@ -532,7 +338,7 @@ def _test_grape_schroedinger_discrete():
     hamiltonian = lambda params, t: params[0] * _hamiltonian
     initial_states = matrix_to_column_vector_list(np.eye(hilbert_size, dtype=np.complex128))
     target_states = matrix_to_column_vector_list(iswap_unitary)
-    costs = [TargetInfidelity(target_states)]
+    costs = (TargetInfidelity(target_states),)
     param_count = 1
     pulse_time = np.divide(np.pi, 2)
     pulse_step_count = 10
@@ -542,19 +348,15 @@ def _test_grape_schroedinger_discrete():
     magnus_policy = MagnusPolicy.M6
     log_iteration_step = 0
     save_iteration_step = 0
-    save_path = None
-    save_file_name = None
     result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
                                          iteration_count, param_count, pulse_step_count,
                                          pulse_time, initial_params=initial_params,
                                          log_iteration_step=log_iteration_step,
                                          magnus_policy=magnus_policy,
-                                         save_file_name=save_file_name,
                                          save_iteration_step=save_iteration_step,
-                                         save_path=save_path,
                                          system_step_multiplier=system_step_multiplier)
     assert(np.allclose(result.last_error, 0))
-    assert(np.allclose(result.last_states, target_states, atol=1e-03))
+    assert(np.allclose(result.last_states, target_states))
 
     # Evolving under the zero hamiltonian should yield no change
     # in the system. Furthermore, not using parameters should
@@ -581,9 +383,9 @@ def _test_grape_schroedinger_discrete():
                                          pulse_time, initial_params=initial_params,
                                          log_iteration_step=log_iteration_step,
                                          system_step_multiplier=system_step_multiplier)
-    # assert(result.grads.all() == 0)
-    # assert(np.allclose(initial_params, result.params))
-    # assert(np.allclose(initial_states, result.states))
+    assert(np.allclose(result.last_grads, np.zeros_like(result.last_grads)))
+    assert(np.allclose(initial_params, result.last_params))
+    assert(np.allclose(initial_states, result.last_states))
 
     # Some nontrivial gradients should appear at each time step
     # if we evolve a nontrivial hamiltonian and penalize
@@ -598,7 +400,7 @@ def _test_grape_schroedinger_discrete():
     param_count = 1
     pulse_time = 10
     pulse_step_count = 10
-    initial_params, max_param_amplitudes = _initialize_params(None, None,
+    initial_params, max_param_norms = initialize_params(None, None,
                                                               pulse_time, pulse_step_count,
                                                               param_count)
     costs = [ForbidStates(forbidden_states, pulse_step_count)]
@@ -610,9 +412,9 @@ def _test_grape_schroedinger_discrete():
                                          pulse_time, initial_params=initial_params,
                                          log_iteration_step=log_iteration_step,
                                          magnus_policy=magnus_policy,
-                                         max_param_amplitudes=max_param_amplitudes)
-    # assert(result.grads.all() != 0)
-    # assert(not np.array_equal(result.params, initial_params))
+                                         max_param_norms=max_param_norms)
+    assert(not (np.equal(result.last_grads, np.zeros_like(result.last_grads)).any()))
+    assert(not (np.equal(result.last_params, initial_params).any()))
 
     # If we use complex parameters on a hermitian hamiltonian,
     # the complex parameters should have no contribution to the
@@ -626,9 +428,10 @@ def _test_grape_schroedinger_discrete():
                                          pulse_time, initial_params=initial_params,
                                          log_iteration_step=log_iteration_step,
                                          magnus_policy=magnus_policy,
-                                         max_param_amplitudes=max_param_amplitudes)
-    # assert(result.grads.imag.all() == 0)
+                                         max_param_norms=max_param_norms)
+    assert(np.allclose(result.last_grads.imag, np.zeros_like(result.last_grads.imag)))
 
+    # TOOD: Rework this test when parameter clipping gets reworked.
     # Parameters should be clipped if they grow too large.
     # You can log result.parameters from the test above
     # that uses the same hamiltonian to see that
@@ -642,10 +445,10 @@ def _test_grape_schroedinger_discrete():
     param_count = 1
     pulse_time = 10
     pulse_step_count = 10
-    initial_params, max_param_amplitudes = _initialize_params(None, None,
+    initial_params, max_param_norms = initialize_params(None, None,
                                                               pulse_time, pulse_step_count,
                                                               param_count)
-    max_param_amplitudes = np.repeat(0.8 + 0.8j, param_count)
+    max_param_norms = np.repeat(0.8 + 0.8j, param_count)
     costs = [ForbidStates(forbidden_states, pulse_step_count)]
     iteration_count = 100
     magnus_policy = MagnusPolicy.M2
@@ -655,11 +458,19 @@ def _test_grape_schroedinger_discrete():
                                          pulse_time, initial_params=initial_params,
                                          log_iteration_step=log_iteration_step,
                                          magnus_policy=magnus_policy,
-                                         max_param_amplitudes=max_param_amplitudes)
+                                         max_param_norms=max_param_norms)
     
-    for i in range(result.params.shape[1]):
-        assert(np.less_equal(np.abs(result.params[:,i]),
-                             np.abs(max_param_amplitudes[i])).all())
+    # for i in range(result.params.shape[1]):
+    #     assert(np.less_equal(np.abs(result.params[:,i]),
+    #                          np.abs(max_param_norms[i])).all())
+
+
+def _test():
+    """
+    Run tests on the module.
+    """
+    # _test_grads()
+    _test_grape_schroedinger_discrete()
 
 
 if __name__ == "__main__":
