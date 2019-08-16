@@ -115,7 +115,7 @@ def initialize_params(initial_params, max_param_norms,
         # If the user specified initial params, check that they conform to
         # max param amplitudes.
         for i, step_params in enumerate(initial_params):
-            if not np.less_equal(step_params, max_param_norms).all():
+            if not (np.less_equal(np.abs(step_params), max_param_norms).all()):
                 raise ValueError("Expected that initial_params specified by "
                                  "user conformed to max_param_norms, but "
                                  "found conflict at step {} with {} and {}"

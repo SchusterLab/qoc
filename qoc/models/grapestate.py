@@ -418,16 +418,11 @@ def _choose_magnus(hamiltonian, interpolation_policy, magnus_policy):
     gradients. So, the dmagnus_dparams function will return the magnus expansion,
     the gradient of the magnus expansion with respect to the parameters, and
     the indices of the parameters with nonzero gradients.
-    The shape of the jacobian of the magnus expansion can be obtained
-    by rolling the axes of the autograd jacobian backwards by one.
-    Autograd defines the shape of the jacobian in terms of the
-    original function's input and the output shapes
-    (https://github.com/HIPS/autograd/blob/master/autograd/differential_operators.py),
-    but this is not what we want
-    (https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant).
+
     Args:
     hamiltonian :: (params :: numpy.ndarray, time :: float) -> hamiltonian :: numpy.ndarray
         - the time and parameter dependent hamiltonian
+
     Returns:
     dmagnus_dparams :: (dt :: float, params :: np.ndarray, step :: int, time :: float)
                        -> (dmagnus_dparams :: numpy.ndarray, indices :: numpy.ndarray,
@@ -464,12 +459,6 @@ def _choose_magnus(hamiltonian, interpolation_policy, magnus_policy):
     #ENDIF
     
     magnus_wrapper = lambda *args, **kwargs: anp.real(magnus(*args, **kwargs))
-    # def dmagnus_dparams(*args, **kwargs):
-    #     _magnus, _dmagnus_dparams = ans_jacobian(magnus_wrapper, 1)(*args, **kwargs)
-    #     old_axes = np.arange(len(_dmagnus_dparams.shape))
-    #     new_axes = np.roll(old_axes, -2)
-    #     return (np.moveaxis(_dmagnus_dparams, old_axes, new_axes),
-    #             _magnus)
     dmagnus_dparams = None
 
     return dmagnus_dparams, magnus, magnus_param_indices

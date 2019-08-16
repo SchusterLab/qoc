@@ -16,7 +16,7 @@ from qoc.core.common import (gen_params_cos, initialize_params,
 from qoc.models import (MagnusPolicy, OperationPolicy, GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerPolicy, GrapeResult,
                         InterpolationPolicy, Dummy)
-from qoc.standard import (Adam, ForbidStates, TargetInfidelity, expm,
+from qoc.standard import (Adam, SGD, ForbidStates, TargetInfidelity, ParamValue, expm,
                           PAULI_X, PAULI_Y, PAULI_Z, conjugate_transpose,
                           matrix_to_column_vector_list, matmuls,
                           complex_to_real_imag_flat,
@@ -44,8 +44,9 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
     """
     a method to optimize the evolution of a set of states under the
     schroedinger equation for time-discrete control parameters
+
     Args:
-    costs :: [qoc.models.Cost] - the cost functions to guide optimization
+    costs :: tuple(qoc.models.Cost) - the cost functions to guide optimization
     grape_schroedinger_policy :: qoc.GrapeSchroedingerPolicy - how to perform
         the main integration of GRAPE, can be optimized for time or memory
     hamiltonian :: (params :: numpy.ndarray, time :: float)
@@ -90,15 +91,16 @@ def grape_schroedinger_discrete(costs, hamiltonian, initial_states,
     system_step_multiplier :: int - this factor will be used to determine how
         many steps inbetween each pulse step the system should evolve,
         control parameters will be interpolated at these steps
+
     Returns:
     result :: qoc.GrapeResult - useful information about the optimization
     """
     # Initialize parameters.
     initial_params, max_param_norms = initialize_params(initial_params,
-                                                              max_param_norms,
-                                                              pulse_time,
-                                                              pulse_step_count,
-                                                              param_count)
+                                                        max_param_norms,
+                                                        pulse_time,
+                                                        pulse_step_count,
+                                                        param_count)
     
     # Construct the grape state.
     hilbert_size = initial_states[0].shape[0]
@@ -133,10 +135,12 @@ def _grape_schroedinger_discrete_time(gstate, initial_params):
     """
     Perform GRAPE for the schroedinger equation with time discrete parameters.
     Use autograd to compute evolution gradients.
+
     Args:
     gstate :: qoc.GrapeSchroedingerDiscreteState - information required to
          perform the optimization
     initial_params :: numpy.ndarray - the transformed initial_params
+
     Returns: 
     result :: qoc.GrapeResult - an object that tracks important information
         about the optimization
@@ -158,6 +162,7 @@ def _grape_schroedinger_discrete_time(gstate, initial_params):
 def _gsd_compute(params, gstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
+
     Args:
     params :: numpy.ndarray - the control parameters
     gstate :: qoc.GrapeSchroedingerDiscreteState - static objects
@@ -166,36 +171,45 @@ def _gsd_compute(params, gstate, reporter):
     Returns:
     total_error :: numpy.ndarray - total error of the evolution
     """
-    # Compute the total error for this evolution.
-    total_error = 0
+    # Initialize local variables (heap -> stack).
+    costs = gstate.costs
+    dt = gstate.dt
+    final_pulse_step = gstate.final_pulse_step
+    final_time_step = gstate.final_time_step
+    get_magnus_expansion = gstate.magnus
+    get_magnus_param_indices = gstate.magnus_param_indices
     states = gstate.initial_states
-    for time_step in range(gstate.final_time_step + 1):
-        pulse_step, _ = anp.divmod(time_step, gstate.system_step_multiplier)
-        is_final_pulse_step = pulse_step == gstate.final_pulse_step
-        is_final_time_step = time_step == gstate.final_time_step
-        t = time_step * gstate.dt
+    step_costs = gstate.step_costs
+    system_step_multiplier = gstate.system_step_multiplier
+    total_error = 0
+    
+    # Compute the total error for this evolution.
+    for time_step in range(final_time_step + 1):
+        pulse_step, _ = anp.divmod(time_step, system_step_multiplier)
+        is_final_pulse_step = pulse_step == final_pulse_step
+        is_final_time_step = time_step == final_time_step
+        time = time_step * dt
         
-        # Evolve.
         # Get the parameters to use for magnus expansion interpolation.
         # New parameters are used every pulse step.
-        magnus_param_indices = gstate.magnus_param_indices(gstate.dt, params,
-                                                           pulse_step, t,
-                                                           is_final_pulse_step)
-        magnus_params = params[magnus_param_indices,]
         # If magnus_params includes only one parameter array,
         # wrap it in another dimension.
+        magnus_param_indices = get_magnus_param_indices(dt, params,
+                                                        pulse_step, time,
+                                                        is_final_pulse_step)
+        magnus_params = params[magnus_param_indices,]
         if magnus_params.ndim == 1:
             magnus_params = anp.expand_dims(magnus_params, axis=0)
-        magnus = gstate.magnus(gstate.dt, magnus_params, pulse_step, t,
-                               is_final_pulse_step)
-        unitary = expm(-1j * magnus)
-        # assert(anp.allclose(anp.matmul(unitary, conjugate_transpose(unitary)),
-        #                    anp.eye(gstate.hilbert_size)))
+            
+        # Evolve the states.
+        magnus = get_magnus_expansion(dt, magnus_params, pulse_step, time,
+                                      is_final_pulse_step)
+        unitary = expm(magnus)
         states = anp.matmul(unitary, states)
         
         # Compute cost every time step.
         if is_final_time_step:
-            for i, cost in enumerate(gstate.costs):
+            for i, cost in enumerate(costs):
                 error = cost.cost(params, states, time_step)
                 total_error = total_error + error
             #ENDFOR
@@ -203,11 +217,13 @@ def _gsd_compute(params, gstate, reporter):
             # Report information.
             reporter.last_states = states
         else:
-            for i, step_cost in enumerate(gstate.step_costs):
+            for i, step_cost in enumerate(step_costs):
                 error = step_cost.cost(params, states, time_step)
                 total_error = total_error + error
+            #ENDFOR
 
     #ENDFOR
+    
     return total_error
 
 
@@ -277,52 +293,61 @@ def _grape_schroedinger_discrete_memory(gstate, params):
 
 _BIG = 100
 
-# TOOD: implement grad tests
-def _test_grads():
-    """
-    Ensure derivatives are being computed properly.
-    """
-    hilbert_size = 2
-    annihilation_operator = get_annihilation_operator(hilbert_size)
-    creation_operator = get_creation_operator(hilbert_size)
-    h_system = PAULI_Z / 2
-    hamiltonian = lambda params, t: (h_system
-                                     + params[0] * annihilation_operator
-                                     + anp.conjugate(params[0]) * creation_operator)
-    initial_state_0 = anp.array([[1], [0]])
-    target_state_0 = anp.array([[0], [1]])
-    initial_states = anp.stack((initial_state_0,), axis=0)
-    target_states = anp.stack((target_state_0,), axis=0)
-    costs = [TargetInfidelity(target_states)]
-    param_count = 1
-    pulse_time = 1
-    pulse_step_count = 1
-    iteration_count = 1
-    initial_params = np.ones((pulse_step_count, param_count))
-    
-    result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
-                                         iteration_count, param_count,
-                                         pulse_step_count, pulse_time,
-                                         initial_params=initial_params)
-    
-    dt = pulse_time / pulse_step_count
-    m = np.array([[dt / 2, initial_params[0][0] * dt],
-                  [initial_params[0][0] * dt, -dt / 2]])
-    du_dm = la.expm_frechet(-1j * m, m, compute_expm=False)
-    td = np.array([[0, 1]])
-    dm_de = np.array([[0], [dt]])
-    dip_de = matmuls(td, du_dm, dm_de)[0, 0]
-    dc_de = 2 * np.abs(dip_de)
-    
-    print("analytic_grads:\n{}\nresult.last_grads:\n{}"
-          "".format(dc_de, result.last_grads))
-
-
 def _test_grape_schroedinger_discrete():
     """
     Run end-to-end test on grape_schroedinger_discrete.
     """
     ## Test grape schroedinger discrete. ##
+
+    # Check that the error, states, and gradients are what
+    # we expect them to be for a hand-checked test case.
+    # This implicitly tests _gsd_compute.
+    hilbert_size = 2
+    a = get_annihiliation_operator(hilbert_size)
+    a_dagger = get_creation_operator(hilbert_size)
+    def hamiltonian(params, time):
+        p0 = params[0]
+        p0c = anp.conjugate(p0)
+        return np.array((0,  p0c),
+                        (p0, 0))
+    state0 = np.array(((1), (0)))
+    initial_states = np.stack((state0,))
+    target0 = np.array(((1j), (0)))
+    target_states = np.stack((target0,))
+    forbid0_0 = np.array(((1j), (1))) / np.sqrt(2)
+    forbid_states0 = np.stack((forbid0_0,))
+    forbid_states = np.stack((forbid_states0,))
+    pulse_step_count = 2
+    system_step_multiplier = 1
+    param_count = 2
+    iteration_count = 1
+    pulse_time = total_step_count
+    total_step_count = pulse_step_count * system_step_multiplier
+    costs = (TargetInfidelity(target_states,),
+             TargetInfidelityTime(total_step_count, target_states,),
+             ParamValue())
+    optimizer = SGD()
+    initial_params = ((1,), (1+1j,),)
+    max_param_norms = (5,)
+
+    result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
+                                         iteration_count, param_count, pulse_step_count,
+                                         pulse_time,
+                                         initial_params=initial_params,
+                                         magnus_policy=magnus_policy,
+                                         max_param_norms=max_param_norms,
+                                         optimizer=optimizer)
+    
+    m0 = -1j * hamiltonian(initial_params[0], 0)
+    m1 = -1j * hamiltonian(initial_params[1], 0)
+    expected_last_error = 0
+    expected_last_grads = 0 
+    expected_last_states = 0
+
+    assert(np.allclose(result.last_error, expected_last_error))
+    assert(np.allclose(result.last_grads, expected_last_grads))
+    assert(np.allclose(result.last_states, expected_last_states))
+    
     
     # Evolving the state under this hamiltonian for this time should
     # perform an iSWAP. See p. 31, e.q. 109 of

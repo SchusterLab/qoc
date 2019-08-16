@@ -188,7 +188,26 @@ def _tests():
     Args: none
     Returns: nothing
     """
-    pass
+
+    # Test row and column manipulations.
+    matrix = np.random.rand(matrix_size, matrix_size)
+    vector = np.random.rand(matrix_size)
+
+    col_mult_matrix = np.zeros_like(matrix)
+    for col_index in range(matrix_size):
+        col_mult_matrix[:, col_index] = matrix[:, col_index] * vector[col_index]
+
+    row_mult_matrix = np.zeros_like(matrix)
+    for row_index in range(matrix_size):
+        row_mult_matrix[row_index, :] = matrix[row_index, :] * vector[row_index]
+
+    assert(np.allclose(col_mult_matrix, mult_cols(matrix, vector)))
+    assert(np.allclose(row_mult_matrix, mult_rows(matrix, vector)))
+    
+    # Test complex number mapping.
+    rand_complex = np.random.rand(_BIG) + 1j * np.random.rand(_BIG)
+    rand_complex_mapped = real_imag_to_complex_flat(complex_to_real_imag_flat(rand_complex))
+    assert(np.allclose(rand_complex, rand_complex_mapped))
 
 
 if __name__ == "__main__":

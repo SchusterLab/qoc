@@ -110,7 +110,7 @@ def magnus_m2_linear(hamiltonian, dt, params, step, t, sentinel=False):
     Returns:
     magnus :: numpy.ndarray - the m2 magnus expansion of the sytem hamiltonian
     """
-    return magnus_m2(hamiltonian(params[0], t), dt)
+    return magnus_m2(-1j * hamiltonian(params[0], t), dt)
 
 
 def magnus_m2_linear_param_indices(hamiltonian, dt, params, step, t, sentinel=False):
@@ -167,8 +167,8 @@ def magnus_m4_linear(hamiltonian, dt, params, step, t, sentinel=False):
         params2 = interpolate_linear(params_left, params_right, t, t + dt, t2)
 
     # Generate hamiltonians.
-    a1 = hamiltonian(params1, t1)
-    a2 = hamiltonian(params2, t2)
+    a1 = -1j * hamiltonian(params1, t1)
+    a2 = -1j * hamiltonian(params2, t2)
     
     return magnus_m4(a1, a2, dt)
 
@@ -227,9 +227,9 @@ def magnus_m6_linear(hamiltonian, dt, params, step, t, sentinel=False):
         params3 = interpolate_linear(params_left, params_right, t, t + dt, t3)
     
     # Generate hamiltonians.
-    a1 = hamiltonian(params1, t1)
-    a2 = hamiltonian(params2, t2)
-    a3 = hamiltonian(params3, t3)
+    a1 = -1j * hamiltonian(params1, t1)
+    a2 = -1j * hamiltonian(params2, t2)
+    a3 = -1j * hamiltonian(params3, t3)
     
     return magnus_m6(a1, a2, a3, dt)
 
@@ -294,6 +294,28 @@ def _test():
     assert(anp.allclose(magnus_m6(a1, a2, a3, dt),
                       anp.array([[-241.71158615, 100.47657236],
                                 [310.29160996, 263.71158615]])))
+
+    # Test the magnus param indices methods.
+    step_count = 20
+    final_step = step_count - 1
+    for step in range(step_count):
+        sentinel = (step == final_step)
+        assert(magnus_m2_linear_param_indices(None, None, None, step, None, sentinel=sentinel)
+               == np.array((step,)))
+        if sentinel:
+            assert(np.allclose(magnus_m4_linear_param_indices(None, None, None, step,
+                                                              None, sentinel=sentinel),
+                               np.array((step - 1, step,))))
+            assert(np.allclose(magnus_m6_linear_param_indices(None, None, None, step,
+                                                  None, sentinel=sentinel),
+                   np.array((step - 1, step,))))
+        else:
+            assert(np.allclose(magnus_m4_linear_param_indices(None, None, None, step,
+                                                              None, sentinel=sentinel),
+                               np.array((step, step + 1,))))
+            assert(np.allclose(magnus_m6_linear_param_indices(None, None, None, step,
+                                                              None, sentinel=sentinel),
+                               np.array((step, step + 1,))))
 
 
 if __name__ == "__main__":
