@@ -52,7 +52,8 @@ def clip_param_norms(max_param_norms, params):
 def gen_params_cos(pulse_time, pulse_step_count, param_count,
                     max_param_norms, periods=10.):
     """
-    Create a parameter set that obeys a cosine function.
+    Create a discrete, complex parameter set that is shaped like
+    a cosine function.
 
     Args:
     pulse_time :: float - the duration of the pulse
@@ -68,6 +69,7 @@ def gen_params_cos(pulse_time, pulse_step_count, param_count,
     Returns:
     params :: np.ndarray(pulse_step_count, param_count) - paramters for
         the specified pulse_step_count and param_count with a cosine fit
+        that are complex by default
     """
     period = np.divide(pulse_step_count, periods)
     b = np.divide(2 * np.pi, period)
@@ -82,6 +84,9 @@ def gen_params_cos(pulse_time, pulse_step_count, param_count,
                    + np.divide(max_amplitude, 2))
         params[:, i] = _params
     #ENDFOR
+
+    # Mimic the cosine fit for the imaginary parts and normalize.
+    params = (params + 1j * params) / np.sqrt(2)
 
     return params
 

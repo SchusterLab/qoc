@@ -2,6 +2,8 @@
 standard - a directory for standard definitions
 """
 
+from .autograd_extensions import (ans_jacobian)
+
 from .constants import (PAULI_X, PAULI_Y, PAULI_Z,
                         get_creation_operator,
                         get_annihilation_operator,
@@ -24,6 +26,8 @@ from .functions import (commutator, conjugate_transpose,
 from .optimizers import (Adam, LBFGSB, SGD,)
 
 __all__ = [
+    "ans_jacobian",
+    
     "PAULI_X", "PAULI_Y", "PAULI_Z", "get_creation_operator",
     "get_annihilation_operator", "get_eij",
     

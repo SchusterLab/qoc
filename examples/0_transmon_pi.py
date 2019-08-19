@@ -33,15 +33,7 @@ PARAM_COUNT = 1
 PULSE_TIME = 10
 PULSE_STEP_COUNT = 10
 ITERATION_COUNT = 1000
-OPTIMIZER = SGD()
-COMPLEX_PARAMS = True
-if COMPLEX_PARAMS:
-    INITIAL_PARAMS = (anp.random.rand(PULSE_STEP_COUNT, PARAM_COUNT)
-                      + 1j * anp.random.rand(PULSE_STEP_COUNT, PARAM_COUNT))
-    MAX_PARAM_NORMS = anp.ones((PARAM_COUNT)) * 2
-else:
-    INITIAL_PARAMS = anp.random.rand(PULSE_STEP_COUNT, PARAM_COUNT)
-    MAX_PARAM_NORMS = anp.ones((PARAM_COUNT))
+OPTIMIZER = Adam()
 
 # Define output.
 LOG_ITERATION_STEP = 1
@@ -54,9 +46,7 @@ def main():
     result = grape_schroedinger_discrete(COSTS, hamiltonian, INITIAL_STATES,
                                          ITERATION_COUNT, PARAM_COUNT,
                                          PULSE_STEP_COUNT, PULSE_TIME,
-                                         initial_params=INITIAL_PARAMS,
                                          log_iteration_step=LOG_ITERATION_STEP,
-                                         max_param_norms=MAX_PARAM_NORMS,
                                          optimizer=OPTIMIZER,
                                          save_file_name=SAVE_FILE_NAME,
                                          save_iteration_step=SAVE_ITERATION_STEP,
