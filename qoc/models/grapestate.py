@@ -28,7 +28,6 @@ class GrapeState(object):
     Fields:
     complex_params :: bool - whether or not the parameters are complex
     costs :: [qoc.models.Cost] - the cost functions to guide optimization
-    cost_count :: int - the number of cost functions
     hilbert_size :: int - the dimension of the hilbert space in which
         states are evolving
     initial_params :: numpy.ndarray - the parameters for the first
@@ -78,7 +77,6 @@ class GrapeState(object):
         super().__init__()
         self.complex_params = initial_params.dtype in (np.complex64, np.complex128)
         self.costs = costs
-        self.cost_count = len(costs)
         self.hilbert_size = hilbert_size
         self.initial_params = initial_params
         self.initial_states = initial_states
@@ -116,7 +114,6 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     complex_params :: bool - whether or not the optimization parameters
         are complex
     costs :: [qoc.models.Cost] - the cost functions to guide optimization
-    cost_count :: int - the number of cost functions
     dt :: float - the length of a time step 
     dmagnus_dparams :: (dt :: float, params :: numpy.ndarray, step :: int, time :: float)
                                -> (magnus :: numpy.ndarray,
@@ -172,6 +169,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     save_file_path :: str - the full path to the save file
     save_iteration_step :: the number of iterations at which to write
         progress to the save file
+    should_log :: bool - whether or not to log progress
+    should_save :: bool - whether or not to save progress
     step_cost_indices :: [int] - the indices into the costs list of the
         costs that need to be evaluated at every step
     system_step_multiplier :: int - the multiple of pulse_step_count at which
@@ -288,7 +287,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             with h5py.File(self.save_file_path, "w") as save_file:
                 save_file["cost_names"] = np.array([np.string_("{}".format(cost))
                                                     for cost in self.costs])
-                save_file["error"] = np.zeros((save_count, self.cost_count),
+                save_file["error"] = np.zeros((save_count),
                                               dtype=np.float64)
                 save_file["grads"] = np.zeros((save_count, self.pulse_step_count,
                                                self.param_count), dtype=self.initial_params.dtype)
@@ -361,20 +360,6 @@ class GrapeResult(object):
                 "last_error:{},\nlast_grads:\n{}\nlast_params:\n{}\nlast_states:\n{}"
                 "".format(self.best_error, self.best_grads, self.best_params, self.best_states,
                           self.last_error, self.last_grads, self.last_params, self.last_states))
-
-
-class EvolveResult(object):
-    """
-    a class to encapsulate the results of an evolution
-    Fields:
-    final_states :: [numpy.ndarray] - the resultant, evolved final states
-    """
-    def __init__(self, final_states):
-        """
-        See class definition for argument specifications.
-        """
-        super().__init__()
-        self.final_states = final_states
 
 
 ### HELPER METHODS ###

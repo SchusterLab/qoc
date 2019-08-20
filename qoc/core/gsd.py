@@ -250,7 +250,7 @@ def _gsd_compute_jacobian_wrap(params, gstate, reporter):
     params = slap_params(gstate, params)
     total_error, jacobian = _gsd_compute_ans_jacobian(params, gstate, reporter)
     # Autograd defines the derivative of a function of complex inputs as
-    # df_dz = du_dx - i * du_dy.
+    # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
     if gstate.complex_params:
         jacobian = np.conjugate(jacobian)
@@ -366,10 +366,9 @@ def _test_grape_schroedinger_discrete():
     print("expected_last_grads:\n{}"
           "".format(expected_last_grads))
 
-    # assert(np.allclose(result.last_error, expected_last_error))
-    # assert(np.allclose(result.last_grads, expected_last_grads))
-    # assert(np.allclose(result.last_states, expected_last_states))
-    exit(0)
+    assert(np.allclose(result.last_error, expected_last_error))
+    assert(np.allclose(result.last_grads, expected_last_grads))
+    assert(np.allclose(result.last_states, expected_last_states))
     
     # Evolving the state under this hamiltonian for this time should
     # perform an iSWAP. See p. 31, e.q. 109 of
