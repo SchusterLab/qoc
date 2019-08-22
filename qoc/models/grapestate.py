@@ -17,7 +17,7 @@ from qoc.models.grapepolicy import GrapeSchroedingerPolicy
 from qoc.models.interpolationpolicy import InterpolationPolicy
 from qoc.models.magnuspolicy import MagnusPolicy
 from qoc.models.operationpolicy import OperationPolicy
-from qoc.standard.autograd_extensions import ans_jacobian
+from qoc.standard import ans_jacobian
 
 ### MAIN STRUCTURES ###
 

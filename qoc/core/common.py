@@ -47,8 +47,8 @@ def clip_param_norms(max_param_norms, params):
                            * max_param_norm)
         _params[offending_indices] = resolved_params
     #ENDFOR
-            
 
+    
 def gen_params_cos(pulse_time, pulse_step_count, param_count,
                     max_param_norms, periods=10.):
     """
@@ -91,6 +91,7 @@ def gen_params_cos(pulse_time, pulse_step_count, param_count,
     return params
 
 
+NORM_TOLERANCE = 1e-10
 def initialize_params(initial_params, max_param_norms,
                        pulse_time,
                        pulse_step_count, param_count):
@@ -120,7 +121,7 @@ def initialize_params(initial_params, max_param_norms,
         # If the user specified initial params, check that they conform to
         # max param amplitudes.
         for i, step_params in enumerate(initial_params):
-            if not (np.less_equal(np.abs(step_params), max_param_norms).all()):
+            if not (np.less_equal(np.abs(step_params), max_param_norms + NORM_TOLERANCE).all()):
                 raise ValueError("Expected that initial_params specified by "
                                  "user conformed to max_param_norms, but "
                                  "found conflict at step {} with {} and {}"
