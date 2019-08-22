@@ -48,7 +48,7 @@ def clip_param_norms(max_param_norms, params):
         _params[offending_indices] = resolved_params
     #ENDFOR
             
-
+NORM_TOLERANCE = 1e-10
 def gen_params_cos(pulse_time, pulse_step_count, param_count,
                     max_param_norms, periods=10.):
     """
@@ -78,15 +78,20 @@ def gen_params_cos(pulse_time, pulse_step_count, param_count,
     # Create a wave for each parameter over all time
     # and add it to the parameters.
     for i in range(param_count):
-        max_amplitude = max_param_norms[i]
-        _params = (np.divide(max_amplitude, 4)
-                   * np.cos(b * np.arange(pulse_step_count))
-                   + np.divide(max_amplitude, 2))
+        # Generate a cosine wave about y=0 with amplitude
+        # half of the max.
+        max_norm = max_param_norms[i]
+        _params = (np.divide(max_norm, 2)
+                   * np.cos(b * np.arange(pulse_step_count)))
+        # Replace all parameters that have zero value
+        # with small values.
+        small_norm = max_norm * 1e-1
+        _params = np.where(_params, _params, small_norm)
         params[:, i] = _params
     #ENDFOR
 
     # Mimic the cosine fit for the imaginary parts and normalize.
-    params = (params + 1j * params) / np.sqrt(2)
+    params = (params - 1j * params) / np.sqrt(2)
 
     return params
 
@@ -120,7 +125,7 @@ def initialize_params(initial_params, max_param_norms,
         # If the user specified initial params, check that they conform to
         # max param amplitudes.
         for i, step_params in enumerate(initial_params):
-            if not (np.less_equal(np.abs(step_params), max_param_norms).all()):
+            if not (np.less_equal(np.abs(step_params), max_param_norms + NORM_TOLERANCE).all()):
                 raise ValueError("Expected that initial_params specified by "
                                  "user conformed to max_param_norms, but "
                                  "found conflict at step {} with {} and {}"
