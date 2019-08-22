@@ -47,8 +47,8 @@ def clip_param_norms(max_param_norms, params):
                            * max_param_norm)
         _params[offending_indices] = resolved_params
     #ENDFOR
-            
-NORM_TOLERANCE = 1e-10
+
+
 def gen_params_cos(pulse_time, pulse_step_count, param_count,
                     max_param_norms, periods=10.):
     """
@@ -96,6 +96,7 @@ def gen_params_cos(pulse_time, pulse_step_count, param_count,
     return params
 
 
+NORM_TOLERANCE = 1e-10
 def initialize_params(initial_params, max_param_norms,
                        pulse_time,
                        pulse_step_count, param_count):
