@@ -1,5 +1,5 @@
 """
-autograd_extensions.py - a module for extending autograd's core
+autogradextensions.py - a module for extending autograd's core
 functionality
 """
 

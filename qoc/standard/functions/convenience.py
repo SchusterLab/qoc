@@ -12,7 +12,7 @@ import numpy as np
 import scipy.linalg as la
 
 from qoc.models.operationpolicy import OperationPolicy
-from qoc.standard.autograd_extensions import ans_jacobian
+from qoc.standard import ans_jacobian
 
 ### COMPUTATIONS ###
 
