@@ -1,6 +1,6 @@
 """
-grapestate.py - a module for classes to encapsulate the state of a
-GRAPE optimization
+programstate.py - a module to define classes that
+encapsulate necessary information to execute the program
 """
 
 import os
@@ -13,10 +13,10 @@ from qoc.core.maths import (magnus_m2_linear, magnus_m4_linear,
                             magnus_m6_linear,
                             magnus_m2_linear_param_indices, magnus_m4_linear_param_indices,
                             magnus_m6_linear_param_indices)
-from qoc.models.grapepolicy import GrapeSchroedingerPolicy
-from qoc.models.interpolationpolicy import InterpolationPolicy
-from qoc.models.magnuspolicy import MagnusPolicy
-from qoc.models.operationpolicy import OperationPolicy
+from .grapepolicy import GrapeSchroedingerPolicy
+from .interpolationpolicy import InterpolationPolicy
+from .magnuspolicy import MagnusPolicy
+from .operationpolicy import OperationPolicy
 from qoc.standard import ans_jacobian
 
 ### MAIN STRUCTURES ###
@@ -539,6 +539,27 @@ class EvolveLindbladDiscreteState(object):
         self.initial_densities = initial_densities
         self.operation_policy = operation_policy
         self.system_step_multiplier = system_step_multiplier
+
+
+class EvolveLindbladDiscreteResult(object):
+    """
+    This class encapsulates the evolution of the
+    Lindblad equation under time-discerete controls.
+    
+    Fileds:
+    final_densities :: ndarray - the density matrices
+        at the end of the evolution time
+    total_error :: float - the optimization error
+        incurred by the relevant cost functions
+    """
+    
+    def __init__(self, final_densities=None,
+                 total_error=None):
+        """
+        See the class definition for arguments not listed here.
+        """
+        self.final_densities = final_densities
+        self.total_error = total_error
 
 
 ### HELPER METHODS ###
