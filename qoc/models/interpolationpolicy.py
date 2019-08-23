@@ -11,10 +11,13 @@ class InterpolationPolicy(Enum):
     """
     LINEAR = 1
 
+    def __repr__(self):
+        return self.__str__()
+
+    
     def __str__(self):
         if self.value == 1:
             return "interpolation_linear"
 
         
-    def __repr__(self):
-        return self.__str__()
+

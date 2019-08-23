@@ -12,7 +12,8 @@ import numpy as np
 from qoc.core.maths import (magnus_m2_linear, magnus_m4_linear,
                             magnus_m6_linear,
                             magnus_m2_linear_param_indices, magnus_m4_linear_param_indices,
-                            magnus_m6_linear_param_indices)
+                            magnus_m6_linear_param_indices,
+                            evolve_lindblad)
 from .grapepolicy import GrapeSchroedingerPolicy
 from .interpolationpolicy import InterpolationPolicy
 from .magnuspolicy import MagnusPolicy
@@ -20,6 +21,65 @@ from .operationpolicy import OperationPolicy
 from qoc.standard import ans_jacobian
 
 ### MAIN STRUCTURES ###
+
+class ProgramState(object):
+    """
+    Fields:
+    controls :: ndarray - the control parameters
+    costs :: iterable(qoc.models.Cost) - the cost functions that
+        define the cost model for evolution
+    dt :: float - the time step used for evolution, it is the time
+        inbetween system steps
+    final_control_step :: int - the ultimate index into the control array
+    final_system_step :: int - the last time step
+    hamiltonian :: (controls :: ndarray, time :: float)
+                    -> hamiltonian :: ndarray
+        - an autograd compatible function that returns the system
+          hamiltonian for the specified control parameters and time
+    interpolation_policy :: qoc.InterpolationPolicy - defines how
+        the control parameters should be interpolated between
+        control steps
+    operation_policy :: qoc.models.OperationPolicy - defines how
+        computations should be performed, e.g. CPU, GPU, sparse, etc.
+    step_costs :: iterable(qoc.models.Cost) - the cost functions that
+        define the cost model for evolution that should be evaluated
+        at every time step
+    step_cost_indices :: iterable(int)- a list of the indices in the costs
+        array which are step costs
+    system_step_multiplier :: int - this value times `control_step_count`
+        determines how many time steps are used in evolution
+    """
+    def __init__(self, control_step_count, controls, costs, evolution_time,
+                 hamiltonian,
+                 interpolation_policy,
+                 operation_policy, system_step_multiplier):
+        """
+        See class definition for arguments not listed here.
+
+        Args:
+        control_step_count :: int - the number of time steps at which the
+            evolution time should be initially split into and the number
+            of control parameter updates
+        evolution_time :: float - the time over which the system will evolve
+        """
+        self.controls = controls
+        self.costs = costs
+        system_step_count = control_step_count * system_step_multiplier
+        self.dt = evolution_time / system_step_count
+        self.final_control_step = control_step_count - 1
+        self.final_system_step = system_step_count - 1
+        self.hamiltonian = hamiltonian
+        self.interpolation_policy = interpolation_policy
+        self.operation_policy = operation_policy
+        self.step_costs = list()
+        self.step_cost_indices = list()
+        for i, cost in enumerate(costs):
+            if cost.requires_step_evaluation:
+                self.step_costs.append(cost)
+                self.step_cost_indices.append(i)
+        #ENDFOR
+        self.system_step_multiplier = system_step_multiplier
+
 
 class GrapeState(object):
     """
@@ -379,216 +439,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                   "=========================================")
 
 
-## Lindblad Program States ##
-
-class GrapeLindbladDiscreteState(GrapeState):
-    """
-    This class encapsulates the necessary information to optimize a set
-    of time-discrete control parameters under the lindblad equation.
-
-    Fields:
-    complex_controls :: bool - whether or not the parameters are complex
-    control_count :: int - the number of control parameters that should be supplied
-        to the hamiltonian at each time step
-    control_step_count :: int - the number of time steps at which the pulse
-        should be optimized
-    controls_shape :: int - the shape of the initial parameters
-    costs :: iterable(qoc.models.Cost) - the cost functions to guide optimization
-    dt :: float - the length of a time step 
-    evolution_time :: float - the duration of the system evolution
-    evolve_lindblad :: (controls :: ndarray, control_step :: int,
-                        densities :: ndarray, dt :: float, time :: float
-                        sentinel :: bool) -> densities :: ndarray
-        - evolve the `densities` for the specified time step
-    final_iteration :: int - the last optimization iteration
-    final_control_step :: int 
-    final_system_step :: int
-    hilbert_size :: int - the dimension of the hilbert space in which
-        density matrices are evolving
-    initial_controls :: ndarray - the parameters for the first
-        optimization iteration
-    initial_densities :: ndarray - the states at the first time step
-    interpolation_policy :: qoc.InterpolationPolicy - how parameters
-        should be interpolated for intermediate time steps
-    iteration_count :: int - the number of iterations to optimize for
-    log_iteration_step :: the number of iterations at which to print
-        progress to stdout
-    max_control_norms :: the maximum aboslute value at which to clip
-        the parameters
-    operation_policy :: qoc.OperationPolicy - how computations should be
-        performed, e.g. CPU, GPU, sparse, etc.
-    optimizer :: qoc.Optimizer - an instance of an optimizer to perform
-        gradient-based-optimization
-    save_file_path :: str - the full path to the save file
-    save_iteration_step :: the number of iterations at which to write
-        progress to the save file
-    should_log :: bool - whether or not to log progress
-    should_save :: bool - whether or not to save progress
-    step_costs :: [qoc.models.Cost] - the cost functions to guide optimization
-        that need to be evaluated at each step
-    step_cost_indices :: [int] - the indices into the costs list of the
-        costs that need to be evaluated at every step
-    system_step_multiplier :: int - the multiple of pulse_step_count at which
-        the system should evolve, control parameters will be interpolated at
-        these steps
-    """
-    def __init__(self, control_count,
-                 control_step_count,
-                 costs, evolution_time,
-                 hamiltonian,
-                 hilbert_size,
-                 initial_controls,
-                 initial_densities,
-                 interpolation_policy,
-                 iteration_count,
-                 lindblad_operators,
-                 log_iteration_step,
-                 max_control_norms, operation_policy,
-                 optimizer,
-                 save_file_name,
-                 save_iteration_step, save_path,
-                 system_step_multiplier):
-        """
-        See class definiton for arguments not listed here.
-        
-        Args:
-        hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
-            - an autograd compatible function to generate the hamiltonian
-              for the given controls and time
-        lindblad_operators :: (time :: float) -> operators :: ndarray
-            - a function to generate the lindblad operators for a given time,
-              an array of operators should be returned even if there is only
-              one operator
-        save_file_name :: str - this will identify the save file
-        save_path :: str - the directory to create the save file in,
-            the directory will be created if it does not exist
-        """
-        super().__init__(control_count,
-                         control_step_count,
-                         costs, evolution_time,
-                         hilbert_size,
-                         initial_controls,
-                         iteration_count,
-                         log_iteration_step,
-                         max_control_norms, operation_policy,
-                         optimizer,
-                         save_file_name,
-                         save_iteration_step, save_path,
-                         system_step_multiplier)
-        self.evolve_lindblad = _choose_evolve_lindblad(hamiltonian,
-                                                       interpolation_policy,
-                                                       lindblad_operators)
-        self.initial_densities = initial_densities
-
-
-class EvolveLindbladDiscreteState(object):
-    """
-    This class encapsulates the necessary information to evolve
-    a set of density matrices under the lindblad equation and compute
-    optimization error for one round.
-
-    Fields:
-    controls :: ndarray - the controls that should be provided to the
-        hamiltonian for the evolution
-    costs :: iterable(qoc.models.Cost) - the cost functions to guide optimization
-    dt :: float - the length of a time step 
-    evolve_lindblad :: (controls :: ndarray, control_step :: int,
-                        densities :: ndarray, dt :: float, time :: float
-                        sentinel :: bool) -> densities :: ndarray
-        - evolve the `densities` for the specified time step
-    final_control_step :: int 
-    final_system_step :: int
-    initial_densities :: ndarray - the states at the first time step
-    operation_policy :: qoc.OperationPolicy - how computations should be
-        performed, e.g. CPU, GPU, sparse, etc.
-    system_step_multiplier :: int - the multiple of pulse_step_count at which
-        the system should evolve, control parameters will be interpolated at
-        these steps    
-    """
-
-    def __init__(self, control_step_count,
-                 controls, costs, evolution_time,
-                 hamiltonian, initial_densities,
-                 interpolation_policy,
-                 lindblad_operators,
-                 operation_policy,
-                 system_step_multiplier):
-        """
-        See class definition for arguments not listed here.
-
-        Args:
-        hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
-            - an autograd compatible function to generate the hamiltonian
-              for the given controls and time
-        interpolation_policy :: qoc.InterpolationPolicy - how parameters
-            should be interpolated for intermediate time steps
-        lindblad_operators :: (time :: float) -> operators :: ndarray
-            - a function to generate the lindblad operators for a given time,
-              an array of operators should be returned even if there is only
-              one operator
-        """
-        self.controls = controls
-        self.costs = costs
-        system_step_count = control_step_count * system_step_multiplier
-        self.dt = evolution_time / system_step_count
-        self.evolve_lindblad = _choose_evolve_lindblad(hamiltonian,
-                                                       interpolation_policy,
-                                                       lindblad_operators)
-        self.final_control_step = control_step_count - 1
-        self.final_system_step = system_step_count - 1
-        self.initial_densities = initial_densities
-        self.operation_policy = operation_policy
-        self.system_step_multiplier = system_step_multiplier
-
-
-class EvolveLindbladDiscreteResult(object):
-    """
-    This class encapsulates the evolution of the
-    Lindblad equation under time-discerete controls.
-    
-    Fileds:
-    final_densities :: ndarray - the density matrices
-        at the end of the evolution time
-    total_error :: float - the optimization error
-        incurred by the relevant cost functions
-    """
-    
-    def __init__(self, final_densities=None,
-                 total_error=None):
-        """
-        See the class definition for arguments not listed here.
-        """
-        self.final_densities = final_densities
-        self.total_error = total_error
-
-
 ### HELPER METHODS ###
-
-def _choose_evolve_lindblad(hamiltonian, interpolation_policy,
-                            lindblad_operators):
-    """
-    Generate a function which will evolve a set of density matrices
-    under the lindbladian specified by the given hamiltonian and
-    lindblad operators.
-
-    Args:
-    hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
-        - an autograd compatible function to generate the hamiltonian
-          for the given controls and time
-    interpolation_policy :: qoc.InterpolationPolicy - how parameters
-        should be interpolated for intermediate time steps
-    lindblad_operators :: (time :: float) -> operators :: ndarray
-        - a function to generate the lindblad operators for a given time,
-          an array of operators should be returned even if there is only
-          one operator
-
-    Returns:
-    evolve_lindblad :: (controls :: ndarray, control_step :: int,
-                        densities :: ndarray, dt :: float, time :: float
-                        sentinel :: bool) -> densities :: ndarray
-        - evolve the `densities` for the specified time step
-    """
-    pass
 
 
 def _choose_magnus(hamiltonian, interpolation_policy, magnus_policy):

@@ -5,7 +5,10 @@ maths.py - a module for math methods
 import autograd.numpy as anp
 import numpy as np
 
-from qoc.standard import commutator
+from qoc.models.interpolationpolicy import (InterpolationPolicy,)
+from qoc.models.operationpolicy import (OperationPolicy,)
+from qoc.standard import (commutator, conjugate_transpose,
+                          matmuls,)
 
 ### INTERPOLATION METHODS ###
 
@@ -24,7 +27,7 @@ def interpolate_linear(y1, y2, x1, x2, x3):
     y3 :: any - the interpolated value corresponding to x3, type
                 is that resulting from composition of y1 and y2
     """
-    return y1 + anp.divide(y2 - y1, x2 - x1) * (x3 - x1)
+    return y1 + (((y2 - y1) / (x2 - x1)) * (x3 - x1))
 
 
 ### MAGNUS EXPANSION METHODS ###
@@ -247,6 +250,110 @@ def magnus_m6_linear_param_indices(hamiltonian, dt, params, step, t, sentinel=Fa
         return np.array([step, step + 1])
 
 
+### LINDBLAD EVALUATIONS ###
+
+def evolve_lindblad(controls, control_step, densities, dt,
+                    hamiltonian, interpolation_policy, lindblad_operators,
+                    time, control_sentinel=False,
+                    operation_policy=OperationPolicy.CPU):
+    """
+    Use Runge-Kutta 4th order to evolve the density matrices to the next time step
+    under the lindblad master equation.
+
+    NOTATION:
+     - t is time, c is controls, h is hamiltonian, g is dissipation constants,
+       l is lindblad operators, k are the runge-kutta increments
+
+    Args:
+    controls :: ndarray - the controls that should be provided to the
+        hamiltonian for the evolution    
+    control_sentinel :: bool - set to True if this is the final control step,
+        in which case control interpolation is performed on the last two
+        control sets in the controls array
+    control_step :: int - the index into the control array at which control
+        interpolation should be performed
+    densities :: ndarray - the probability density matrices to evolve
+    dt :: float - the time step
+    hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
+        - an autograd compatible function to generate the hamiltonian
+          for the given controls and time
+    interpolation_policy :: qoc.InterpolationPolicy - how parameters
+        should be interpolated for intermediate time steps
+    lindblad_operators :: (time :: float) -> (dissipartors :: ndarray, operators :: ndarray)
+        - a function to generate the dissipation constants and lindblad operators
+          for a given time
+    operation_policy :: qoc.OperationPolicy - how computations should be
+        performed, e.g. CPU, GPU, sparse, etc.
+    time :: float - the current evolution time
+
+    Returns:
+    densities :: ndarray - the densities evolved to `time + dt`
+    """
+    if control_sentinel:
+        control_left = controls[control_step - 1]
+        control_right = controls[control_step]
+    else:
+        control_left = controls[control_step]
+        control_right = controls[control_step + 1]
+    t1 = time
+    t2 = time + 0.5 * dt
+    t2 = t3
+    t4 = time + dt
+    c1 = control_left
+    if interpolation_policy == InterpolationPolicy.LINEAR:
+        c2 = interpolate_linear(control_left)
+    else:
+        raise ValueError("Unrecognized interpolation policy {}"
+                         "".format(interpolation_policy))
+    c3 = c2
+    c4 = control_right
+    h1 = hamiltonian(c1, t1)
+    h2 = hamiltonian(c2, t2)
+    h3 = h2
+    h4 = hamiltonian(c4, t4)
+    g1, l1 = lindblad_operators(t1)
+    g2, l2 = lindblad_operators(t2)
+    g3, l3 = lindblad_operators(t3)
+    g4, l4 = lindblad_operators(t4)
+    k1 = dt * get_lindbladian(densities, g1, h1, l1)
+    k2 = dt * get_lindbladian(densities + 0.5 * k1, g2, h2, l2)
+    k3 = dt * get_lindbladian(densities + 0.5 * k2, g3, h3, l3)
+    k4 = dt * get_lindbladian(densities + k3, g4, h4, l4)
+
+    densities = densities + (1 / 6) * (k1 + 2 * k2 + 2 * k3 + k4)
+    return densities
+
+
+def get_lindbladian(densities, dissipators, hamiltonian, operators):
+    """
+    Compute the action of the lindblad operator on a single (set of)
+    density matrix (matrices).
+
+    Implemented by definition: https://en.wikipedia.org/wiki/Lindbladian
+
+    Args:
+    densities :: ndarray - the probability density matrices
+    dissipators :: ndarray - the lindblad dissipators
+    hamiltonian :: ndarray
+    operators :: ndarray - the lindblad operators
+
+    Returns:
+    lindbladian :: ndarray - the lindbladian operator acting on the densities
+    """
+    operators_dagger = conjugate_transpose(operators)
+    operators_product = matmuls(operators_dagger, operators)
+    lindbladian = -1j * commutator(hamiltonian, densities)
+    for i, operator in enumerate(operators):
+        dissipator = dissipators[i]
+        operator_dagger = operators_dagger[i]
+        operator_product = operators_product[i]
+        lindbladian = lindbladian + (dissipator * (matmuls(operator, densities, operator_dagger)
+                                                   - 0.5 * matmuls(operator_product, densities)
+                                                   - 0.5 * matmuls(densities, operator_product)))
+    #ENDFOR
+    return lindbladian
+
+
 ### MODULE TESTS ###
 
 
@@ -320,4 +427,3 @@ def _test():
 
 if __name__ == "__main__":
     _test()
-

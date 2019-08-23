@@ -8,21 +8,19 @@ import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import (EvolveLindbladDiscreteState,
-                        EvolveLindbladDiscreteResult,
-                        InterpolationPolicy, OperationPolicy)
+                        EvolveLindbladResult,
+                        InterpolationPolicy,
+                        OperationPolicy,
+                        evolve_step_lindblad)
 
 ### MAIN METHODS ###
 
-def grape_lindblad_discrete():
-    pass
-
-
 def evolve_lindblad_discrete(control_step_count, evolution_time, hamiltonian,
                              initial_densities, lindblad_operators,
-                             controls=None, costs=None,                        
+                             controls=None, costs=[],                        
                              interpolation_policy=InterpolationPolicy.LINEAR,
                              operation_policy=OperationPolicy.CPU,
-                             system_step_multiplier=1.,):
+                             system_step_multiplier=1,):
     """
     Evolve a set of density matrices under the lindblad equation
     and compute the optimization error.
@@ -53,17 +51,18 @@ def evolve_lindblad_discrete(control_step_count, evolution_time, hamiltonian,
         these steps
 
     Returns:
-    result :: qoc.models.EvolveLindbladDiscreteResult - information
+    result :: qoc.models.EvolveLindbladResult - information
         about the evolution
     """
     pstate = EvolveLindbladDiscreteState(control_step_count, controls,
-                                         costs, evolution_time,
-                                         hamiltonian, initial_densities
+                                         costs,
+                                         evolution_time,
+                                         hamiltonian, initial_densities,
                                          interpolation_policy,
                                          lindblad_operators,
                                          operation_policy,
-                                         system_step_multiplier)
-    result = EvolveLindbladDiscreteResult
+                                         system_step_multiplier,)
+    result = EvolveLindbladResult()
 
     _ = _evaluate_lindblad(None, pstate, result)
 
@@ -90,9 +89,12 @@ def _evaluate_lindblad(controls, pstate, reporter):
     costs = pstate.costs
     densities = pstate.initial_densities
     dt = pstate.dt
-    evolve_lindblad = pstate.evolve_lindblad
+    hamiltonian = pstate.hamiltonian
     final_control_step = pstate.final_control_step
     final_system_step = pstate.final_system_step
+    interpolation_policy = pstate.interpolation_policy
+    lindblad_operators = pstate.lindblad_operators
+    operation_policy = pstate.operation_policy
     step_costs = pstate.step_costs
     system_step_multiplier = pstate.system_step_multiplier
     total_error = 0
@@ -104,8 +106,10 @@ def _evaluate_lindblad(controls, pstate, reporter):
         time = system_step * dt
 
         # Evolve the density matrices.
-        densities = evolve_lindblad(controls, control_step, densities, dt,
-                                    time, is_final_control_step)
+        densities = evolve_step_lindblad(densities, dt, hamiltonian, lindblad_operators,
+                                         time, is_final_control_step, control_step,
+                                         controls, interpolation_policy,
+                                         operation_policy)
 
         # Compute the costs.
         if is_final_system_step:
@@ -136,6 +140,10 @@ def _generate_complex_matrix(matrix_size):
 def _test():
     from qutip import mesolve, Qobj
     from qoc.standard import conjugate_transpose
+
+    # Test that lindblad evolution with lindblad operators results in
+    # a known matrix.
+    
         
     # Test that lindblad evolution yields similar result to qutip.    
     for matrix_size in range(2, _BIG):
@@ -147,10 +155,10 @@ def _test():
                                       for _ in np.arange(np.random.randint(0, matrix_size))]
         if len(lindblad_matrices) != 0:
             lindblad_matrices = np.stack(lindblad_matrices)
-            lindblad_operators = lambda time: lindblad_matrices
+            lindblad_dissipators = np.ones((lindblad_matrices.shape[0]))
+            lindblad_operators = lambda time: (lindblad_dissipators, lindblad_matrices)
         else:
-            zero_matrix = np.zeros((matrix_size, matrix_size))
-            lindblad_operators = lambda time: zero_matrix
+            lindblad_operators = lambda time: (None, None)
         density_matrix = _generate_complex_matrix(matrix_size)
         initial_densities = np.stack((density_matrix,))
         evolution_time = control_step_count = _BIG
@@ -177,7 +185,7 @@ def _test():
         print("qutip_final_density_matrix:\n{}"
               "".format(qutip_final_density_matrix))
         
-        # assert(np.allclose(eld_final_density_matrix, qutip_final_density_matrix))
+        assert(np.allclose(eld_final_density_matrix, qutip_final_density_matrix))
     #ENDFOR
 
 
