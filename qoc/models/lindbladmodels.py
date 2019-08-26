@@ -4,9 +4,7 @@ encapsulate the necessary information to execute
 programs involving lindblad evolution
 """
 
-from .programstate import (ProgramState, GrapeState)
-
-### MAIN STRUCTURES ###
+from qoc.models.programstate import ProgramState
 
 class EvolveLindbladDiscreteState(ProgramState):
     """
@@ -15,7 +13,6 @@ class EvolveLindbladDiscreteState(ProgramState):
     optimization error for one round.
 
     Fields:
-    controls :: ndarray - the control parameters to feed to the hamiltonian
     costs :: iterable(qoc.models.Cost) - the cost functions that
         define the cost model for evolution
     dt :: float - the time step used for evolution, it is the time
@@ -46,7 +43,7 @@ class EvolveLindbladDiscreteState(ProgramState):
     """
     
     def __init__(self, control_step_count,
-                 controls, costs, evolution_time,
+                 costs, evolution_time,
                  hamiltonian, initial_densities,
                  interpolation_policy,
                  lindblad_data,
@@ -67,7 +64,6 @@ class EvolveLindbladDiscreteState(ProgramState):
                          evolution_time, hamiltonian,
                          interpolation_policy,
                          operation_policy, system_step_multiplier)
-        self.controls = controls
         self.initial_densities = initial_densities
         self.lindblad_data = lindblad_data
 
