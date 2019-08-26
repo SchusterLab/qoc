@@ -2,8 +2,6 @@
 standard - a directory for standard definitions
 """
 
-from .autogradextensions import (ans_jacobian)
-
 from .constants import (PAULI_X, PAULI_Y, PAULI_Z,
                         SIGMA_PLUS, SIGMA_MINUS,
                         get_creation_operator,
@@ -24,13 +22,13 @@ from .functions import (commutator, conjugate_transpose,
                         complex_to_real_imag_flat,
                         real_imag_to_complex_flat,)
 
-from .jsonextensions import (CustomJSONEncoder,)
-
 from .optimizers import (Adam, LBFGSB, SGD,)
 
+from .util import (ans_jacobian,
+                   CustomJSONEncoder,
+                   generate_save_file_path,)
+
 __all__ = [
-    "ans_jacobian",
-    
     "PAULI_X", "PAULI_Y", "PAULI_Z", "get_creation_operator",
     "get_annihilation_operator", "get_eij",
     
@@ -41,7 +39,7 @@ __all__ = [
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "complex_to_real_imag_flat", "real_imag_to_complex_flat",
 
-    "CustomJSONEncoder",
+    "ans_jacobian", "CustomJSONEncoder", "generate_save_file_path",
     
     "Adam", "LBFGSB", "SGD",
 ]

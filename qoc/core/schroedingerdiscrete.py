@@ -70,105 +70,81 @@ def evolve_schroedinger_discrete(control_step_count, evolution_time,
     return result
 
 
-def grape_schroedinger_discrete():
-    pass
-# def grape_schroedinger_discrete(control_count, control_step_count,
-#                                 costs, evolution_time, hamiltonian, initial_states,
-#                                 initial_controls=None,
-#                                 interpolation_policy=InterpolationPolicy.LINEAR,
-#                                 iteration_count=1000, 
-#                                 log_iteration_step=10,
-#                                 magnus_policy=MagnusPolicy.M2,
-#                                 max_control_norms=None,
-#                                 operation_policy=OperationPolicy.CPU,
-#                                 optimizer=Adam(),
-#                                 performance_policy=PerformancePolicy.TIME,
-#                                 save_file_path=None, save_iteration_step=0,
-#                                 system_step_multiplier=1,):
-#     """
-#     a method to optimize the evolution of a set of states under the
-#     schroedinger equation for time-discrete control parameters
+def grape_schroedinger_discrete(control_count, control_step_count,
+                                costs, evolution_time, hamiltonian, initial_states,
+                                complex_controls=False,
+                                initial_controls=None,
+                                interpolation_policy=InterpolationPolicy.LINEAR,
+                                iteration_count=1000, 
+                                log_iteration_step=10,
+                                magnus_policy=MagnusPolicy.M2,
+                                max_control_norms=None,
+                                operation_policy=OperationPolicy.CPU,
+                                optimizer=Adam(),
+                                performance_policy=PerformancePolicy.TIME,
+                                save_file_path=None, save_iteration_step=0,
+                                system_step_multiplier=1,):
+    """
+    This method optimizes the evolution of a set of states under the schroedinger
+    equation for time-discrete control parameters.
 
-#     Args:
-#     control_count :: int - the number of control parameters required to be
-#         passed to the hamiltonian at each time step
-#     control_step_count :: int - the number of time steps in the evolution
-#         where control parameters are fit
-#     evolution_time :: float - the duration of system's evolution
-#     costs :: iterable(qoc.models.cost.Cost) - the cost functions to guide optimization
-#     hamiltonian :: (controls :: ndarray (control_count), time :: float)
-#                     -> hamiltonian :: ndarray (hilbert_size x hilbert_size)
-#       - an autograd compatible (https://github.com/HIPS/autograd) function that
-#         returns the system hamiltonian given the control parameters
-#         and evolution time
-#     initial_controls :: ndarray (control_step_count x control_count)
-#         - the values to use for the controls for the first iteration,
-#     initial_states :: ndarray (state_count x hilbert_size x 1)
-#         - a list of the states to evolve
-#         A column vector is specified as np.array([[0], [1], [2]]).
-#         A column vector is NOT a row vector np.array([[0, 1, 2]]).
-#     interpolation_policy :: qoc.InterpolationPolicy - how to interpolate
-#         controls where they are not defined
-#     iteration_count :: int - the number of iterations to optimize for
-#     log_iteration_step :: int - how often to write to stdout,
-#         set to 0 to disable logging
-#     magnus_policy :: qoc.models.magnuspolicy.MagnusPolicy
-#         - the method to use for the magnus expansion
-#     max_control_norms :: ndarray (control_count) - These are the absolute values at
-#         which to clip the controls if their norm exceeds these values.
-#         The default maximum norms will be 1 if not specified. 
-#     operation_policy :: qoc.models.operationpolicy.OperationPolicy
-#         - this policy encapsulates the array class that is used and how operations
-#         should be performed on those arrays,
-#         e.g. CPU, GPU, CPU-sparse, GPU-spares, etc.
-#     optimizer :: qoc.models.optimizer.Optimizer
-#         - an instance of an optimizer to perform gradient-based optimization
-#     performance_policy :: qoc.PerformancePolicy - minimize the usage of this
-#         resource
-#     save_file_path :: str - the full path to an h5 file where
-#         information should be saved
-#     save_iteration_step :: int - how often to write to the save file,
-#         set 0 to disable saving
-#     system_step_multiplier :: int - this factor will be used to determine how
-#         many steps inbetween each pulse step the system should evolve,
-#         control parameters will be interpolated at these steps
+    Args:
+    complex_controls
+    control_count
+    control_step_count
+    costs
+    evolution_time
+    hamiltonian
+    initial_states
+    interpolation_policy
+    iteration_count
+    log_iteration_step
+    magnus_policy
+    max_control_norms
+    operation_policy
+    optimizer
+    performance_policy
+    save_file_path
+    save_iteration_step
+    system_step_multiplier
 
-#     Returns:
-#     result :: qoc.models.schroedingermodels.GrapeSchroedingerResult
-#         - useful information about the optimization
-#     """
-#     # Initialize controls.
-#     initial_controls, max_control_norms = initialize_controls(initial_controls,
-#                                                               max_control_norms,
-#                                                               evolution_time,
-#                                                               control_step_count,
-#                                                               control_count)
+    Returns:
+    result
+    """
+    # Initialize the controls.
+    initial_controls, max_control_norms = initialize_controls(complex_controls,
+                                                              control_count,
+                                                              control_step_count,
+                                                              evolution_time,
+                                                              initial_controls,
+                                                              max_control_norms,)
+    # Construct the program state.
+    pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
+                                            control_step_count, costs,
+                                            evolution_time, hamiltonian,
+                                            initial_controls,
+                                            initial_states,
+                                            interpolation_policy,
+                                            iteration_count,
+                                            log_iteration_step, magnus_policy,
+                                            max_control_nroms, operation_policy,
+                                            optimizer, performance_policy,
+                                            save_file_path, save_iteration_step,
+                                            system_step_multiplier,)
+    # TODO: Refactor left off here.
+    pstate.log_and_save_initial()
+
+    # Transform the initial parameters to their optimizer
+    # friendly form.
+    initial_controls = strip_controls(pstate, initial_controls)
     
-#     # Construct the grape state.
-#     hilbert_size = initial_states[0].shape[0]
-#     pstate = GrapeSchroedingerDiscreteState(costs, performance_policy,
-#                                             hamiltonian, hilbert_size,
-#                                             initial_controls,
-#                                             initial_states,
-#                                             interpolation_policy, iteration_count,
-#                                             log_iteration_step, magnus_policy,
-#                                             max_control_norms, operation_policy,
-#                                             optimizer, control_count, control_step_count,
-#                                             evolution_time, save_file_name, save_iteration_step,
-#                                             save_path, system_step_multiplier)
-#     pstate.log_and_save_initial()
+    # Switch on the GRAPE implementation method.
+    if pstate.performance_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
+        result = _grape_schroedinger_discrete_time(pstate, initial_controls)
+    else:
+        result = _grape_schroedinger_discrete_memory(pstate, initial_controls)
 
-#     # Transform the initial parameters to their optimizer
-#     # friendly form.
-#     initial_controls = strip_controls(pstate, initial_controls)
-    
-#     # Switch on the GRAPE implementation method.
-#     if pstate.performance_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
-#         result = _grape_schroedinger_discrete_time(pstate, initial_controls)
-#     else:
-#         result = _grape_schroedinger_discrete_memory(pstate, initial_controls)
-
-#     return result
+    return result
 
 
 ### HELPER METHODS ###
@@ -472,7 +448,7 @@ def _test_evolve_schroedinger_discrete():
     Run end-to-end test on the evolve_schroedinger_discrete
     function.
     """
-    from qutip import essolve, mesolve, Qobj, Options
+    from qutip import mesolve, Qobj, Options
 
     # Test that evolving states under a hamiltonian yields
     # a known result. Use e.q. 109 of 
@@ -550,6 +526,7 @@ def _test_grape_schroedinger_discrete():
     """
     Run end-to-end test on the grape_schroedinger_discrete function.
     """
+    # TODO: implement me
     pass
     # # TOOD: Rework this test when parameter clipping gets reworked.
     # # Parameters should be clipped if they grow too large.

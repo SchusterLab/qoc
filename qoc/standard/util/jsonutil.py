@@ -1,6 +1,7 @@
 """
-jsonextensions.py - a module for json extensions
+jsoneutil.py - This module provides utilities for interfacing with JSON.
 """
+
 import json
 
 import numpy as np
