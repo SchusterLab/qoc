@@ -6,9 +6,11 @@ import numpy as np
 
 ### CONSTANTS ###
 
-PAULI_X = np.array([[0, 1], [1, 0]])
-PAULI_Y = np.array([[0, -1j], [1j, 0]])
-PAULI_Z = np.array([[1, 0], [0, -1]])
+PAULI_X = np.array(((0, 1), (1, 0)))
+PAULI_Y = np.array(((0, -1j), (1j, 0)))
+PAULI_Z = np.array(((1, 0), (0, -1)))
+SIGMA_PLUS = np.array(((0, 0), (1, 0)))
+SIGMA_MINUS = np.array(((0, 1), (0, 0)))
 
 
 ### GENERATIVE CONSTANTS ###

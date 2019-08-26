@@ -382,7 +382,7 @@ def _test_grape_schroedinger_discrete():
     _hamiltonian = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
                                      + np.kron(PAULI_Y, PAULI_Y))
     hamiltonian = lambda params, t: params[0] * _hamiltonian
-    initial_states = matrix_to_column_vector_list(np.eye(hilbert_size, dtype=np.complex128))
+    initial_states = matrix_to_column_vector_list(identity_matrix)
     target_states = matrix_to_column_vector_list(iswap_unitary)
     costs = (TargetInfidelity(target_states),)
     param_count = 1

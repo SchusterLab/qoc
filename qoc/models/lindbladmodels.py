@@ -28,10 +28,10 @@ class EvolveLindbladDiscreteState(ProgramState):
         to evolve
     interpolation_policy :: qoc.InterpolationPolicy - how parameters
         should be interpolated for intermediate time steps
-    lindblad_operators :: (time :: float) -> (dissapartors :: ndarray, operators :: ndarray)
+    lindblad_data :: (time :: float) -> (dissapartors :: ndarray, operators :: ndarray)
         - a function to generate the dissapation constants and lindblad operators
           for a given time,
-          an array of dissapators and operators should be returned even if there
+          an array of dissipators and operators should be returned even if there
           are zero or one dissapator and operator pairs
     operation_policy :: qoc.models.OperationPolicy - defines how
         computations should be performed, e.g. CPU, GPU, sparse, etc.
@@ -48,7 +48,7 @@ class EvolveLindbladDiscreteState(ProgramState):
                  controls, costs, evolution_time,
                  hamiltonian, initial_densities,
                  interpolation_policy,
-                 lindblad_operators,
+                 lindblad_data,
                  operation_policy,
                  system_step_multiplier,):
 
@@ -67,7 +67,7 @@ class EvolveLindbladDiscreteState(ProgramState):
                          interpolation_policy,
                          operation_policy, system_step_multiplier)
         self.initial_densities = initial_densities
-        self.lindblad_operators = lindblad_operators
+        self.lindblad_data = lindblad_data
 
 
 class EvolveLindbladResult(object):

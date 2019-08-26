@@ -5,6 +5,7 @@ standard - a directory for standard definitions
 from .autogradextensions import (ans_jacobian)
 
 from .constants import (PAULI_X, PAULI_Y, PAULI_Z,
+                        SIGMA_PLUS, SIGMA_MINUS,
                         get_creation_operator,
                         get_annihilation_operator,
                         get_eij,)
