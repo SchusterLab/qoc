@@ -25,7 +25,6 @@ from qoc.standard import ans_jacobian
 class ProgramState(object):
     """
     Fields:
-    controls :: ndarray - the control parameters
     costs :: iterable(qoc.models.Cost) - the cost functions that
         define the cost model for evolution
     dt :: float - the time step used for evolution, it is the time
@@ -49,7 +48,7 @@ class ProgramState(object):
     system_step_multiplier :: int - this value times `control_step_count`
         determines how many time steps are used in evolution
     """
-    def __init__(self, control_step_count, controls, costs, evolution_time,
+    def __init__(self, control_step_count, costs, evolution_time,
                  hamiltonian,
                  interpolation_policy,
                  operation_policy, system_step_multiplier):
@@ -62,7 +61,6 @@ class ProgramState(object):
             of control parameter updates
         evolution_time :: float - the time over which the system will evolve
         """
-        self.controls = controls
         self.costs = costs
         system_step_count = control_step_count * system_step_multiplier
         self.dt = evolution_time / system_step_count

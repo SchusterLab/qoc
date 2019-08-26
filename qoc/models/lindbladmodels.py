@@ -15,6 +15,7 @@ class EvolveLindbladDiscreteState(ProgramState):
     optimization error for one round.
 
     Fields:
+    controls :: ndarray - the control parameters to feed to the hamiltonian
     costs :: iterable(qoc.models.Cost) - the cost functions that
         define the cost model for evolution
     dt :: float - the time step used for evolution, it is the time
@@ -59,13 +60,14 @@ class EvolveLindbladDiscreteState(ProgramState):
         control_step_count :: int - the number of time steps at which the
             evolution time should be initially split into and the number
             of control parameter updates
-        controls :: ndarray - the control parameters to feed to the hamiltonian
+
         evolution_time :: float - the time over which the system will evolve
         """
-        super().__init__(control_step_count, controls, costs,
+        super().__init__(control_step_count, costs,
                          evolution_time, hamiltonian,
                          interpolation_policy,
                          operation_policy, system_step_multiplier)
+        self.controls = controls
         self.initial_densities = initial_densities
         self.lindblad_data = lindblad_data
 
