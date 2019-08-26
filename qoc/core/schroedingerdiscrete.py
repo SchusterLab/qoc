@@ -1,5 +1,5 @@
 """
-gsd.py - a module to expose the grape schroedinger discrete
+schroedingerdiscrete.py - a module to expose the grape schroedinger discrete
 optimization algorithm
 """
 
