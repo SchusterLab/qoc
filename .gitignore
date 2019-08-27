@@ -1,15 +1,21 @@
+# binary
+*.h5
+*.png
+
+# editor files
+*~
+*#
+
+# local
+_test/*
+
 # python files
 **/__pycache__/*
 *.pyc
 *.egg-info
 **/.ipynb_checkpoints/*
 
-# editor files
-*~
-*#
 
-# private
-_test/*
 
-# binary
-*.h5
+
+
