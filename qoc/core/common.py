@@ -164,40 +164,42 @@ def initialize_controls(complex_controls,
     return controls, max_control_norms
 
 
-def slap_controls(gstate, controls):
+def slap_controls(complex_controls, controls, controls_shape,):
     """
-    Reshape and transform controleters displayed to the optimizer
-    to controleters understood by the cost function.
+    Reshape and transform controls in optimizer format
+    to controls in cost function format.
+
     Args:
-    gstate :: qoc.GrapeState - information about the optimization
     controls :: ndarray - the controls in question
+    pstate :: qoc.models.GrapeState - information about the optimization
+
     Returns:
     new_controls :: ndarray - the reshapen, transformed controls
     """
-    # Transform the controleters to C if they are complex.
-    if gstate.complex_controls:
+    # Transform the controls to C if they are complex.
+    if complex_controls:
         controls = real_imag_to_complex_flat(controls)
-    # Reshape the controleters.
-    controls = np.reshape(controls, gstate.controls_shape)
-    # Clip the controleters.
-    clip_control_norms(gstate.max_control_norms, controls)
+    # Reshape the controls.
+    controls = np.reshape(controls, controls_shape)
     
     return controls
 
 
-def strip_controls(gstate, controls):
+def strip_controls(complex_controls, controls):
     """
-    Reshape and transform controleters understood by the cost
-    function to controleters understood by the optimizer.
-    gstate :: qoc.GrapeState - information about the optimization
+    Reshape and transform controls understood by the cost
+    function to controls understood by the optimizer.
+
+    Args:
     controls :: ndarray - the controls in question
+
     Returns:
     new_controls :: ndarray - the reshapen, transformed controls
     """
-    # Flatten the controleters.
+    # Flatten the controls.
     controls = controls.flatten()
-    # Transform the controleters to R2 if they are complex.
-    if gstate.complex_controls:
+    # Transform the controls to R2 if they are complex.
+    if complex_controls:
         controls = complex_to_real_imag_flat(controls)
 
     return controls
@@ -214,32 +216,32 @@ def _test():
     from qoc.models.dummy import Dummy
 
     # Test control optimizer transformations.
-    gstate = Dummy()
-    gstate.complex_controls = True
+    pstate = Dummy()
+    pstate.complex_controls = True
     shape_range = np.arange(_BIG) + 1
     for step_count in shape_range:
         for control_count in shape_range:
-            gstate.controls_shape = controls_shape = (step_count, control_count)
-            gstate.max_control_norms = np.ones(control_count) * 2
+            pstate.controls_shape = controls_shape = (step_count, control_count)
+            pstate.max_control_norms = np.ones(control_count) * 2
             controls = np.random.rand(*controls_shape) + 1j * np.random.rand(*controls_shape)
-            stripped_controls = strip_controls(gstate, controls)
+            stripped_controls = strip_controls(pstate, controls)
             assert(stripped_controls.ndim == 1)
             assert(not (stripped_controls.dtype in (np.complex64, np.complex128)))
-            transformed_controls = slap_controls(gstate, stripped_controls)
+            transformed_controls = slap_controls(pstate, stripped_controls)
             assert(np.allclose(controls, transformed_controls))
             assert(controls.shape == transformed_controls.shape)
     #ENDFOR
 
-    gstate.complex_controls = False
+    pstate.complex_controls = False
     for step_count in shape_range:
         for control_count in shape_range:
-            gstate.controls_shape = controls_shape = (step_count, control_count)
-            gstate.max_control_norms = np.ones(control_count)
+            pstate.controls_shape = controls_shape = (step_count, control_count)
+            pstate.max_control_norms = np.ones(control_count)
             controls = np.random.rand(*controls_shape)
-            stripped_controls = strip_controls(gstate, controls)
+            stripped_controls = strip_controls(pstate, controls)
             assert(stripped_controls.ndim == 1)
             assert(not (stripped_controls.dtype in (np.complex64, np.complex128)))
-            transformed_controls = slap_controls(gstate, stripped_controls)
+            transformed_controls = slap_controls(pstate, stripped_controls)
             assert(np.allclose(controls, transformed_controls))
             assert(controls.shape == transformed_controls.shape)
     #ENDFOR

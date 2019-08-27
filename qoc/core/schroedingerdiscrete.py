@@ -10,8 +10,8 @@ import autograd.numpy as anp
 from autograd.extend import Box
 import numpy as np
 
-# from qoc.core.common import (gen_controls_cos, initialize_controls,
-#                              slap_controls, strip_controls,)
+from qoc.core.common import (initialize_controls,
+                             slap_controls, strip_controls,)
 from qoc.models import (MagnusPolicy, OperationPolicy,
                         PerformancePolicy,
                         InterpolationPolicy, Dummy,
@@ -27,7 +27,6 @@ from qoc.standard import (ans_jacobian, Adam, SGD, ForbidStates, TargetInfidelit
                           real_imag_to_complex_flat,
                           get_annihilation_operator,
                           get_creation_operator)
-
 
 ### MAIN METHODS ###
 
@@ -131,18 +130,13 @@ def grape_schroedinger_discrete(control_count, control_step_count,
                                             optimizer, performance_policy,
                                             save_file_path, save_iteration_step,
                                             system_step_multiplier,)
-    # TODO: Refactor left off here.
     pstate.log_and_save_initial()
 
-    # Transform the initial parameters to their optimizer
-    # friendly form.
-    initial_controls = strip_controls(pstate, initial_controls)
-    
     # Switch on the GRAPE implementation method.
-    if pstate.performance_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
-        result = _grape_schroedinger_discrete_time(pstate, initial_controls)
+    if performance_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
+        result = _grape_schroedinger_discrete_time(pstate)
     else:
-        result = _grape_schroedinger_discrete_memory(pstate, initial_controls)
+        result = _grape_schroedinger_discrete_memory(pstate)
 
     return result
 
@@ -325,32 +319,33 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian, states, time,
     return states
 
 
-# def _grape_schroedinger_discrete_time(pstate, initial_controls):
-#     """
-#     Perform GRAPE for the schroedinger equation with time discrete parameters.
-#     Use autograd to compute evolution gradients.
+def _grape_schroedinger_discrete_time(pstate):
+    """
+    Perform GRAPE for the schroedinger equation with time discrete parameters.
+    Use autograd to compute evolution gradients.
 
-#     Args:
-#     pstate :: qoc.GrapeSchroedingerDiscreteState - information required to
-#          perform the optimization
-#     initial_controls :: ndarray - the transformed initial_controls
+    Args:
+    pstate :: qoc.models.GrapeSchroedingerDiscreteState - information required to
+         perform the optimization
 
-#     Returns: 
-#     result :: qoc.GrapeResult - an object that tracks important information
-#         about the optimization
-#     """
-#     # Autograd does not allow multiple return values from
-#     # a differentiable function.
-#     # Scipy's minimization algorithms require us to provide
-#     # functions that they evaluate on their own schedule.
-#     # The best solution to track mutable objects, that I can think of,
-#     # is to use a reporter object.
-#     reporter = GrapeResult()
-#     pstate.optimizer.run((pstate, reporter), _evaluate_schroedinger_discrete_wrap,
-#                          pstate.iteration_count, initial_controls,
-#                          _evaluate_schroedinger_discrete_jacobian_wrap)
+    Returns: 
+    result :: qoc.models.GrapeResult - an object that tracks important information
+        about the optimization
+    """
+    # TODO: multiple reporters?
+    # Autograd does not allow multiple return values from
+    # a differentiable function.
+    # Scipy's minimization algorithms require us to provide
+    # functions that they evaluate on their own schedule.
+    # The best solution to track mutable objects, that I can think of,
+    # is to use a reporter object.
+    reporter = GrapeResult()
+    initial_controls = strip_controls(pstate.complex_controls)
+    pstate.optimizer.run((pstate, reporter), _evaluate_schroedinger_discrete_wrap,
+                         pstate.iteration_count, initial_controls,
+                         _evaluate_schroedinger_discrete_jacobian_wrap)
 
-#     return reporter
+    return reporter
 
 
 # # Wrapper to do intermediary work before passing control to _evaluate_schroedinger_discrete.

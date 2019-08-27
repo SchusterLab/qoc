@@ -68,6 +68,7 @@ class GrapeState(ProgramState):
     Fields:
     complex_controls
     control_count
+    controls_shape
     costs
     dt
     final_control_step
@@ -82,6 +83,8 @@ class GrapeState(ProgramState):
     optimizer
     save_file_path
     save_iteration_step
+    should_log
+    should_save
     step_cost_indices
     step_costs
     system_step_multiplier
@@ -109,6 +112,7 @@ class GrapeState(ProgramState):
                          system_step_multiplier)
         self.complex_controls = complex_controls
         self.control_count = control_count
+        self.controls_shape = (control_step_count, control_count)
         self.initial_controls = initial_controls
         self.iteration_count = iteration_count
         self.log_iteration_step = log_iteration_step
@@ -116,5 +120,6 @@ class GrapeState(ProgramState):
         self.optimizer = optimizer
         self.save_file_path = save_file_path
         self.save_iteration_step = save_iteration_step
-        
-        
+        self.should_log = log_iteration_step != 0
+        self.should_save = ((save_iteration_step != 0)
+                            and (not (save_file_path is None)))
