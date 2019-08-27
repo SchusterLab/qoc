@@ -162,7 +162,7 @@ def _esd_wrap(controls, pstate, reporter, result):
     clip_control_norms(pstate.max_control_norms, controls)
 
     # Evaluate the cost function.
-    return _evaluate_schroedinger_discrete(controls)
+    return _evaluate_schroedinger_discrete(controls, pstate, reporter)
 
 
 def _esdj_wrap(controls, pstate, reporter, result):

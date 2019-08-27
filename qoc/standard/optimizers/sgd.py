@@ -8,6 +8,7 @@ class SGD(object):
     """
     a class to define the Stochastic Gradient Descent optimizer
     This implementation follows intuition.
+
     Fields:
     learning_rate :: float - the initial step size
     """

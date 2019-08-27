@@ -12,6 +12,7 @@ from .costs import (ControlNorm,
                     ForbidDensities,
                     ForbidStates,
                     TargetDensityInfidelity,
+                    TargetDensityInfidelityTime,
                     TargetStateInfidelity,
                     TargetStateInfidelityTime,)
 
@@ -33,15 +34,14 @@ __all__ = [
     "get_annihilation_operator", "get_creation_operator",
     "get_eij", "SIGMA_X", "SIGMA_Y", "SIGMA_Z", "SIGMA_MINUS",
     "SIGMA_PLUS",
-    
-    "ControlNorm", "ControlVariation", "ForbidStates",
+    "ControlNorm", "ControlVariation", "ForbidDensities",
+    "ForbidStates",
+    "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
-    
     "commutator", "conjugate", "conjugate_transpose", "expm", "krons",
+    "mult_cols", "mult_rows", "transpose",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "complex_to_real_imag_flat", "real_imag_to_complex_flat",
-
-    "ans_jacobian", "CustomJSONEncoder", "generate_save_file_path",
-    
     "Adam", "LBFGSB", "SGD",
+    "ans_jacobian", "CustomJSONEncoder", "generate_save_file_path",
 ]

@@ -18,14 +18,13 @@ class ForbidStates(Cost):
     forbidden_states_dagger :: ndarray - the conjugate transpose of
         the forbidden states
     name :: str - a unique identifier for this cost
+    normalization_constant :: int - used to normalize the cost
     requires_step_evaluation :: bool - True if the cost needs
         to be computed at each optimization time step, False
         if it should be computed only at the final optimization
         time step
-    state_count :: int - the number of evolving states
     state_normalization_constants :: ndarray - the number of states
         that each evolving state is forbidden from
-    system_step_count :: float - the number of evolution steps
     """
     name = "forbid_states"
     requires_step_evaluation = True
@@ -40,14 +39,15 @@ class ForbidStates(Cost):
             in the first axis is an array of states that the corresponding
             evolving state is forbidden from, that is, each evolving
             state has its own list of forbidden states
+        system_step_count :: int - the number of system steps in the evolution
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.forbidden_states_dagger = conjugate_transpose(forbidden_states)
-        self.state_count = len(forbidden_states)
-        self.state_normalization_constants = np.array([len(state_forbidden_states)
+        state_count = forbidden_states.shape[0]
+        self.normalization_constant = state_count * system_step_count
+        self.state_normalization_constants = np.array([state_forbidden_states.shape[0]
                                                        for state_forbidden_states
                                                        in forbidden_states])
-        self.system_step_count = system_step_count
 
 
     def cost(self, controls, states, system_step):
@@ -57,6 +57,7 @@ class ForbidStates(Cost):
         states :: ndarray - an array of the initial states evolved to
             the current time step
         system_step :: int - the system time step
+
         Returns:
         cost :: float - the penalty
         """
@@ -74,8 +75,7 @@ class ForbidStates(Cost):
         
         # Normalize the cost for the number of evolving states
         # and the number of time evolution steps.
-        cost = (cost / (self.state_count
-                        * self.system_step_count))
+        cost = (cost / self.normalization_constant)
         
         return self.cost_multiplier * cost
 
@@ -98,7 +98,7 @@ def _test():
     fs = ForbidStates(forbidden_states, system_step_count)
     
     cost = fs.cost(None, states, None)
-    expected_cost = np.divide(5, 160)
+    expected_cost = np.divide(5, 80)
     assert(np.allclose(cost, expected_cost,))
 
 

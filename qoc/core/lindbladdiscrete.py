@@ -190,7 +190,7 @@ def _eld_wrap(controls, pstate, reporter, result):
     clip_control_norms(pstate.max_control_norms, controls)
 
     # Evaluate the cost function.
-    return _evaluate_lindblad_discrete(controls)
+    return _evaluate_lindblad_discrete(controls, pstate, reporter)
 
 
 def _eldj_wrap(controls, pstate, reporter, result):

@@ -47,18 +47,16 @@ class TargetStateInfidelityTime(Cost):
         self.state_count = target_states.shape[0]
         self.step_count = step_count
         self.target_states_dagger = conjugate_transpose(anp.stack(target_states))
-        # This cost function does not make use of parameter penalties.
-        self.dcost_dparams = (lambda params, states, step:
-                              np.zeros_like(params))
 
 
-    def cost(self, params, states, step):
+    def cost(self, controls, states, system_step):
         """
         Args:
-        params :: numpy.ndarray - the control parameters for all time steps
-        states :: numpy.ndarray - an array of the states evolved to
+        controls :: ndarray - the control parameters for all time steps
+        states :: ndarray - an array of the states evolved to
             the current time step
-        step :: int - the pulse time step
+        system_step :: int - the system time step
+
         Returns:
         cost :: float - the penalty
         """

@@ -7,6 +7,7 @@ from scipy.optimize import minimize
 class LBFGSB(object):
     """
     The L-BFGS-B optimizer.
+
     Fields: none
     """
 
