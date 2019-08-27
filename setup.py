@@ -7,13 +7,19 @@ from distutils.core import setup
 
 NAME = "qoc"
 VERSION = "0.1alpha"
+DEPENDENCIES = [
+    "autograd",
+    "numpy",
+    "scipy",
+]
 DESCRIPTION = "a package for performing quantum optimal control"
 AUTHOR = "Thomas Propson"
 AUTHOR_EMAIL = "tcpropson@uchicago.edu"
 
-setup(name=NAME,
-      version=VERSION,
-      description=DESCRIPTION,
-      author=AUTHOR,
+setup(author=AUTHOR,
       author_email=AUTHOR_EMAIL,
+      description=DESCRIPTION,
+      install_requires=DEPENDENCIES,
+      name=NAME,
+      version=VERSION,
 )
