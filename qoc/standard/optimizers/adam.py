@@ -4,13 +4,9 @@ adam.py - a module for defining the Adam optimizer
 
 import numpy as np
 
-from qoc.models import Dummy
-from qoc.models.optimizer import Optimizer
-from qoc.standard import (complex_to_real_imag_flat,
-                          real_imag_to_complex_flat)
+from qoc.models.operationpolicy import OperationPolicy
 
-
-class Adam(Optimizer):
+class Adam(object):
     """
     a class to define the Adam optimizer
     This implementation follows the original algorithm
@@ -33,6 +29,7 @@ class Adam(Optimizer):
     learning_rate_decay :: float - the number of iterations it takes for
         the learning rate to decay by 1/e, if not set, no decay is
         applied
+    operation_policy
     name :: str - identifier for the optimizer
     scale_grads :: float - the value to scale the norm of the gradients to,
         if not set, the gradients will not be scaled
@@ -41,7 +38,8 @@ class Adam(Optimizer):
 
     def __init__(self, beta_1=0.9, beta_2=0.999, clip_grads=None,
                  epsilon=1e-8, learning_rate=1e-3,
-                 learning_rate_decay=None, scale_grads=None):
+                 learning_rate_decay=None, operation_policy=OperationPolicy.CPU,
+                 scale_grads=None):
         """
         See class definition for argument specifications.
         Default values are chosen in accordance to those proposed
@@ -82,8 +80,8 @@ class Adam(Optimizer):
                           self.clip_grads, self.scale_grads))
     
 
-    def run(self, args, function, iteration_count,
-            initial_params, jacobian):
+    def run(self, function, iteration_count,
+            initial_params, jacobian, args=()):
         """
         Run an Adam optimization series.
         Args:
@@ -92,7 +90,7 @@ class Adam(Optimizer):
         function :: any -> float
             - the function to minimize
         iteration_count :: int - how many iterations to perform
-        initial_params :: numpy.ndarray - the initial optimization values
+        initial_params :: ndarray - the initial optimization values
         jacobian :: numpy.ndarray - the jacobian of the function
             with respect to the params
         Returns: none
@@ -173,6 +171,7 @@ def _test():
     """
     # Use the functions that are used in the core module.
     from qoc.core.common import (strip_params, slap_params)
+    from qoc.models.dummy import Dummy
     
     # Check that the update method was implemented correctly
     # using hand-checked values.

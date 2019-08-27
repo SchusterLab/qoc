@@ -16,8 +16,10 @@ class EvolveSchroedingerDiscreteState(ProgramState):
     qoc.core.schroedingerdiscrete.evolve_schroedinger_discrete.
     
     Fields:
+    control_step_count
     costs
     dt
+    evolution_time
     final_control_step
     final_system_step
     hamiltonian
@@ -72,9 +74,12 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     complex_controls
     control_count
     controls_shape
+    control_step_count
     costs
     dt
+    evolution_time
     final_control_step
+    final_iteration
     final_system_step
     hamiltonian
     hilbert_size
@@ -85,6 +90,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     log_iteration_step
     magnus_policy
     max_control_norms
+    minimum_error
     operation_policy
     optimizer
     performance_policy
@@ -101,7 +107,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                  costs, evolution_time, hamiltonian, initial_controls,
                  initial_states, interpolation_policy, iteration_count, log_iteration_step,
                  magnus_policy,
-                 max_control_norms, operation_policy, optimizer,
+                 max_control_norms, minimum_error, operation_policy, optimizer,
                  performance_policy,
                  save_file_path, save_iteration_step, system_step_multiplier,):
         """
@@ -109,13 +115,13 @@ class GrapeSchroedingerDiscreteState(GrapeState):
 
         Args:
         control_count
-        control_step_count
         evolution_time
         """
         super().__init__(complex_controls, control_count, control_step_count,
                          costs, evolution_time, hamiltonian, initial_controls,
                          interpolation_policy, iteration_count,
-                         log_iteration_step, max_control_norms, operation_policy,
+                         log_iteration_step, max_control_norms,
+                         minimum_error, operation_policy,
                          optimizer, save_file_path, save_iteration_step,
                          system_step_multiplier,)
         self.hilbert_size = initial_states[0].shape[0]
@@ -196,7 +202,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                               dtype=np.float64)
                 save_file["evolution_time"]= self.evolution_time
                 save_file["grads"] = np.zeros((save_count, self.control_step_count,
-                                               self.param_count), dtype=self.initial_controls.dtype)
+                                               self.control_count), dtype=self.initial_controls.dtype)
                 save_file["initial_controls"] = self.initial_controls
                 save_file["initial_states"] = self.initial_states
                 save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
@@ -218,17 +224,25 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                   "=========================================")
 
 
-class GrapeSchroedingerResult():
+class GrapeSchroedingerResult(object):
     """
     This class encapsulates useful information about a
     grape optimization under the Schroedinger equation.
 
     Fields:
+    best_controls
+    best_final_states
+    best_iteration
+    best_total_error
     """
-    def __init__(self):
+    def __init__(self, best_controls=None,
+                 best_final_states=None,
+                 best_iteration=None,
+                 best_total_error=np.finfo(np.float64).max):
         """
         See class definition for arguments not listed here.
-
-        Args:
         """
-        pass
+        self.best_controls = best_controls
+        self.best_final_states = best_final_states
+        self.best_iteration = best_iteration
+        self.best_total_error = best_total_error

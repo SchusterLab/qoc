@@ -4,10 +4,7 @@ sgd.py - a module for defining the Stochastic Gradient Descent optimizer
 
 import numpy as np
 
-from qoc.models.optimizer import Optimizer
-
-
-class SGD(Optimizer):
+class SGD(object):
     """
     a class to define the Stochastic Gradient Descent optimizer
     This implementation follows intuition.
@@ -24,8 +21,8 @@ class SGD(Optimizer):
         self.learning_rate = learning_rate
 
 
-    def run(self, args, function, iteration_count,
-            initial_params, jacobian):
+    def run(self, function, iteration_count,
+            initial_params, jacobian, args=()):
         """
         Run a SGD optimization series.
         Args:

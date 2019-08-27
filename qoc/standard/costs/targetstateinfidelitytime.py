@@ -1,5 +1,5 @@
 """
-targetinfidelitytime.py - a module for defining the target fidelity cost function
+targetstateinfidelitytime.py - a module for defining the target fidelity cost function
 evaluated at each time step
 """
 
@@ -9,8 +9,10 @@ import numpy as np
 from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
 
-class TargetInfidelityTime(Cost):
-    """a class to encapsulate the target infidelity cost function
+class TargetStateInfidelityTime(Cost):
+    """a class to encapsulate the target state infidelity cost function
+    for all time
+
     Fields:
     cost_multiplier :: float - the wieght factor for this cost
     dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
@@ -77,12 +79,12 @@ def _tests():
     target0 = np.array([[1], [0]])
     states = np.stack((state0,), axis=0)
     targets = np.stack((target0,), axis=0)
-    ti = TargetInfidelityTime(step_count, targets)
+    ti = TargetStateInfidelityTime(step_count, targets)
     cost = ti.cost(None, states, None)
     expected_cost = 0.1
     assert(np.allclose(cost, expected_cost))
 
-    ti = TargetInfidelityTime(step_count, states)
+    ti = TargetStateInfidelityTime(step_count, states)
     cost = ti.cost(None, states, None)
     expected_cost = 0
     assert(np.allclose(cost, expected_cost))
@@ -93,7 +95,7 @@ def _tests():
     target1 = np.array([[1], [0]])
     states = np.stack((state0, state1,), axis=0)
     targets = np.stack((target0, target1,), axis=0)
-    ti = TargetInfidelityTime(step_count, targets)
+    ti = TargetStateInfidelityTime(step_count, targets)
     cost = ti.cost(None, states, None)
     expected_cost = 0.025
     assert(np.allclose(cost, expected_cost))

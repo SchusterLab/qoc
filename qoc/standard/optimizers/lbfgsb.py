@@ -3,9 +3,8 @@ lbfgsb.py - a module to expose the L-BFGS-B optimization algorithm
 """
 
 from scipy.optimize import minimize
-from qoc.models.optimizer import Optimizer
 
-class LBFGSB(Optimizer):
+class LBFGSB(object):
     """
     The L-BFGS-B optimizer.
     Fields: none
@@ -18,8 +17,8 @@ class LBFGSB(Optimizer):
         super().__init__()
 
 
-    def run(self, args, function, iteration_count, 
-            initial_params, jacobian):
+    def run(self, function, iteration_count, 
+            initial_params, jacobian, args=()):
         """
         Run the L-BFGS-B method.
 

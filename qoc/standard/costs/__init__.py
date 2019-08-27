@@ -2,13 +2,13 @@
 costs - a directory to define cost functions to guide optimization
 """
 
+from .controlnorm import ControlNorm
+# from .controlvariation import ControlVariation
 from .forbidstates import ForbidStates
-from .paramvalue import ParamValue
-from .paramvariation import ParamVariation
-from .targetinfidelity import TargetInfidelity
-from .targetinfidelitytime import TargetInfidelityTime
+from .targetstateinfidelity import TargetStateInfidelity
+from .targetstateinfidelitytime import TargetStateInfidelityTime
 
 __all__ = [
-    "ForbidStates", "ParamValue", "ParamVariation",
-    "TargetInfidelity", "TargetInfidelityTime",
+    "ControlNorm", "ControlVariation", "ForbidStates",
+    "TargetStateInfidelity", "TargetStateInfidelityTime",
 ]

@@ -4,11 +4,12 @@
 
 import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (Adam, LBFGSB, SGD, TargetInfidelity,
+from qoc.standard import (TargetInfidelity,
                           conjugate_transpose,
                           get_annihilation_operator,
                           get_creation_operator,
-                          PAULI_Z,)
+                          PAULI_Z,
+                          generate_save_file_path)
 
 # Define the system.
 HILBERT_SIZE = 2
@@ -29,28 +30,28 @@ TARGET_STATES = anp.stack((TARGET_STATE_0,), axis=0)
 COSTS = [TargetInfidelity(TARGET_STATES)]
 
 # Define the optimization.
-PARAM_COUNT = 1
-PULSE_TIME = 10
-PULSE_STEP_COUNT = 10
+COMPLEX_CONTROLS = True
+CONTROL_COUNT = 1
+EVOLUTION_TIME = CONTROL_STEP_COUNT = 10
 ITERATION_COUNT = 1000
-OPTIMIZER = Adam()
 
 # Define output.
 LOG_ITERATION_STEP = 1
 SAVE_ITERATION_STEP = 1
 SAVE_PATH = "./out"
 SAVE_FILE_NAME = "test"
+SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
 
 
 def main():
-    result = grape_schroedinger_discrete(COSTS, hamiltonian, INITIAL_STATES,
-                                         ITERATION_COUNT, PARAM_COUNT,
-                                         PULSE_STEP_COUNT, PULSE_TIME,
+    result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_STEP_COUNT,
+                                         COSTS, EVOLUTION_TIME, hamiltonian,
+                                         INITIAL_STATES,
+                                         complex_controls=COMPLEX_CONTROLS,
+                                         iteration_count=ITERATION_COUNT,
                                          log_iteration_step=LOG_ITERATION_STEP,
-                                         optimizer=OPTIMIZER,
-                                         save_file_name=SAVE_FILE_NAME,
-                                         save_iteration_step=SAVE_ITERATION_STEP,
-                                         save_path=SAVE_PATH,)
+                                         save_file_path=SAVE_FILE_PATH,
+                                         save_iteration_step=SAVE_ITERATION_STEP,)
 
 
 if __name__ == "__main__":

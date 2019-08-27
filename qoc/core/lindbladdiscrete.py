@@ -9,8 +9,10 @@ from qoc.models import (EvolveLindbladDiscreteState,
                         interpolate_linear,
                         InterpolationPolicy,
                         OperationPolicy,
-                        get_lindbladian,)
-from qoc.standard import (commutator, conjugate_transpose,
+                        get_lindbladian,
+                        GrapeLindbladDiscreteState,
+                        GrapeLindbladResult,)
+from qoc.standard import (Adam, commutator, conjugate_transpose,
                           matmuls,)
 
 ### MAIN METHODS ###
@@ -71,7 +73,167 @@ def evolve_lindblad_discrete(control_step_count, evolution_time,
     return result
 
 
+def grape_lindblad_discrete(control_count, control_step_count,
+                            costs, evolution_time, initial_densities,
+                            complex_controls=False,
+                            hamiltonian=None,
+                            initial_controls=None,
+                            interpolation_policy=InterpolationPolicy.LINEAR,
+                            iteration_count=1000,
+                            lindblad_data=None,
+                            log_iteration_step=10,
+                            max_control_norms=None,
+                            minimum_error=0,
+                            operation_policy=OperationPolicy.CPU,
+                            optimizer=Adam(),
+                            save_file_path=None, save_iteration_step=0,
+                            system_step_multiplier=1,):
+    """
+    This method optimizes the evolution of a set of states under the lindblad
+    equation for time-discrete control parameters.
+
+    Args:
+    complex_controls
+    control_count
+    control_step_count
+    costs
+    evolution_time
+    hamiltonian
+    initial_controls
+    initial_densities
+    interpolation_policy
+    iteration_count
+    lindblad_data
+    log_iteration_step
+    max_control_norms
+    minimum_error
+    operation_policy
+    optimizer
+    save_file_path
+    save_iteration_step
+    system_step_multiplier
+
+    Returns:
+    result
+    """
+    # Initialize the controls.
+    initial_controls, max_control_norms = initialize_controls(complex_controls,
+                                                              control_count,
+                                                              control_step_count,
+                                                              evolution_time,
+                                                              initial_controls,
+                                                              max_control_norms,)
+    # Construct the program state.
+    pstate = GrapeLindbladDiscreteState(complex_controls, control_count,
+                                        control_step_count, costs,
+                                        evolution_time, hamiltonian,
+                                        initial_controls,
+                                        initial_densities,
+                                        interpolation_policy,
+                                        iteration_count,
+                                        lindblad_data,
+                                        log_iteration_step,
+                                        max_control_norms, minimum_error,
+                                        operation_policy,
+                                        optimizer,
+                                        save_file_path, save_iteration_step,
+                                        system_step_multiplier,)
+    pstate.log_and_save_initial()
+
+    # Autograd does not allow multiple return values from
+    # a differentiable function.
+    # Scipy's minimization algorithms require us to provide
+    # functions that they evaluate on their own schedule.
+    # The best solution to track mutable objects, that I can think of,
+    # is to use a reporter object.
+    reporter = Dummy()
+    reporter.iteration = 0
+    result = GrapeSchroedingerResult()
+    
+    # Convert the controls from cost function format to optimizer format.
+    initial_controls = strip_controls(pstate.complex_controls, pstate.initial_controls)
+    
+    # Run the optimization.
+    pstate.optimizer.run(_eld_wrap, pstate.iteration_count, initial_controls,
+                         _eldj_wrap, args=(pstate, reporter, result))
+
+    return result
+
+
 ### HELPER METHODS ###
+
+def _eld_wrap(controls, pstate, reporter, result):
+    """
+    Do intermediary work between the optimizer feeding controls
+    to _evaluate_lindblad_discrete.
+
+    Args:
+    controls
+    pstate
+    reporter
+    result
+
+    Returns:
+    total_error
+    """
+    # Convert the controls from optimizer format to cost function format.
+    controls = slap_controls(pstate.complex_controls, controls,
+                             pstate.controls_shape)
+    clip_control_norms(pstate.max_control_norms, controls)
+
+    # Evaluate the cost function.
+    return _evaluate_lindblad_discrete(controls)
+
+
+def _eldj_wrap(controls, pstate, reporter, result):
+    """
+    Do intermediary work between the optimizer feeding controls to 
+    the jacobian of _evaluate_indblad_discrete.
+
+    Args:
+    controls
+    pstate
+    reporter
+    result
+
+    Returns:
+    grads
+    """
+    # Convert the controls from optimizer format to cost function format.
+    controls = slap_controls(pstate.complex_controls, controls,
+                             pstate.controls_shape)
+    clip_control_norms(pstate.max_control_norms, controls)
+
+    # Evaluate the jacobian.
+    total_error, grads = (ans_jacobian(_evaluate_lindblad_discrete, 0)
+                          (controls, pstate, reporter))
+    # Autograd defines the derivative of a function of complex inputs as
+    # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
+    # For optimization, we care about df_dz = du_dx + i * du_dy.
+    if pstate.complex_controls:
+        grads = conjugate(grads)
+
+    # The states need to be unwrapped from their autograd box.
+    if isinstance(reporter.final_densities, Box):
+        final_states = reporter.final_densities._value
+
+    # Update best configuration.
+    if total_error < result.best_total_error:
+        result.best_controls = controls
+        result.best_final_densities = final_densities
+        result.best_iteration = reporter.iteration
+        result.best_total_error = total_error
+    
+    # Save and log optimization progress.
+    pstate.log_and_save(controls, final_densities, total_error,
+                        grads, reporter.iteration,)
+    reporter.iteration += 1
+
+    # Convert the gradients from cost function to optimizer format.
+    grads = strip_controls(pstate.complex_controls, grads)
+    
+    return grads
+
 
 def _evaluate_lindblad_discrete(controls, pstate, reporter):
     """
@@ -238,7 +400,7 @@ def _test_evolve_lindblad_discrete():
     """
     Run end-to-end tests on evolve_lindblad_discrete.
     """
-        import numpy as np
+    import numpy as np
     from qutip import mesolve, Qobj, Options
     
     from qoc.standard import (conjugate_transpose,
@@ -362,11 +524,54 @@ def _test_evolve_lindblad_discrete():
     #ENDFOR
 
 
+def _test_grape_lindblad_discrete():
+    """
+    Run end-to-end test on the grape_lindblad_discrete function.
+
+    NOTE: We mostly care about the tests for evolve_lindblad_discrete.
+    For grape_lindblad_discrete we care that everything is being passed
+    through functions properly, but autograd has a really solid testing
+    suite and we trust that their gradients are being computed
+    correctly.
+    """
+    from qoc.standard import (conjugate_transpose,
+                              ForbidDensities, PAULI_X, PAULI_Y,)
+    
+    # Test that parameters are clipped if they grow too large.
+    hilbert_size = 4
+    hamiltonian_matrix = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
+                                            + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian = lambda controls, t: (controls[0] * hamiltonian_matrix)
+    initial_states = np.array([[[0], [1], [0], [0]]])
+    initial_densities = np.matmul(initial_states, conjugate_transpose(initial_states))
+    forbidden_states = np.array([[[[0], [1], [0], [0]]]])
+    forbidden_densities = np.matmul(forbidden_states, conjugate_transpose(forbidden_densities))
+    control_count = 1
+    evolution_time = 10
+    control_step_count = 10
+    max_norm = 1e-10
+    max_control_norms = np.repeat(max_norm, control_count)
+    costs = [ForbidDensities(forbidden_densities, control_step_count)]
+    iteration_count = 100
+    log_iteration_step = 0
+    result = grape_lindblad_discrete(control_count, control_step_count,
+                                     costs, evolution_time,
+                                     initial_densities,
+                                     hamiltonian=hamiltonian,
+                                     iteration_count=iteration_count,
+                                     log_iteration_step=log_iteration_step,
+                                     max_control_norms=max_control_norms)
+    for i in range(result.best_controls.shape[1]):
+        assert(np.less_equal(np.abs(result.best_controls[:,i]),
+                             max_control_norms[i]).all())
+
+
 def _test():
     """
     Run tests on the module.
     """
-    _test_evolve_lindblad_discrete()
+    _test_evolve_lindblad_discrete() 
+    _test_grape_lindblad_discrete()
 
 
 if __name__ == "__main__":

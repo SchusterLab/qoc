@@ -1,5 +1,6 @@
 """
-targetinfidelity.py - a module for defining the target fidelity cost function
+targetstateinfidelity.py - This module defines the target state
+infidelity cost function.
 """
 
 import autograd.numpy as anp
@@ -8,8 +9,8 @@ import numpy as np
 from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
 
-class TargetInfidelity(Cost):
-    """a class to encapsulate the target infidelity cost function
+class TargetStateInfidelity(Cost):
+    """a class to encapsulate the target state infidelity cost function
     Fields:
     cost_multiplier :: float - the wieght factor for this cost
     dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
@@ -28,7 +29,7 @@ class TargetInfidelity(Cost):
     target_states_dagger :: numpy.ndarray - the hermitian conjugate of
         the target states
     """
-    name = "target_infidelity"
+    name = "target_state_infidelity"
     requires_step_evaluation = False
 
 
@@ -40,7 +41,7 @@ class TargetInfidelity(Cost):
             used in optimization
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.target_states_dagger = conjugate_transpose(anp.stack(target_states))
+        self.target_states_dagger = conjugate_transpose(np.stack(target_states))
         self.state_normalization_constant = len(target_states)
         # This cost function does not make use of parameter penalties.
         self.dcost_dparams = (lambda params, states, step:
@@ -71,11 +72,11 @@ def _tests():
     target0 = np.array([[1], [0]])
     states = np.stack((state0,), axis=0)
     targets = np.stack((target0,), axis=0)
-    ti = TargetInfidelity(targets)
+    ti = TargetStateInfidelity(targets)
     cost = ti.cost(None, states, None)
     assert(np.allclose(cost, 1))
 
-    ti = TargetInfidelity(states)
+    ti = TargetStateInfidelity(states)
     cost = ti.cost(None, states, None)
     assert(np.allclose(cost, 0))
 
@@ -85,7 +86,7 @@ def _tests():
     target1 = np.array([[1], [0]])
     states = np.stack((state0, state1,), axis=0)
     targets = np.stack((target0, target1,), axis=0)
-    ti = TargetInfidelity(targets)
+    ti = TargetStateInfidelity(targets)
     cost = ti.cost(None, states, None)
     assert(np.allclose(cost, .25))
 

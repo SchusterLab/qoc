@@ -11,22 +11,21 @@ from autograd.extend import Box
 import numpy as np
 
 from qoc.core.common import (initialize_controls,
-                             slap_controls, strip_controls,)
-from qoc.models import (MagnusPolicy, OperationPolicy,
-                        PerformancePolicy,
-                        InterpolationPolicy, Dummy,
-                        magnus_m2, magnus_m4, magnus_m6,
-                        EvolveSchroedingerDiscreteState,
+                             slap_controls, strip_controls,
+                             clip_control_norms,)
+from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         EvolveSchroedingerResult,
-                        interpolate_linear,)
-from qoc.standard import (ans_jacobian, Adam, SGD, ForbidStates, TargetInfidelity,
-                          ParamValue, expm,
-                          PAULI_X, PAULI_Y, PAULI_Z, conjugate_transpose,
-                          matrix_to_column_vector_list, matmuls,
-                          complex_to_real_imag_flat,
-                          real_imag_to_complex_flat,
-                          get_annihilation_operator,
-                          get_creation_operator)
+                        GrapeSchroedingerDiscreteState,
+                        GrapeSchroedingerResult,
+                        interpolate_linear,
+                        InterpolationPolicy,
+                        magnus_m2, magnus_m4, magnus_m6,
+                        MagnusPolicy, OperationPolicy,
+                        PerformancePolicy,)
+from qoc.standard import (Adam, ans_jacobian,
+                          conjugate, expm,
+                          conjugate_transpose,
+                          matmuls,)
 
 ### MAIN METHODS ###
 
@@ -78,6 +77,7 @@ def grape_schroedinger_discrete(control_count, control_step_count,
                                 log_iteration_step=10,
                                 magnus_policy=MagnusPolicy.M2,
                                 max_control_norms=None,
+                                minimum_error=0,
                                 operation_policy=OperationPolicy.CPU,
                                 optimizer=Adam(),
                                 performance_policy=PerformancePolicy.TIME,
@@ -94,12 +94,14 @@ def grape_schroedinger_discrete(control_count, control_step_count,
     costs
     evolution_time
     hamiltonian
+    initial_controls
     initial_states
     interpolation_policy
     iteration_count
     log_iteration_step
     magnus_policy
     max_control_norms
+    minimum_error
     operation_policy
     optimizer
     performance_policy
@@ -126,14 +128,15 @@ def grape_schroedinger_discrete(control_count, control_step_count,
                                             interpolation_policy,
                                             iteration_count,
                                             log_iteration_step, magnus_policy,
-                                            max_control_nroms, operation_policy,
+                                            max_control_norms, minimum_error,
+                                            operation_policy,
                                             optimizer, performance_policy,
                                             save_file_path, save_iteration_step,
                                             system_step_multiplier,)
     pstate.log_and_save_initial()
 
     # Switch on the GRAPE implementation method.
-    if performance_policy == GrapeSchroedingerPolicy.TIME_EFFICIENT:
+    if performance_policy == PerformancePolicy.TIME:
         result = _grape_schroedinger_discrete_time(pstate)
     else:
         result = _grape_schroedinger_discrete_memory(pstate)
@@ -142,6 +145,79 @@ def grape_schroedinger_discrete(control_count, control_step_count,
 
 
 ### HELPER METHODS ###
+
+def _esd_wrap(controls, pstate, reporter, result):
+    """
+    Do intermediary work between the optimizer feeding controls
+    to _evaluate_schroedinger_discrete.
+
+    Args:
+    controls
+    pstate
+    reporter
+    result
+
+    Returns:
+    total_error
+    """
+    # Convert the controls from optimizer format to cost function format.
+    controls = slap_controls(pstate.complex_controls, controls,
+                             pstate.controls_shape)
+    clip_control_norms(pstate.max_control_norms, controls)
+
+    # Evaluate the cost function.
+    return _evaluate_schroedinger_discrete(controls)
+
+
+def _esdj_wrap(controls, pstate, reporter, result):
+    """
+    Do intermediary work between the optimizer feeding controls to 
+    the jacobian of _evaluate_schroedinger_discrete.
+
+    Args:
+    controls
+    pstate
+    reporter
+    result
+
+    Returns:
+    grads
+    """
+    # Convert the controls from optimizer format to cost function format.
+    controls = slap_controls(pstate.complex_controls, controls,
+                             pstate.controls_shape)
+    clip_control_norms(pstate.max_control_norms, controls)
+
+    # Evaluate the jacobian.
+    total_error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+                          (controls, pstate, reporter))
+    # Autograd defines the derivative of a function of complex inputs as
+    # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
+    # For optimization, we care about df_dz = du_dx + i * du_dy.
+    if pstate.complex_controls:
+        grads = conjugate(grads)
+
+    # The states need to be unwrapped from their autograd box.
+    if isinstance(reporter.final_states, Box):
+        final_states = reporter.final_states._value
+
+    # Update best configuration.
+    if total_error < result.best_total_error:
+        result.best_controls = controls
+        result.best_final_states = final_states
+        result.best_iteration = reporter.iteration
+        result.best_total_error = total_error
+    
+    # Save and log optimization progress.
+    pstate.log_and_save(controls, total_error, grads, reporter.iteration,
+                        final_states)
+    reporter.iteration += 1
+
+    # Convert the gradients from cost function to optimizer format.
+    grads = strip_controls(pstate.complex_controls, grads)
+    
+    return grads
+
 
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     """
@@ -332,89 +408,21 @@ def _grape_schroedinger_discrete_time(pstate):
     result :: qoc.models.GrapeResult - an object that tracks important information
         about the optimization
     """
-    # TODO: multiple reporters?
     # Autograd does not allow multiple return values from
     # a differentiable function.
     # Scipy's minimization algorithms require us to provide
     # functions that they evaluate on their own schedule.
     # The best solution to track mutable objects, that I can think of,
     # is to use a reporter object.
-    reporter = GrapeResult()
-    initial_controls = strip_controls(pstate.complex_controls)
-    pstate.optimizer.run((pstate, reporter), _evaluate_schroedinger_discrete_wrap,
-                         pstate.iteration_count, initial_controls,
-                         _evaluate_schroedinger_discrete_jacobian_wrap)
-
-    return reporter
-
-
-# # Wrapper to do intermediary work before passing control to _evaluate_schroedinger_discrete.
-# _evaluate_schroedinger_discrete_wrap = (lambda controls, pstate, reporter:
-#                      _evaluate_schroedinger_discrete(slap_controls(pstate, controls),
-#                                   pstate, reporter))
-
-# # Value and jacobian of gsd_compute.
-# _evaluate_schroedinger_discrete_ans_jacobian = ans_jacobian(_evaluate_schroedinger_discrete, 0)
-
-
-# def _evaluate_schroedinger_discrete_jacobian_wrap(controls, pstate, reporter):
-#     """
-#     Do intermediary work before passing control to _evaluate_schroedinger_discrete_ans_jacobian.
-#     Args:
-#     controls :: ndarray - the control parameters in optimizer format
-#     pstate :: qoc.GrapeSchroedingerDiscreteState - static objects
-#     reporter :: qoc.Dummy - a reporter for mutable objects
-#     Returns:
-#     jac :: ndarray - the jacobian of the cost function with
-#         respect to controls in optimizer format
-#     """
-#     controls = slap_controls(pstate, controls)
-#     total_error, jacobian = _evaluate_schroedinger_discrete_ans_jacobian(controls, pstate, reporter)
-#     # Autograd defines the derivative of a function of complex inputs as
-#     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
-#     # For optimization, we care about df_dz = du_dx + i * du_dy.
-#     if pstate.complex_controls:
-#         jacobian = np.conjugate(jacobian)
-
-#     # Remove states from autograd box.
-#     if isinstance(reporter.last_states, Box):
-#         reporter.last_states = reporter.last_states._value
-    
-#     # Report information.
-#     pstate.log_and_save(total_error, jacobian, reporter.iteration,
-#                         controls, reporter.last_states)
-#     reporter.iteration += 1
-    
-#     # Update last configuration.
-#     reporter.last_error = total_error
-#     reporter.last_grads = jacobian
-#     reporter.last_controls = controls
-
-#     # Update minimum configuration.
-#     if total_error < reporter.best_error:
-#         reporter.best_error = total_error
-#         reporter.best_grads = jacobian
-#         reporter.best_controls = controls
-#         reporter.best_states = reporter.last_states
-
-#     return strip_controls(pstate, jacobian)
-
-
-# # TOOD: Implement me.
-# def _grape_schroedinger_discrete_memory(pstate, controls):
-#     """
-#     Perform GRAPE for the schroedinger equation with time discrete parameters.
-#     Use the memory efficient method.
-#     Args:
-#     pstate :: qoc.GrapeSchroedingerDiscreteState - information required to
-#          perform the optimization
-#     controls :: ndarray - the initial controls
-
-#     Returns:
-#     result :: qoc.GrapeResult - the optimization result
-#     """
-#     reporter = GrapeResult()
-#     return reporter
+    reporter = Dummy()
+    reporter.iteration = 0
+    result = GrapeSchroedingerResult()
+    # Convert the controls from cost function format to optimizer format.
+    initial_controls = strip_controls(pstate.complex_controls, pstate.initial_controls)
+    # Run the optimization.
+    pstate.optimizer.run(_esd_wrap, pstate.iteration_count, initial_controls,
+                         _esdj_wrap, args=(pstate, reporter, result))
+    return result
 
 
 ### MODULE TESTS ###
@@ -444,6 +452,9 @@ def _test_evolve_schroedinger_discrete():
     function.
     """
     from qutip import mesolve, Qobj, Options
+    
+    from qoc.standard import (matrix_to_column_vector_list,
+                              PAULI_X, PAULI_Y,)
 
     # Test that evolving states under a hamiltonian yields
     # a known result. Use e.q. 109 of 
@@ -520,48 +531,46 @@ def _test_evolve_schroedinger_discrete():
 def _test_grape_schroedinger_discrete():
     """
     Run end-to-end test on the grape_schroedinger_discrete function.
+
+    NOTE: We mostly care about the tests for evolve_schroedinger_discrete.
+    For grape_schroedinger_discrete we care that everything is being passed
+    through functions properly, but autograd has a really solid testing
+    suite and we trust that their gradients are being computed
+    correctly.
     """
-    # TODO: implement me
-    pass
-    # # TOOD: Rework this test when parameter clipping gets reworked.
-    # # Parameters should be clipped if they grow too large.
-    # # You can log result.parameters from the test above
-    # # that uses the same hamiltonian to see that
-    # # each of result.controls is greater than 0.8 + 0.8j.
-    # hilbert_size = 4
-    # _hamiltonian = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
-    #                                  + np.kron(PAULI_Y, PAULI_Y))
-    # hamiltonian = lambda controls, t: (controls[0] * _hamiltonian)
-    # initial_states = np.array([[[0], [1], [0], [0]]])
-    # forbidden_states = np.array([[[[0], [1], [0], [0]]]])
-    # control_count = 1
-    # evolution_time = 10
-    # control_step_count = 10
-    # initial_controls, max_control_norms = initialize_controls(None, None,
-    #                                                           evolution_time, control_step_count,
-    #                                                           control_count)
-    # max_control_norms = np.repeat(0.8 + 0.8j, control_count)
-    # costs = [ForbidStates(forbidden_states, control_step_count)]
-    # iteration_count = 100
-    # magnus_policy = MagnusPolicy.M2
-    # log_iteration_step = 0
-    # result = grape_schroedinger_discrete(costs, hamiltonian, initial_states,
-    #                                      iteration_count, control_count, control_step_count,
-    #                                      evolution_time, initial_controls=initial_controls,
-    #                                      log_iteration_step=log_iteration_step,
-    #                                      magnus_policy=magnus_policy,
-    #                                      max_control_norms=max_control_norms)
+    from qoc.standard import (ForbidStates, PAULI_X, PAULI_Y,)
     
-    # for i in range(result.controls.shape[1]):
-    #     assert(np.less_equal(np.abs(result.controls[:,i]),
-    #                          np.abs(max_control_norms[i])).all())
+    # Test that parameters are clipped if they grow too large.
+    hilbert_size = 4
+    hamiltonian_matrix = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
+                                            + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian = lambda controls, t: (controls[0] * hamiltonian_matrix)
+    initial_states = np.array([[[0], [1], [0], [0]]])
+    forbidden_states = np.array([[[[0], [1], [0], [0]]]])
+    control_count = 1
+    evolution_time = 10
+    control_step_count = 10
+    max_norm = 1e-10
+    max_control_norms = np.repeat(max_norm, control_count)
+    costs = [ForbidStates(forbidden_states, control_step_count)]
+    iteration_count = 100
+    log_iteration_step = 0
+    result = grape_schroedinger_discrete(control_count, control_step_count,
+                                         costs, evolution_time,
+                                         hamiltonian, initial_states,
+                                         iteration_count=iteration_count,
+                                         log_iteration_step=log_iteration_step,
+                                         max_control_norms=max_control_norms)
+    for i in range(result.best_controls.shape[1]):
+        assert(np.less_equal(np.abs(result.best_controls[:,i]),
+                             max_control_norms[i]).all())
 
 
 def _test():
     """
     Run tests on the module.
     """
-    _test_evolve_schroedinger_discrete()
+    _test_evolve_schroedinger_discrete() 
     _test_grape_schroedinger_discrete()
 
 

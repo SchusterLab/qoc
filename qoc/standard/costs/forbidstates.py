@@ -9,63 +9,56 @@ from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
 
 class ForbidStates(Cost):
-    """a class to encapsulate the forbid states cost function
+    """
+    This class encapsulates a cost function that penalizes
+    the occupation of forbidden states.
+
     Fields:
     cost_multiplier :: float - the wieght factor for this cost
-    dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
-                      -> dcost_dparams :: numpy.ndarray
-        - the gradient of the cost function with respect to the parameters
-    dcost_dstates :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
-                      -> dcost_dstates :: numpy.ndarray
-        - the gradient of the cost function with respect to the states
-    forbidden_states_dagger :: numpy.ndarray - the conjugate transpose of
+    forbidden_states_dagger :: ndarray - the conjugate transpose of
         the forbidden states
-
     name :: str - a unique identifier for this cost
     requires_step_evaluation :: bool - True if the cost needs
         to be computed at each optimization time step, False
         if it should be computed only at the final optimization
         time step
-
-    state_normalization_constants :: np.ndarray - the number of states
+    state_count :: int - the number of evolving states
+    state_normalization_constants :: ndarray - the number of states
         that each evolving state is forbidden from
-    step_normalization_constant :: float - the number of evolution steps
-    total_state_normalization_constant :: float - the total number
-        of evolving states
+    step_count :: float - the number of evolution steps
     """
     name = "forbid_states"
     requires_step_evaluation = True
 
 
-    def __init__(self, forbidden_states, step_count, cost_multiplier=1.):
+    def __init__(self, forbidden_states, system_step_count, cost_multiplier=1.):
         """
-        See class definition for parameter specification.
+        See class definition for arguments not listed here.
+
         Args:
-        forbidden_states :: numpy.ndarray - an array where each entry
+        forbidden_states :: ndarray - an array where each entry
             in the first axis is an array of states that the corresponding
             evolving state is forbidden from, that is, each evolving
             state has its own list of forbidden states
-        step_count :: int - the total number of steps in an evolution
+        system_step_count :: int - the total number of steps in an evolution
+            this is typically computed as control_step_count * system_step_multiplier
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        # This cost function does not make use of parameter penalties.
-        self.dcost_dparams = (lambda params, states, step:
-                              np.zeros_like(params))
         self.forbidden_states_dagger = conjugate_transpose(forbidden_states)
+        self.state_count = len(forbidden_states)
         self.state_normalization_constants = np.array([len(state_forbidden_states)
                                                        for state_forbidden_states
                                                        in forbidden_states])
-        self.step_normalization_constant = step_count
-        self.total_state_normalization_constant = len(forbidden_states)
+        self.system_step_count = system_step_count
 
 
-    def cost(self, params, states, step):
+    def cost(self, controls, states, system_step):
         """
         Args:
-        params :: numpy.ndarray - the control parameters for all time steps
-        states :: numpy.ndarray - an array of the initial states evolved to
+        controls :: ndarray - the control parameters for all time steps
+        states :: ndarray - an array of the initial states evolved to
             the current time step
-        step :: int - the pulse time step
+        system_step :: int - the system time step
         Returns:
         cost :: float - the penalty
         """
@@ -83,17 +76,17 @@ class ForbidStates(Cost):
         
         # Normalize the cost for the number of evolving states
         # and the number of time evolution steps.
-        cost = (cost / (self.total_state_normalization_constant
-                        * self.step_normalization_constant))
+        cost = (cost / (self.state_count
+                        * self.system_step_count))
         
         return self.cost_multiplier * cost
 
 
 def _test():
     """
-    Run test on the module.
+    Run tests on the module.
     """
-    step_count = 10
+    system_step_count = 10
     state0 = np.array([[1], [0]])
     forbid0_0 = np.array([[1], [0]])
     forbid0_1 = np.divide(np.array([[1], [1]]), np.sqrt(2))
@@ -104,7 +97,7 @@ def _test():
     forbidden_states0 = np.stack((forbid0_0, forbid0_1,))
     forbidden_states1 = np.stack((forbid1_0, forbid1_1,))
     forbidden_states = np.stack((forbidden_states0, forbidden_states1,))
-    fs = ForbidStates(forbidden_states, step_count)
+    fs = ForbidStates(forbidden_states, system_step_count)
     
     cost = fs.cost(None, states, None)
     expected_cost = np.divide(5, 160)

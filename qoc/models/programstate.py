@@ -6,10 +6,14 @@ information to execute programs.
 class ProgramState(object):
     """
     Fields:
+    control_step_count :: int - the number of time steps at which the
+        evolution time should be initially split into and the number
+        of control parameter updates
     costs :: iterable(qoc.models.Cost) - the cost functions that
         define the cost model for evolution
     dt :: float - the time step used for evolution, it is the time
         inbetween system steps
+    evolution_time :: float - the time over which the system will evolve
     final_control_step :: int - the ultimate index into the control array
     final_system_step :: int - the last time step
     hamiltonian :: (controls :: ndarray, time :: float)
@@ -35,16 +39,12 @@ class ProgramState(object):
                  operation_policy, system_step_multiplier):
         """
         See class definition for arguments not listed here.
-
-        Args:
-        control_step_count :: int - the number of time steps at which the
-            evolution time should be initially split into and the number
-            of control parameter updates
-        evolution_time :: float - the time over which the system will evolve
         """
+        self.control_step_count = control_step_count
         self.costs = costs
         system_step_count = control_step_count * system_step_multiplier
         self.dt = evolution_time / system_step_count
+        self.evolution_time = evolution_time
         self.final_control_step = control_step_count - 1
         self.final_system_step = system_step_count - 1
         self.hamiltonian = hamiltonian
@@ -72,6 +72,7 @@ class GrapeState(ProgramState):
     costs
     dt
     final_control_step
+    final_iteration
     final_system_step
     hamiltonian
     initial_controls
@@ -79,6 +80,7 @@ class GrapeState(ProgramState):
     iteration_count
     log_iteration_step
     max_control_norms
+    minimum_error
     operation_policy
     optimizer
     save_file_path
@@ -96,16 +98,12 @@ class GrapeState(ProgramState):
                  hamiltonian, initial_controls,
                  interpolation_policy, iteration_count,
                  log_iteration_step, max_control_norms,
+                 minimum_error,
                  operation_policy, optimizer,
                  save_file_path, save_iteration_step,
                  system_step_multiplier,):
         """
         See class definition for arguments not listed here.
-
-        Args:
-        control_count
-        control_step_count
-        evolution_time
         """
         super().__init__(control_step_count, costs, evolution_time,
                          hamiltonian, interpolation_policy, operation_policy,
@@ -113,10 +111,12 @@ class GrapeState(ProgramState):
         self.complex_controls = complex_controls
         self.control_count = control_count
         self.controls_shape = (control_step_count, control_count)
+        self.final_iteration = iteration_count - 1
         self.initial_controls = initial_controls
         self.iteration_count = iteration_count
         self.log_iteration_step = log_iteration_step
         self.max_control_norms = max_control_norms
+        self.minimum_error = minimum_error
         self.optimizer = optimizer
         self.save_file_path = save_file_path
         self.save_iteration_step = save_iteration_step

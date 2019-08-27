@@ -8,13 +8,12 @@ from .constants import (PAULI_X, PAULI_Y, PAULI_Z,
                         get_annihilation_operator,
                         get_eij,)
 
-from .costs import (ForbidStates,
-                    ParamValue,
-                    ParamVariation,
-                    TargetInfidelity,
-                    TargetInfidelityTime,)
+from .costs import (ControlNorm,
+                    ForbidStates,
+                    TargetStateInfidelity,
+                    TargetStateInfidelityTime,)
 
-from .functions import (commutator, conjugate_transpose,
+from .functions import (commutator, conjugate, conjugate_transpose,
                         expm, krons, matmuls,
                         mult_cols, mult_rows, transpose,
                         column_vector_list_to_matrix,
@@ -33,9 +32,9 @@ __all__ = [
     "get_annihilation_operator", "get_eij",
     
     "ParamValue", "ParamVariation", "ForbidStates",
-    "TargetInfidelity", "TargetInfidelityTime",
+    "TargetStateInfidelity", "TargetStateInfidelityTime",
     
-    "commutator", "conjugate_transpose", "expm", "krons",
+    "commutator", "conjugate", "conjugate_transpose", "expm", "krons",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "complex_to_real_imag_flat", "real_imag_to_complex_flat",
 

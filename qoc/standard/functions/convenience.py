@@ -12,7 +12,6 @@ import numpy as np
 import scipy.linalg as la
 
 from qoc.models.operationpolicy import OperationPolicy
-from qoc.standard import ans_jacobian
 
 ### COMPUTATIONS ###
 
@@ -34,6 +33,23 @@ def commutator(a, b, operation_policy=OperationPolicy.CPU):
 
     return _commutator
 
+
+def conjugate(x, operation_policy=OperationPolicy.CPU):
+    """
+    Compute the conjugate of a value.
+    
+    Args:
+    x :: ndarray - the value to compute the conjugate of
+    
+    Returns:
+    conj :: ndarray - the conjugate of x
+    """
+    if operation_policy == OperationPolicy.CPU:
+        conj = anp.conjugate(x)
+    else:
+        pass
+
+    return conj
 
 def conjugate_transpose(matrix, operation_policy=OperationPolicy.CPU):
     """
