@@ -1,10 +1,17 @@
 """
-linbladdiscrete.py - a module to evolve a set of density matrices
-under the lindblad master equation using time-discrete
-control parameters
+linbladdiscrete.py - This module defines methods to
+evolve a set of density matrices under the
+lindblad master equation using time-discrete
+control parameters.
 """
 
-from qoc.models import (EvolveLindbladDiscreteState,
+from autograd.extend import Box
+
+from qoc.core.common import (clip_control_norms,
+                             initialize_controls,
+                             slap_controls, strip_controls,)
+from qoc.models import (Dummy,
+                        EvolveLindbladDiscreteState,
                         EvolveLindbladResult,
                         interpolate_linear,
                         InterpolationPolicy,
@@ -12,7 +19,8 @@ from qoc.models import (EvolveLindbladDiscreteState,
                         get_lindbladian,
                         GrapeLindbladDiscreteState,
                         GrapeLindbladResult,)
-from qoc.standard import (Adam, commutator, conjugate_transpose,
+from qoc.standard import (Adam, ans_jacobian, commutator, conjugate,
+                          conjugate_transpose,
                           matmuls,)
 
 ### MAIN METHODS ###
@@ -148,7 +156,7 @@ def grape_lindblad_discrete(control_count, control_step_count,
     # is to use a reporter object.
     reporter = Dummy()
     reporter.iteration = 0
-    result = GrapeSchroedingerResult()
+    result = GrapeLindbladResult()
     
     # Convert the controls from cost function format to optimizer format.
     initial_controls = strip_controls(pstate.complex_controls, pstate.initial_controls)
@@ -215,7 +223,7 @@ def _eldj_wrap(controls, pstate, reporter, result):
 
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_densities, Box):
-        final_states = reporter.final_densities._value
+        final_densities = reporter.final_densities._value
 
     # Update best configuration.
     if total_error < result.best_total_error:
@@ -404,7 +412,7 @@ def _test_evolve_lindblad_discrete():
     from qutip import mesolve, Qobj, Options
     
     from qoc.standard import (conjugate_transpose,
-                              PAULI_X, PAULI_Y,
+                              SIGMA_X, SIGMA_Y,
                               matrix_to_column_vector_list,
                               SIGMA_PLUS, SIGMA_MINUS,)
 
@@ -430,8 +438,8 @@ def _test_evolve_lindblad_discrete():
     target_states = matrix_to_column_vector_list(iswap_unitary)
     initial_densities = np.matmul(initial_states, conjugate_transpose(initial_states))
     target_densities = np.matmul(target_states, conjugate_transpose(target_states))
-    system_hamiltonian = ((1/ 2) * (np.kron(PAULI_X, PAULI_X)
-                              + np.kron(PAULI_Y, PAULI_Y)))
+    system_hamiltonian = ((1/ 2) * (np.kron(SIGMA_X, SIGMA_X)
+                              + np.kron(SIGMA_Y, SIGMA_Y)))
     hamiltonian = lambda controls, time: system_hamiltonian
     control_step_count = int(1e3)
     evolution_time = np.pi / 2
@@ -534,18 +542,20 @@ def _test_grape_lindblad_discrete():
     suite and we trust that their gradients are being computed
     correctly.
     """
+    import numpy as np
+    
     from qoc.standard import (conjugate_transpose,
-                              ForbidDensities, PAULI_X, PAULI_Y,)
+                              ForbidDensities, SIGMA_X, SIGMA_Y,)
     
     # Test that parameters are clipped if they grow too large.
     hilbert_size = 4
-    hamiltonian_matrix = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
-                                            + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian_matrix = np.divide(1, 2) * (np.kron(SIGMA_X, SIGMA_X)
+                                            + np.kron(SIGMA_Y, SIGMA_Y))
     hamiltonian = lambda controls, t: (controls[0] * hamiltonian_matrix)
     initial_states = np.array([[[0], [1], [0], [0]]])
     initial_densities = np.matmul(initial_states, conjugate_transpose(initial_states))
     forbidden_states = np.array([[[[0], [1], [0], [0]]]])
-    forbidden_densities = np.matmul(forbidden_states, conjugate_transpose(forbidden_densities))
+    forbidden_densities = np.matmul(forbidden_states, conjugate_transpose(forbidden_states))
     control_count = 1
     evolution_time = 10
     control_step_count = 10
@@ -570,7 +580,7 @@ def _test():
     """
     Run tests on the module.
     """
-    _test_evolve_lindblad_discrete() 
+    _test_evolve_lindblad_discrete()
     _test_grape_lindblad_discrete()
 
 

@@ -25,7 +25,7 @@ class ForbidStates(Cost):
     state_count :: int - the number of evolving states
     state_normalization_constants :: ndarray - the number of states
         that each evolving state is forbidden from
-    step_count :: float - the number of evolution steps
+    system_step_count :: float - the number of evolution steps
     """
     name = "forbid_states"
     requires_step_evaluation = True
@@ -40,8 +40,6 @@ class ForbidStates(Cost):
             in the first axis is an array of states that the corresponding
             evolving state is forbidden from, that is, each evolving
             state has its own list of forbidden states
-        system_step_count :: int - the total number of steps in an evolution
-            this is typically computed as control_step_count * system_step_multiplier
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.forbidden_states_dagger = conjugate_transpose(forbidden_states)
@@ -68,8 +66,8 @@ class ForbidStates(Cost):
             state = states[i]
             state_cost = 0
             for forbidden_state_dagger in state_forbidden_states_dagger:
-                state_cost = cost + anp.square(anp.abs(anp.matmul(forbidden_state_dagger,
-                                                                  state)[0,0]))
+                inner_product = anp.matmul(forbidden_state_dagger, state)[0, 0]
+                state_cost = state_cost + anp.square(anp.abs(inner_product))
             #ENDFOR
             cost = cost + anp.divide(state_cost, self.state_normalization_constants[i])
         #ENDFOR

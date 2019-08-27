@@ -5,8 +5,8 @@ mathmethods.py - mathematical methods in physics
 import numpy as np
 
 from qoc.models.operationpolicy import OperationPolicy
-from qoc.standard import (commutator, conjugate_transpose,
-                          matmuls,)
+from qoc.standard.functions.convenience import (commutator, conjugate_transpose,
+                                                matmuls,)
 
 ### INTERPOLATION METHODS ###
 

@@ -4,6 +4,7 @@ encapsulate the necessary information to execute
 programs involving lindblad evolution
 """
 
+import h5py
 import numpy as np
 
 from qoc.models.programstate import (GrapeState, ProgramState,)

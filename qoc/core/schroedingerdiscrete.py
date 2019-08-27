@@ -3,10 +3,6 @@ schroedingerdiscrete.py - a module to expose the grape schroedinger discrete
 optimization algorithm
 """
 
-import os
-
-from autograd import jacobian
-import autograd.numpy as anp
 from autograd.extend import Box
 import numpy as np
 
@@ -248,7 +244,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     
     # Compute the total error for this evolution.
     for system_step in range(final_system_step + 1):
-        control_step, _ = anp.divmod(system_step, system_step_multiplier)
+        control_step, _ = divmod(system_step, system_step_multiplier)
         is_final_control_step = control_step == final_control_step
         is_final_system_step = system_step == final_system_step
         time = system_step * dt
@@ -281,11 +277,11 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     return total_error
 
 
-_M4_T1 = np.divide(1, 2) - np.divide(np.sqrt(3), 6)
-_M4_T2 = np.divide(1, 2) + np.divide(np.sqrt(3), 6)
-_M6_T1 = np.divide(1, 2) - np.divide(np.sqrt(15), 10)
-_M6_T2 = np.divide(1, 2)
-_M6_T3 = np.divide(1, 2) + np.divide(np.sqrt(15), 10)
+_M4_T1 = 0.5 - np.divide(np.sqrt(3), 6)
+_M4_T2 = 0.5 + np.divide(np.sqrt(3), 6)
+_M6_T1 = 0.5 - np.divide(np.sqrt(15), 10)
+_M6_T2 = 0.5
+_M6_T3 = 0.5 + np.divide(np.sqrt(15), 10)
 
 def _evolve_step_schroedinger_discrete(dt, hamiltonian, states, time,
                                        control_sentinel=False,
@@ -454,7 +450,7 @@ def _test_evolve_schroedinger_discrete():
     from qutip import mesolve, Qobj, Options
     
     from qoc.standard import (matrix_to_column_vector_list,
-                              PAULI_X, PAULI_Y,)
+                              SIGMA_X, SIGMA_Y,)
 
     # Test that evolving states under a hamiltonian yields
     # a known result. Use e.q. 109 of 
@@ -465,8 +461,8 @@ def _test_evolve_schroedinger_discrete():
                               (0,   0, -1j, 0),
                               (0, -1j,   0, 0),
                               (0,   0,   0, 1)))
-    hamiltonian_matrix = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
-                                     + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian_matrix = np.divide(1, 2) * (np.kron(SIGMA_X, SIGMA_X)
+                                     + np.kron(SIGMA_Y, SIGMA_Y))
     hamiltonian = lambda controls, time: hamiltonian_matrix
     initial_states = matrix_to_column_vector_list(identity_matrix)
     target_states = matrix_to_column_vector_list(iswap_unitary)
@@ -538,12 +534,12 @@ def _test_grape_schroedinger_discrete():
     suite and we trust that their gradients are being computed
     correctly.
     """
-    from qoc.standard import (ForbidStates, PAULI_X, PAULI_Y,)
+    from qoc.standard import (ForbidStates, SIGMA_X, SIGMA_Y,)
     
     # Test that parameters are clipped if they grow too large.
     hilbert_size = 4
-    hamiltonian_matrix = np.divide(1, 2) * (np.kron(PAULI_X, PAULI_X)
-                                            + np.kron(PAULI_Y, PAULI_Y))
+    hamiltonian_matrix = np.divide(1, 2) * (np.kron(SIGMA_X, SIGMA_X)
+                                            + np.kron(SIGMA_Y, SIGMA_Y))
     hamiltonian = lambda controls, t: (controls[0] * hamiltonian_matrix)
     initial_states = np.array([[[0], [1], [0], [0]]])
     forbidden_states = np.array([[[[0], [1], [0], [0]]]])

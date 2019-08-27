@@ -44,14 +44,14 @@ def plot_best_trial(file_path, save_path=None,
     # error values.
     errors = _file["error"]
     best_index = np.argmin(np.where(errors, errors, np.finfo(np.float64).max))
-    params = np.array(_file["params"][best_index])
-    params_real = np.real(params)
-    params_imag = np.imag(params)
-    param_count = _file["param_count"][()]
-    pulse_step_count = _file["pulse_step_count"][()]
-    pulse_time = _file["pulse_time"][()]
-    time_per_step = np.divide(pulse_time, pulse_step_count)
-    step_per_time = np.divide(pulse_step_count, pulse_time)
+    controls = np.array(_file["controls"][best_index])
+    controls_real = np.real(controls)
+    controls_imag = np.imag(controls)
+    control_count = _file["control_count"][()]
+    control_step_count = _file["control_step_count"][()]
+    evolution_time = _file["evolution_time"][()]
+    time_per_step = np.divide(evolution_time, control_step_count)
+    step_per_time = np.divide(control_step_count, evolution_time)
 
     # If the user did not specify a save path,
     # save the file to the current directory with
@@ -62,10 +62,10 @@ def plot_best_trial(file_path, save_path=None,
     # Create labels and extra content.
     patches = list()
     labels = list()
-    for i in range(param_count):
+    for i in range(control_count):
         i2 = i * 2
-        label_real = "param_{}_real".format(i)
-        label_imag = "param_{}_imag".format(i)
+        label_real = "control_{}_real".format(i)
+        label_imag = "control_{}_imag".format(i)
         color_real = COLOR_PALETTE[i2]
         color_imag = COLOR_PALETTE[i2 + 1]
         labels.append(label_real)
@@ -84,13 +84,13 @@ def plot_best_trial(file_path, save_path=None,
 
     # pulses
     plt.subplot(subplot_count, 1, 1)
-    time_axis = time_per_step * np.arange(pulse_step_count)
-    for i in range(param_count):
+    time_axis = time_per_step * np.arange(control_step_count)
+    for i in range(control_count):
         i2 = i * 2
         color_real = COLOR_PALETTE[i2]
         color_imag = COLOR_PALETTE[i2 + 1]
-        pulse_real = params_real[:, i]
-        pulse_imag = params_imag[:, i]
+        pulse_real = controls_real[:, i]
+        pulse_imag = controls_imag[:, i]
         plt.plot(time_axis, pulse_real, marker_style,
                  color=color_real, ms=2, alpha=0.9)
         plt.plot(time_axis, pulse_imag, marker_style,
