@@ -6,7 +6,7 @@ infidelity cost function.
 import autograd.numpy as anp
 import numpy as np
 
-from qoc.models import Cost
+from qoc.models import (Cost, OperationPolicy)
 from qoc.standard.functions import conjugate_transpose
 
 class TargetStateInfidelity(Cost):
@@ -48,13 +48,17 @@ class TargetStateInfidelity(Cost):
                               np.zeros_like(params))
 
 
-    def cost(self, params, states, step):
+    def cost(self, params, states, step,
+             operation_policy=OperationPolicy.CPU):
         """
         Args:
         params :: numpy.ndarray - the control parameters for all time steps
         states :: numpy.ndarray - an array of the states evolved to
             the current time step
         step :: int - the pulse time step
+        operation_policy
+
+
         Returns:
         cost :: float - the penalty
         """

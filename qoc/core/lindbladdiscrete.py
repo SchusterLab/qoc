@@ -289,14 +289,16 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
         # Compute the costs.
         if is_final_system_step:
             for i, cost in enumerate(costs):
-                error = cost.cost(controls, densities, system_step)
+                error = cost.cost(controls, densities, system_step,
+                                  operation_policy=operation_policy)
                 total_error = total_error + error
             #ENDFOR
             reporter.final_densities = densities
             reporter.total_error = total_error
         else:
             for i, step_cost in enumerate(step_costs):
-                error = step_cost.cost(controls, densities, system_step)
+                error = step_cost.cost(controls, densities, system_step,
+                                       operation_policy=operation_policy)
                 total_error = total_error + error
             #ENDFOR
     #ENDFOR

@@ -262,14 +262,16 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         # Compute cost every time step.
         if is_final_system_step:
             for i, cost in enumerate(costs):
-                error = cost.cost(controls, states, system_step)
+                error = cost.cost(controls, states, system_step,
+                                  operation_policy=operation_policy)
                 total_error = total_error + error
             #ENDFOR
             reporter.final_states = states
             reporter.total_error = total_error
         else:
             for i, step_cost in enumerate(step_costs):
-                error = step_cost.cost(controls, states, system_step)
+                error = step_cost.cost(controls, states, system_step,
+                                       operation_policy=operation_policy)
                 total_error = total_error + error
             #ENDFOR
     #ENDFOR
