@@ -7,7 +7,8 @@ from .constants import (get_annihilation_operator,
                         get_eij,SIGMA_X, SIGMA_Y, SIGMA_Z,
                         SIGMA_MINUS, SIGMA_PLUS,)
 
-from .costs import (ControlNorm,
+from .costs import (ControlArea,
+                    ControlNorm,
                     ControlVariation,
                     ForbidDensities,
                     ForbidStates,
@@ -34,7 +35,7 @@ __all__ = [
     "get_annihilation_operator", "get_creation_operator",
     "get_eij", "SIGMA_X", "SIGMA_Y", "SIGMA_Z", "SIGMA_MINUS",
     "SIGMA_PLUS",
-    "ControlNorm", "ControlVariation", "ForbidDensities",
+    "ControlArea", "ControlNorm", "ControlVariation", "ForbidDensities",
     "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",

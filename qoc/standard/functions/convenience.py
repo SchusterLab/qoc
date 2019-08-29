@@ -147,6 +147,30 @@ def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
     return _matrix
 
 
+def stack_gpu(gpuarray_list):
+    """
+    This function is equivalent to np.stack(*args, axis=0) for
+    gpu arrays.
+    
+    Arguments:
+    gpuarray_list :: list(pycuda.gpuarray.GPUArray) - the list of
+        gpu arrays to stack
+
+    Returns:
+    stack :: pycuda.gpuarray.GPUArray - an array where each of the arrays
+        in gpuarray_list is stacked along axis 0
+    """
+    array_shape = gpuarray_list[0].shape
+    array_count = len(gpuarray_list)
+    stack_shape = (array_count, *array_shape)
+    stack_dtype = gpuarray_list[0].dtype
+    stack = pycuda.gpuarray.empty(stack_shape, stack_dtype)
+    for i, gpuarray in enumerate(gpuarray_list):
+        stack[i] = gpuarray
+    
+    return stack
+
+
 def transpose(matrix, operation_policy=OperationPolicy.CPU):
     """
     Obtain the transpose of the matrix.

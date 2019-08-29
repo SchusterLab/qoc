@@ -41,7 +41,7 @@ INITIAL_STATES = anp.stack((INITIAL_STATE_0,), axis=0)
 TARGET_STATES = anp.stack((TARGET_STATE_0,), axis=0)
 INITIAL_DENSITIES = anp.matmul(INITIAL_STATES, conjugate_transpose(INITIAL_STATES))
 TARGET_DENSITIES = anp.matmul(TARGET_STATES, conjugate_transpose(TARGET_STATES))
-# Note that the TargetDensityInfidelity function uses the frobenius norm,
+# Note that the TargetDensityInfidelity function uses the frobenius inner product,
 # so even if our matrices are identical, the total optimization error may
 # not reach zero. In this case, the minimum error that we could reach
 # should be 0.75.
