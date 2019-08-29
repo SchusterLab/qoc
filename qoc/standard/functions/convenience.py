@@ -10,6 +10,7 @@ from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
+import skcuda.misc as cumisc
 
 from qoc.models.operationpolicy import OperationPolicy
 
@@ -146,7 +147,6 @@ def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
 
     return _matrix
 
-
 def stack_gpu(gpuarray_list):
     """
     This function is equivalent to np.stack(*args, axis=0) for
@@ -169,6 +169,33 @@ def stack_gpu(gpuarray_list):
         stack[i] = gpuarray
     
     return stack
+
+
+def sum_axis(array, *args, **kwargs):
+    """
+    This function is a wrapper around np.sum and skcuda.misc.sum.
+
+    Arguments:
+    array :: ndarray - the array to sum over
+    operation_policy
+
+    Returns:
+    sum :: ndarray - the specified sum
+    """
+    if "operation_policy" in kwargs:
+        operation_policy = kwargs["operation_policy"]
+    else:
+        operation_policy = OperationPolicy.CPU
+    
+    if operation_policy == OperationPolicy.CPU:
+        _sum = anp.sum(array, *args, **kwargs)
+    elif operation_policy == OperationPolicy.GPU:
+        _sum = cumisc.sum(array, *args, **kwargs)
+    else:
+        raise ValueError("This operation is not implemented for "
+                         "the operation policy {}."
+                         "".format(operation_policy))
+    return _sum
 
 
 def transpose(matrix, operation_policy=OperationPolicy.CPU):

@@ -7,6 +7,7 @@ from autograd.extend import (primitive, Box, VSpace, vspace)
 from autograd.wrap_util import (unary_to_nary,)
 import numpy as np
 from pycuda.gpuarray import GPUArray
+from pycuda import cumath
 import skcuda.linalg as culinalg
 import skcuda.misc as cumisc
 
@@ -67,7 +68,6 @@ class GPUArrayBox(Box):
     def __len__(self): return len(self._value)
     def astype(self, *args, **kwargs): return self._value.astype(*args, **kwargs)
 
-    def __neg__(self): return anp.negative(self)
     def __add__(self, other): return cumisc.add(self, other)
     def __sub__(self, other): return cumisc.subtract(self, other)
     def __mul__(self, other): return cumisc.multiply(self, other)
@@ -78,13 +78,11 @@ class GPUArrayBox(Box):
     def __rmul__(self, other): return cumisc.multiply(other, self)
     def __rdiv__(self, other): return cumisc.divide(other, self)
     def __rmatmul__(self, other): return culinalg.dot(other, self)
+    def __abs__(self): return cumath.fabs(self) # assumes floating point datatype
     def __hash__(self): return id(self)
 
 
 GPUArrayBox.register(GPUArray)
-# for type_ in (float, np.float64, np.float32, np.float16,
-#               complex, np.complex64, np.complex128):
-#     GPUArrayBox.register(type_)
 
 
 class GPUArrayVSpace(VSpace):
@@ -147,17 +145,12 @@ VSpace.register(GPUArray,
                 if cumisc.iscomplextype(x.dtype)
                 else GPUArrayVSpace(x))
 
-# for type_ in (float, np.float64, np.float32, np.float16):
-#     GPUArrayVSpace.register(type_)
-
-# for type_ in (complex, np.complex64, np.complex128):
-#     ComplexGPUArrayVSpace.register(type_)
-
 
 ### GPU VJPS ###
 
 GPU_DIFFERENTIABLE_FUNCTIONS = (
-    
+    # pycuda.cumath
+    cumath.fabs,
     
     # skcuda.linalg
     culinalg.dot,
@@ -169,3 +162,45 @@ GPU_DIFFERENTIABLE_FUNCTIONS = (
     cumisc.multiply,
     cumisc.subtract,
 )
+
+# Register differentiable functions.
+for function in GPU_DIFFERENTIABLE_FUNCTIONS:
+    primitive(function)
+
+# Define vjps.
+
+def unbroadcast_gpu(x, target_meta, broadcast_idx=0):
+    target_shape, target_ndim, dtype, target_iscomplex = target_meta
+    while x.ndim > target_ndim:
+        x = cumisc.sum(x, axis=broadcast_idx)
+    for axis, size in enumerate(target_shape):
+        if size == 1:
+            x = cumisc.sum(x, axis=axis, keepdims=True)
+    if cumisc.iscomplextype(x.dtype) and not target_iscomplex:
+        x = x.real
+    return x
+
+def unbroadcast_f_gpu(target, f):
+    target_shape = target.shape
+    target_ndim = target.ndim
+    target_dtype = target.dtype
+    target_iscomplex = cumisc.iscomplextype(target_dtype)
+    target_meta = (target_shape, target_ndim, target_dtype,
+                   target_iscomplex)
+    return lambda g: unbroadcast(f(g), target_meta)
+
+
+defvjp(cumisc.add,
+       lambda ans, x, y : unbroadcast_f(x, lambda g: g),
+       lambda ans, x, y : unbroadcast_f(y, lambda g: g))
+defvjp(cumisc.multiply,
+       lambda ans, x, y : unbroadcast_f(x, lambda g: y * g),
+       lambda ans, x, y : unbroadcast_f(y, lambda g: x * g))
+defvjp(cumisc.subtract,
+       lambda ans, x, y : unbroadcast_f(x, lambda g: g),
+       lambda ans, x, y : unbroadcast_f(y, lambda g: -g))
+defvjp(cumisc.divide,
+       lambda ans, x, y : unbroadcast_f(x, lambda g:   g / y),
+       lambda ans, x, y : unbroadcast_f(y, lambda g: - g * x / y**2))
+
+

@@ -3,9 +3,8 @@ controlarea.py - This module defines a cost function that penalizes
 the "area under the curve" of the control pulse.
 """
 
-import autograd.numpy as anp
-
 from qoc.models import (Cost, OperationPolicy)
+from qoc.standard.convenience import sum_axis
 
 class ControlArea(Cost):
     """
@@ -51,12 +50,8 @@ class ControlArea(Cost):
         cost
         """
         normalized_step_areas = (self.dt / self.max_control_norms) * controls
-        if operation_policy == OperationPolicy.CPU:
-            cost = anp.sum(normalized_step_areas)
-        else:
-            raise ValueError("This cost function does not support "
-                             "the operation policy {}."
-                             "".format(operation_policy))
+        cost = sum_axis(normalized_step_areas,
+                        operation_policy=operation_policy)
         cost_normalized = cost / self.normalization_constant
 
         return cost_normalized * self.cost_multiplier
