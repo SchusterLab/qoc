@@ -27,8 +27,7 @@ from .functions import (commutator, conjugate, conjugate_transpose,
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 
-from .util import (ans_jacobian,
-                   CustomJSONEncoder,
+from .util import (CustomJSONEncoder,
                    generate_save_file_path,)
 
 __all__ = [
@@ -44,5 +43,5 @@ __all__ = [
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "complex_to_real_imag_flat", "real_imag_to_complex_flat",
     "Adam", "LBFGSB", "SGD",
-    "ans_jacobian", "CustomJSONEncoder", "generate_save_file_path",
+    "CustomJSONEncoder", "generate_save_file_path",
 ]

@@ -14,11 +14,6 @@ from qoc.standard.functions.convenience import (commutator,
                                                 complex_to_real_imag_flat,
                                                 real_imag_to_complex_flat,)
 
-from qoc.standard.functions.gpufunctions import (abs_gpu, add_gpu, conj_gpu,
-                                                 divide_gpu, matmul_gpu,
-                                                 multiply_gpu, subtract_gpu,
-                                                 trace_gpu, transpose_gpu,)
-
 from qoc.standard.functions.expm import expm, expm_vjp
 
 __all__ = [

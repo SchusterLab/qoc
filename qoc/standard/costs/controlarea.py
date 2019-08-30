@@ -4,7 +4,7 @@ the "area under the curve" of the control pulse.
 """
 
 from qoc.models import (Cost, OperationPolicy)
-from qoc.standard.convenience import sum_axis
+from qoc.standard.functions.convenience import sum_axis
 
 class ControlArea(Cost):
     """
