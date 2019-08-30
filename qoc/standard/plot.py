@@ -87,8 +87,8 @@ def plot_best_trial(file_path, save_path=None,
     plt.suptitle(file_name)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
-    # plt.subplots_adjust(hspace=0.8)
-    subplot_count = 1
+    plt.subplots_adjust(hspace=0.8)
+    subplot_count = 2
 
     # controls
     plt.subplot(subplot_count, 1, 1)
@@ -113,17 +113,27 @@ def plot_best_trial(file_path, save_path=None,
     plt.xlabel("Time ({})".format(time_unit))
     plt.ylabel("Amplitude ({})".format(amplitude_unit))
 
-    # # fft
-    # plt.subplot(subplot_count, 1, 2)
-    # freq_axis = np.arange(step_count) * np.divide(step_per_time, step_count)
-    # for i, pulse_fft in enumerate(uks_fft):
-    #     color = COLOR_PALETTE[i]
-    #     plt.plot(freq_axis,
-    #              pulse_fft, marker_style, color=color,
-    #              ms=2,alpha=0.9)
-    # #ENDFOR
-    # plt.xlabel("Frequency ({})".format(amplitude_unit))
-    # plt.ylabel("FFT")
+    # fft
+    plt.subplot(subplot_count, 1, 2)
+    freq_axis = np.arange(control_step_count) * np.divide(step_per_time, control_step_count)
+    for i in range(control_count):
+        if complex_controls:
+            pass
+        else:
+            color_real = COLOR_PALETTE[i]
+            color_imag = COLOR_PALETTE[i + 1]
+            control_fft = np.fft.fft(controls[:, i])
+            control_fft_real = control_fft.real
+            control_fft_imag = control_fft.imag
+            plt.plot(freq_axis,
+                     control_fft_real, marker_style, color=color_real,
+                     ms=2,alpha=0.9)
+            plt.plot(freq_axis,
+                     control_fft_imag, marker_style, color=color_imag,
+                     ms=2,alpha=0.9)
+    #ENDFOR
+    plt.xlabel("Frequency ({})".format(amplitude_unit))
+    plt.ylabel("FFT")
 
     # # state population
     # for i in range(initial_vector_count):

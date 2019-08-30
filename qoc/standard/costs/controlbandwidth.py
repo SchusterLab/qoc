@@ -67,6 +67,8 @@ class ControlBandwidth(Cost):
                 normalized_min_control_value = anp.min(normalized_control)
                 normalized_control_bandwidth = ((normalized_max_control_value
                                                  - normalized_min_control_value) / 2)
+                max_control_value = anp.max(controls[:, i])
+                min_control_value = anp.min(controls[:, i])
                 if normalized_control_bandwidth >= normalized_max_control_bandwidth:
                     control_cost = anp.square(anp.abs(normalized_control_bandwidth
                                                       - normalized_max_control_bandwidth))
