@@ -6,7 +6,6 @@ i.e. those that don't begin with '_', are autograd compatible.
 
 from functools import reduce
 
-from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
@@ -69,7 +68,7 @@ def conjugate_transpose(matrix, operation_policy=OperationPolicy.CPU):
                                                        operation_policy))
     else:
         pass
-    
+        
     return _conjugate_transpose
 
 

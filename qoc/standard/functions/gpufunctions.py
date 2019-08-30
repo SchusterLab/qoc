@@ -1,39 +1,55 @@
 """
 gpufunctions.py - This module provides a common namespace for all gpu functions.
-Note that this is required because autograd can't differentiate object method calls.
+
+NOTE:
+skcuda.misc functions are preferred over the pycuda.gpuarray.GPUArray object
+methods because skcuda supports array broadcasting like numpy. Furthermore,
+we want the gpu functions to have the same behavior as their cpu counterparts.
 """
 
 from autograd.extend import primitive
 import skcuda.linalg as culinalg
 import skcuda.misc as cumisc
 
-@primitive
 abs_gpu = lambda x: x.abs()
 
-@primitve
-add_gpu = lambda x, y: x + y
+add_gpu = cumisc.add
 
-@primitive
 conj_gpu = lambda x: x.conj()
 
-@primitive
 divide_gpu = cumisc.divide
 
-@primitive
-matmul_gpu = lambda x, y: x.dot(y)
+matmul_gpu = cumisc.dot
 
-@primitive
-multiply_gpu = lambda x, y: x.__mul__(y)
+multiply_gpu = cumisc.multiply
 
-@primitve
+def stack_gpu(gpuarray_list):
+    """
+    This function is equivalent to np.stack(*args, axis=0) for
+    gpu arrays.
+    
+    Arguments:
+    gpuarray_list :: list(pycuda.gpuarray.GPUArray) - the list of
+        gpu arrays to stack
+
+    Returns:
+    stack :: pycuda.gpuarray.GPUArray - an array where each of the arrays
+        in gpuarray_list is stacked along axis 0
+    """
+    array_shape = gpuarray_list[0].shape
+    array_count = len(gpuarray_list)
+    stack_shape = (array_count, *array_shape)
+    stack_dtype = gpuarray_list[0].dtype
+    stack = pycuda.gpuarray.empty(stack_shape, stack_dtype)
+    for i, gpuarray in enumerate(gpuarray_list):
+        stack[i] = gpuarray
+    
+    return stack
+
 subtract_gpu = cumisc.subtract
 
-@primitive
-transpose_gpu = lambda x, **kwargs: x.transpose(**kwargs)
+sum_gpu = cumisc.sum
 
+trace_gpu = culinalg.trace
 
-
-
-
-    
-
+transpose_gpu = culinalg.transpose

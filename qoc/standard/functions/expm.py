@@ -2,15 +2,11 @@
 expm.py - a module for all things e^M
 """
 
-from autograd import jacobian
-from autograd.extend import (defvjp as autograd_defvjp,
-                             primitive as autograd_primitive)
-import numpy as np
+import autograd.numpy as anp
 import scipy.linalg as la
 
 from qoc.models.operationpolicy import OperationPolicy
 
-@autograd_primitive
 def expm(matrix, operation_policy=OperationPolicy.CPU):
     """
     Compute the matrix exponential of a matrix.
@@ -29,7 +25,7 @@ def expm(matrix, operation_policy=OperationPolicy.CPU):
     return exp_matrix
 
 
-def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
+def expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
     """
     Construct the left-multiplying vector jacobian product function
     for the matrix exponential.
@@ -63,14 +59,14 @@ def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
         matrix_size = matrix.shape[0]
         
         def _expm_vjp_cpu(dfinal_dexpm):
-            dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
+            dfinal_dmatrix = anp.zeros((matrix_size, matrix_size), dtype=anp.complex128)
 
             # Compute a first order approximation of the frechet derivative of the matrix
             # exponential in every unit direction Eij.
             for i in range(matrix_size):
                 for j in range(matrix_size):
                     dexpm_dmij_rowi = exp_matrix[j,:]
-                    dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
+                    dfinal_dmatrix[i, j] = anp.sum(anp.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
                 #ENDFOR
             #ENDFOR
 
@@ -82,9 +78,6 @@ def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
         pass
 
     return vjp_function
-
-
-autograd_defvjp(expm, _expm_vjp)
 
 
 ### MODULE TESTS ###
@@ -100,6 +93,7 @@ def _get_skew_hermitian_matrix(matrix_size):
     skew_hermitian_matrix :: numpy.ndarray - a skew-hermitian matrix
         of `matrix_size`
     """
+    import numpy as np
     matrix = (np.random.rand(matrix_size, matrix_size)
               + 1j * np.random.rand(matrix_size, matrix_size))
     
@@ -111,6 +105,8 @@ def _tests():
     Args: none
     Returns: none
     """
+    from autograd import jacobian
+    import numpy as np
 
     # Test that the end-to-end gradient of the matrix exponential is working.
     m = np.array([[1., 0.],
