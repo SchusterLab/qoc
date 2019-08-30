@@ -44,6 +44,7 @@ def plot_best_trial(file_path, save_path=None,
     # error values.
     errors = _file["error"]
     best_index = np.argmin(np.where(errors, errors, np.finfo(np.float64).max))
+    complex_controls = _file["complex_controls"][()]
     controls = np.array(_file["controls"][best_index])
     controls_real = np.real(controls)
     controls_imag = np.imag(controls)
@@ -63,15 +64,22 @@ def plot_best_trial(file_path, save_path=None,
     patches = list()
     labels = list()
     for i in range(control_count):
-        i2 = i * 2
-        label_real = "control_{}_real".format(i)
-        label_imag = "control_{}_imag".format(i)
-        color_real = COLOR_PALETTE[i2]
-        color_imag = COLOR_PALETTE[i2 + 1]
-        labels.append(label_real)
-        labels.append(label_imag)
-        patches.append(mpatches.Patch(label=label_real, color=color_real))
-        patches.append(mpatches.Patch(label=label_imag, color=color_imag))
+        if complex_controls:
+            i2 = i * 2
+            label_real = "control_{}_real".format(i)
+            labels.append(label_real)
+            color_real = COLOR_PALETTE[i2]
+            patches.append(mpatches.Patch(label=label_real, color=color_real))
+            
+            label_imag = "control_{}_imag".format(i)
+            color_imag = COLOR_PALETTE[i2 + 1]
+            labels.append(label_imag)
+            patches.append(mpatches.Patch(label=label_imag, color=color_imag))
+        else:
+            label = "control_{}".format(i)
+            color = COLOR_PALETTE[i]
+            labels.append(label)
+            patches.append(mpatches.Patch(label=label, color=color))
     #ENDFOR
 
     # Plot the data.
@@ -82,19 +90,25 @@ def plot_best_trial(file_path, save_path=None,
     # plt.subplots_adjust(hspace=0.8)
     subplot_count = 1
 
-    # pulses
+    # controls
     plt.subplot(subplot_count, 1, 1)
     time_axis = time_per_step * np.arange(control_step_count)
     for i in range(control_count):
-        i2 = i * 2
-        color_real = COLOR_PALETTE[i2]
-        color_imag = COLOR_PALETTE[i2 + 1]
-        pulse_real = controls_real[:, i]
-        pulse_imag = controls_imag[:, i]
-        plt.plot(time_axis, pulse_real, marker_style,
-                 color=color_real, ms=2, alpha=0.9)
-        plt.plot(time_axis, pulse_imag, marker_style,
-                 color=color_imag, ms=2, alpha=0.9)
+        if complex_controls:
+            i2 = i * 2
+            color_real = COLOR_PALETTE[i2]
+            color_imag = COLOR_PALETTE[i2 + 1]
+            control_real = controls_real[:, i]
+            control_imag = controls_imag[:, i]
+            plt.plot(time_axis, control_real, marker_style,
+                     color=color_real, ms=2, alpha=0.9)
+            plt.plot(time_axis, control_imag, marker_style,
+                     color=color_imag, ms=2, alpha=0.9)
+        else:
+            color= COLOR_PALETTE[i]
+            control = controls[:, i]
+            plt.plot(time_axis, control, marker_style,
+                     color=color, ms=2, alpha=0.9)
     #ENDFOR
     plt.xlabel("Time ({})".format(time_unit))
     plt.ylabel("Amplitude ({})".format(amplitude_unit))
