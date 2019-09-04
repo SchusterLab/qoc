@@ -13,8 +13,8 @@ import pycuda.cumath as cumath
 import skcuda.linalg as culinalg
 import skcuda.misc as cumisc
 
-from qoc.standard.extensions.autograd_extensions.pycuda.pycuda_wrapper.custom_functions import (
-    _abs_gpu, _power_gpu, _stack_gpu
+from qoc.autograd_extensions.pycuda.pycuda_wrapper.custom_functions import (
+    _abs_gpu, _power_gpu, _stack_gpu, _swapaxes_gpu,
 )
 
 GPU_FUNCTIONS = {
@@ -27,8 +27,8 @@ GPU_FUNCTIONS = {
     "stack_gpu": _stack_gpu,
     "subtract_gpu": cumisc.subtract,
     "sum_gpu": cumisc.sum,
+    "swapaxes_gpu": _swapaxes_gpu,
     "trace_gpu": culinalg.trace,
-    "transpose_gpu": culinalg.transpose,
 }
 
 def wrap_namespace(old, new):
@@ -38,6 +38,5 @@ def wrap_namespace(old, new):
     """
     for name, obj in old.items():
         new[name] = primitive(obj)
-
 
 wrap_namespace(GPU_FUNCTIONS, globals())
