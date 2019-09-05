@@ -504,7 +504,8 @@ def _test_evolve_lindblad_discrete():
     # Test that evolution WITH a random hamiltonian and WITH random lindblad operators
     # yields a similar result to qutip.
     # Note that the allclose tolerance may need to be adjusted.
-    for matrix_size in range(2, _BIG):
+    matrix_size = 4
+    for i in range(_BIG):
         # Evolve under lindbladian.
         hamiltonian_matrix = _generate_hermitian_matrix(matrix_size)
         hamiltonian = lambda controls, time: hamiltonian_matrix
@@ -591,7 +592,7 @@ def _test():
     Run tests on the module.
     """
     _test_evolve_lindblad_discrete()
-    _test_grape_lindblad_discrete()
+    # _test_grape_lindblad_discrete()
 
 
 if __name__ == "__main__":
