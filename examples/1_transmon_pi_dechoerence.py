@@ -31,7 +31,8 @@ hamiltonian = lambda controls, time: (H_SYSTEM_0
 LINDBLAD_OPERATORS = anp.stack((SIGMA_PLUS,))
 GAMMA_1 = 1
 LINDBLAD_DISSIPATORS = anp.stack((GAMMA_1,))
-lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
+#lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
+lindblad_data = None
 
 # Define the problem.
 INITIAL_STATE_0 = anp.array([[1], [0]])
@@ -67,6 +68,7 @@ def main():
                                      complex_controls=COMPLEX_CONTROLS,
                                      hamiltonian=hamiltonian,
                                      iteration_count=ITERATION_COUNT,
+                                     lindblad_data=lindblad_data,
                                      log_iteration_step=LOG_ITERATION_STEP,
                                      save_file_path=SAVE_FILE_PATH,
                                      save_iteration_step=SAVE_ITERATION_STEP,)
