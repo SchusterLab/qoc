@@ -3,10 +3,8 @@ controlnorm.py - a module to define a cost on the
 norm of controls
 """
 
-import autograd.numpy as anp
-import numpy as np
-
 from qoc.models import Cost
+from qoc.standard.functions.convenience import (sum_axis, square)
 
 class ControlNorm(Cost):
     """
@@ -49,12 +47,12 @@ class ControlNorm(Cost):
         cost :: float - the penalty
         """
         # Normalize the controls.
-        normalized_controls = anp.divide(controls, self.max_control_norms)
+        normalized_controls = controls / self.max_control_norms
 
         # Penalize the sum of the square of the absolute value of the normalized
         # controls.
-        cost = anp.sum(anp.square(anp.abs(normalized_controls)))
-        cost_normalized = anp.divide(cost, self.normalization_constant)
+        cost = sum_axis(square(abs(normalized_controls)))
+        cost_normalized = cost / self.normalization_constant
         
         return self.cost_multiplier * cost_normalized
 
@@ -63,6 +61,8 @@ def _test():
     """
     Run test on the module.
     """
+    import numpy as np
+
     controls = np.array(((1+2j, 3-4j), (5-6j, 7+8j), (9+10j, 11+12j),))
     control_count = controls.shape[1]
     control_step_count = controls.shape[0]

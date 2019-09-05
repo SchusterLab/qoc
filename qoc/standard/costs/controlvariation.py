@@ -3,10 +3,8 @@ controlvariation.py - This module defines a cost function
 that penalizes variations in control parameters.
 """
 
-import autograd.numpy as anp
-import numpy as np
-
 from qoc.models import Cost
+from qoc.standard.functions.convenience import (square, sum_axis)
 
 class ControlVariation(Cost):
     """
@@ -55,13 +53,14 @@ class ControlVariation(Cost):
         cost :: float - the penalty
         """
         # Normalize the controls.
-        normalized_controls = anp.divide(controls, self.max_control_norms)
+        normalized_controls = controls / max_control_norms
 
         # Penalize the difference in variations from the value of a control
         # at one step to the next step.
         diffs = anp.diff(normalized_controls, axis=0, n=self.order)
-        diffs_total = anp.sum(anp.square(anp.abs(diffs)))
-        diffs_total_normalized = anp.divide(diffs_total, self.normalization_constant)
+        diffs_total = sum_axis(square(abs(diffs), operation_policy=operation_policy),
+                               operation_policy=operation_policy)
+        diffs_total_normalized = diffs_total / self.normalization_constant
 
         return self.cost_multiplier * diffs_total_normalized
 
@@ -70,6 +69,8 @@ def _test():
     """
     Run test on the module.
     """
+    import numpy as np
+
     controls = np.array(((1+2j, 7+8j,), (3+4j, 9+10j,), (11+12j, 5+6j,),))
     control_count = controls.shape[1]
     control_step_count = controls.shape[0]

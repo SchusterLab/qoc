@@ -7,11 +7,9 @@ i.e. those that don't begin with '_', are autograd compatible.
 from functools import reduce
 
 import autograd.numpy as anp
-import numpy as np
-import scipy.linalg as la
-import skcuda.misc as cumisc
 
 from qoc.models.operationpolicy import OperationPolicy
+from qoc.autograd_extensions.pycuda.pycudawrapper import (matmul_gpu, sum_gpu,)
 
 ### COMPUTATIONS ###
 
@@ -28,8 +26,10 @@ def commutator(a, b, operation_policy=OperationPolicy.CPU):
     """
     if operation_policy == OperationPolicy.CPU:
         _commutator = anp.matmul(a, b) - anp.matmul(b, a)
+    elif operation_policy == OperationPolicy.GPU:
+        _commutator = matmul_gpu(a, b) - matmul_gpu(b, a)
     else:
-        pass
+        _not_implemented(operation_policy)
 
     return _commutator
 
@@ -46,30 +46,27 @@ def conjugate(x, operation_policy=OperationPolicy.CPU):
     """
     if operation_policy == OperationPolicy.CPU:
         conj = anp.conjugate(x)
+    elif operation_policy == OperationPolicy.GPU:
+        conj = conj_gpu(x)
     else:
-        pass
+        _not_implemented(operation_policy)
 
     return conj
 
-def conjugate_transpose(matrix, operation_policy=OperationPolicy.CPU):
+
+def conjugate_transpose(a, operation_policy=OperationPolicy.CPU):
     """
     Compute the conjugate transpose of a matrix.
+
     Args:
-    matrix :: numpy.ndarray - the matrix to compute
-        the conjugate transpose of
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
+    a :: ndarray - the array to compute the conjugate transpose of
+    operation_policy
+
     Returns:
-    _conjugate_tranpose :: numpy.ndarray the conjugate transpose
-        of matrix
+    _conjugate_tranpose :: ndarray - the conjugate transpose of x
     """
-    if operation_policy == OperationPolicy.CPU:
-        _conjugate_transpose = anp.conjugate(transpose(matrix,
-                                                       operation_policy))
-    else:
-        pass
-        
-    return _conjugate_transpose
+    return conjugate(transpose(a, operation_policy=operation_policy),
+                     operation_policy=operation_policy)
 
 
 def krons(*matrices, operation_policy=OperationPolicy.CPU):
@@ -84,7 +81,7 @@ def krons(*matrices, operation_policy=OperationPolicy.CPU):
     if operation_policy == OperationPolicy.CPU:
         _krons = reduce(anp.kron, matrices)
     else:
-        pass
+        _not_implemented(operation_policy)
 
     return _krons
 
@@ -99,11 +96,13 @@ def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
         used to perform the operation and with which method
     """
     if operation_policy == OperationPolicy.CPU:
-        _matmuls = reduce(anp.matmul, matrices)
+        matmul = anp.matmul
+    elif  operation_policy == OperationPolicy.GPU:
+        matmul = matmul_gpu
     else:
-        pass
+        _not_implemented(operation_policy)
 
-    return _matmuls
+    return reduce(matmul, matrices)
 
 
 def mult_cols(matrix, vector, operation_policy=OperationPolicy.CPU):
@@ -121,7 +120,7 @@ def mult_cols(matrix, vector, operation_policy=OperationPolicy.CPU):
     if operation_policy == OperationPolicy.CPU:
         _matrix = matrix * vector
     else:
-        pass
+        _not_implemented(operation_policy)
 
     return _matrix
 
@@ -142,78 +141,73 @@ def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
         _matrix = transpose(transpose(matrix, operation_policy)
                             * vector, operation_policy)
     else:
-        pass
+        _not_implemented(operation_policy)
 
     return _matrix
 
-def stack_gpu(gpuarray_list):
+
+def square(a):
     """
-    This function is equivalent to np.stack(*args, axis=0) for
-    gpu arrays.
+    Square an array.
+
+    Args:
+    a :: ndarray - the array to square
     
-    Arguments:
-    gpuarray_list :: list(pycuda.gpuarray.GPUArray) - the list of
-        gpu arrays to stack
-
-    Returns:
-    stack :: pycuda.gpuarray.GPUArray - an array where each of the arrays
-        in gpuarray_list is stacked along axis 0
+    Returns
+    a_squared :: ndarray - the square of `a`
     """
-    array_shape = gpuarray_list[0].shape
-    array_count = len(gpuarray_list)
-    stack_shape = (array_count, *array_shape)
-    stack_dtype = gpuarray_list[0].dtype
-    stack = pycuda.gpuarray.empty(stack_shape, stack_dtype)
-    for i, gpuarray in enumerate(gpuarray_list):
-        stack[i] = gpuarray
-    
-    return stack
+    if operation_policy == OperationPolicy.CPU:
+        a_squared =  anp.square(a)
+    elif operation_policy == OperationPolicy.GPU:
+        a_squared = square_gpu(a)
+    else:
+        return 
 
 
-def sum_axis(array, *args, **kwargs):
+def sum_axis(*args, **kwargs):
     """
-    This function is a wrapper around np.sum and skcuda.misc.sum.
+    This function is similar to np.sum and skcuda.misc.sum.
 
     Arguments:
-    array :: ndarray - the array to sum over
     operation_policy
 
     Returns:
     sum :: ndarray - the specified sum
     """
     if "operation_policy" in kwargs:
-        operation_policy = kwargs["operation_policy"]
+        operation_policy = kwargs.pop("operation_policy")
     else:
         operation_policy = OperationPolicy.CPU
     
     if operation_policy == OperationPolicy.CPU:
-        _sum = anp.sum(array, *args, **kwargs)
+        _sum = anp.sum(*args, **kwargs)
     elif operation_policy == OperationPolicy.GPU:
-        _sum = cumisc.sum(array, *args, **kwargs)
+        _sum = sum_gpu(*args, **kwargs)
     else:
-        raise ValueError("This operation is not implemented for "
-                         "the operation policy {}."
-                         "".format(operation_policy))
+        _not_implemented(operation_policy)
+
     return _sum
 
 
-def transpose(matrix, operation_policy=OperationPolicy.CPU):
+def transpose(a, operation_policy=OperationPolicy.CPU):
     """
-    Obtain the transpose of the matrix.
+    Obtain the transpose of the array.
+
     Args:
-    matrix :: numpy.ndarray - an N x M matrix
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
+    a :: ndarray - the array to compute the transpose of
+    operation_policy
+
     Returns:
-    matrix_transpose :: numpy.ndarray - an M x N matrix that is the
-        transpose of `matrix`
+    a_transpose :: ndarray - the transpose of `a`
     """
     if operation_policy == OperationPolicy.CPU:
-        matrix_transpose = anp.swapaxes(matrix, -1, -2)
+        swapaxes = anp.swapaxes
+    elif operation_policy == OperationPolicy.GPU:
+        swapaxes = swapaxes_gpu
     else:
-        pass
+        _not_implemented(operation_policy)
 
-    return matrix_transpose
+    return swapaxes(a, -1, -2)
 
 
 ### ISOMORPHISMS ###
@@ -242,6 +236,18 @@ def real_imag_to_complex_flat(x):
     """
     real, imag = np.split(x, 2)
     return real + 1j * imag
+
+
+### HELPER FUNCTIONS ###
+
+def _not_implemented(operation_policy):
+    """
+    Raise a NotImplementedError for the given operation policy.
+    """
+    raise NotImplementedError("The requested operation is not implemented "
+                              "for the {} operation policy."
+                              "".format(operation_policy))
+
 
 
 ### MODULE TESTS ###
