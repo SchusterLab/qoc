@@ -29,8 +29,7 @@ hamiltonian = lambda controls, time: (H_SYSTEM_0
 # Subject the system to T1 type decoherence per fig. 11 of
 # https://www.sciencedirect.com/science/article/pii/S0003491617301252.
 LINDBLAD_OPERATORS = anp.stack((SIGMA_PLUS,))
-T1 = 1e5 # 1e5 nanoseconds = 1e2 microseconds
-GAMMA_1 = 1e-5 #GHz
+GAMMA_1 = 1
 LINDBLAD_DISSIPATORS = anp.stack((GAMMA_1,))
 lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
 
@@ -68,7 +67,6 @@ def main():
                                      complex_controls=COMPLEX_CONTROLS,
                                      hamiltonian=hamiltonian,
                                      iteration_count=ITERATION_COUNT,
-                                     lindblad_data=lindblad_data,
                                      log_iteration_step=LOG_ITERATION_STEP,
                                      save_file_path=SAVE_FILE_PATH,
                                      save_iteration_step=SAVE_ITERATION_STEP,)
