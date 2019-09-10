@@ -36,21 +36,55 @@ def evolve_schroedinger_discrete(control_step_count, evolution_time,
     Evolve a set of state vectors under the schroedinger equation
     and compute the optimization error.
 
-    Args:
-    control_step_count :: int
+    Arguments:
+    control_step_count :: int - This value is the number of positions
+        in time where control parameters are fit. For example, if the
+        evolution time is 10ns and the control step count is 2,
+        control parameters will be fit at 0ns and 5ns. The control
+        parameters at other times will be interpolated based on the ones
+        fit at those values.
     controls :: ndarray (control_step_count x control_count)
-    costs :: iterable(qoc.models.cost.Cost)
-    evolution_time :: float
+        - This array specifies the control parameter values at each
+          control step. These values will be used to determine the `controls`
+          argument passed to the `hamiltonian` function.
+    costs :: iterable(qoc.models.cost.Cost) - This list specifies all
+        the cost functions that the optimizer should evaluate. This list
+        defines the criteria for an "optimal" control set.
+    evolution_time :: float - This value specifies the duration of the
+        system's evolution.
     hamiltonian :: (controls :: ndarray (control_count), time :: float)
                    -> hamiltonian :: ndarray (hilbert_size x hilbert_size)
+        - This function provides the system's hamiltonian given a set
+        of control parameters and a time value. This function must
+        use operations registered with autograd. I.e. use
+        autograd.numpy instead of numpy.
     initial_states :: ndarray (state_count x hilbert_size x 1)
+        - This array specifies the states that should be evolved under the
+        specified system. These are the states at the beggining of the evolution.
     interpolation_policy :: qoc.models.interpolationpolicy.InterpolationPolicy
-    magnus_policy :: qoc.models.magnuspolicy.MagnusPolicy
+        - This value specifies how control parameters should be
+        interpreted at points where they are not defined.
+    magnus_policy :: qoc.models.magnuspolicy.MagnusPolicy - This value
+        specifies what method should be used to perform the magnus expansion
+        of the system matrix for ode integration. Choosing a higher order
+        magnus expansion will yield more accuracy, but it will
+        result in a longer compute time.
     operation_policy :: qoc.models.operationpolicy.OperationPolicy
-    system_step_multiplier :: int
+        - This value specifies which computation backend should be used
+        to execute the program.
+    system_step_multiplier :: int - By default, qoc will integrate the
+        ode at each time interval produced by dividing `evolution_time`
+        into `control_step_count`intervals. Setting the
+        `system_step_multiplier` value will change qoc's behavior to
+        integrate the ode at each time interval produced by dividing
+        `evolution_time`into `control_step_count` * `system_step_multiplier`
+        intervals. This will result in higher accuracy, but more compute time.
+        Additionaly, each cost function that requires evaluation at each
+        time step will also be evaluated at `control_step_count`
+        * `system_step_multiplier` time steps.
 
     Returns:
-    result
+    result :: qoc.models.schroedingermodels.EvolveSchroedingerResult
     """
     pstate = EvolveSchroedingerDiscreteState(control_step_count,
                                              costs, evolution_time,
@@ -83,30 +117,91 @@ def grape_schroedinger_discrete(control_count, control_step_count,
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
 
-    Args:
-    complex_controls
-    control_count
-    control_step_count
-    costs
-    evolution_time
-    hamiltonian
-    initial_controls
-    initial_states
-    interpolation_policy
-    iteration_count
-    log_iteration_step
-    magnus_policy
-    max_control_norms
-    minimum_error
-    operation_policy
-    optimizer
-    performance_policy
-    save_file_path
-    save_iteration_step
-    system_step_multiplier
+    Arguments:
+    complex_controls :: bool - This value determines if the control parameters
+        are complex-valued. If some controls are real only or imaginary only
+        while others are complex, real only and imaginary only controls
+        can be simulated by taking the real or imaginary part of a complex control.
+    control_count :: int - This value specifies how many control parameters
+        should be supplied to the hamiltonian at one time.
+    control_step_count :: int - This value is the number of positions
+        in time where control parameters are fit. For example, if the
+        evolution time is 10ns and the control step count is 2,
+        control parameters will be fit at 0ns and 5ns. The control
+        parameters at other times will be interpolated based on the ones
+        fit at those values.
+    costs :: iterable(qoc.models.cost.Cost) - This list specifies all
+        the cost functions that the optimizer should evaluate. This list
+        defines the criteria for an "optimal" control set.
+    evolution_time :: float - This value specifies the duration of the
+        system's evolution.
+    hamiltonian :: (controls :: ndarray (control_count), time :: float)
+                   -> hamiltonian :: ndarray (hilbert_size x hilbert_size)
+        - This function provides the system's hamiltonian given a set
+        of control parameters and a time value. This function must
+        use operations registered with autograd. I.e. use
+        autograd.numpy instead of numpy.
+    initial_controls :: ndarray (control_step_count x control_count)
+        - This array specifies the control parameters at each
+        control step. These values will be used to determine the `controls`
+        argument passed to the `hamiltonian` function at each time step for
+        the first iteration of optimization.
+    initial_states :: ndarray (state_count x hilbert_size x 1)
+        - This array specifies the states that should be evolved under the
+        specified system. These are the states at the beggining of the evolution.
+    interpolation_policy :: qoc.models.interpolationpolicy.InterpolationPolicy
+        - This value specifies how control parameters should be
+        interpreted at points where they are not defined.
+    iteration_count :: int - This value determines how many total system
+        evolutions the optimizer will perform to determine the
+        optimal control set.
+    log_iteration_step :: int - This value determines how often qoc logs
+        progress to stdout. This value is specified in units of system steps,
+        of which there are `control_step_count` * `system_step_multiplier`.
+        Set this value to 0 to disable logging.
+    magnus_policy :: qoc.models.magnuspolicy.MagnusPolicy - This value
+        specifies what method should be used to perform the magnus expansion
+        of the system matrix for ode integration. Choosing a higher order
+        magnus expansion will yield more accuracy, but it will
+        result in a longer compute time.
+    max_control_norms :: ndarray (control_count) - This array
+        specifies the element-wise maximum norm that each control is
+        allowed to achieve. If, in optimization, the value of a control
+        exceeds its maximum norm, the control will be rescaled to
+        its maximum norm. Note that for non-complex values, this
+        feature acts exactly as absolute value clipping.
+    minimum_error :: float - This value is the threshold below which
+        optimization will terminate.
+    operation_policy :: qoc.models.operationpolicy.OperationPolicy
+        - This value specifies which computation backend should be used
+        to execute the program.
+    optimizer :: class instance - This optimizer object defines the
+        gradient-based procedure for minimizing the total contribution
+        of all cost functions with respect to the control parameters.
+    performance_policy :: qoc.models.performancepolicy.PerformancePolicy
+        - This value determines which computing resources should be
+        minimized during program execution.
+    save_file_path :: str - This is the full path to the file where
+        information about program execution will be stored.
+        E.g. "./out/foo.h5"
+    save_iteration_step :: int - This value determines how often qoc
+    saves progress to the save file specified by `save_file_path`.
+        This value is specified in units of system steps, of which
+        there are `control_step_count` * `system_step_multiplier`.
+        Set this value to 0 to disable saving.
+    system_step_multiplier :: int - By default, qoc will integrate the
+        ode at each time interval produced by dividing `evolution_time`
+        into `control_step_count`intervals. Setting the
+        `system_step_multiplier` value will change qoc's behavior to
+        integrate the ode at each time interval produced by dividing
+        `evolution_time`into `control_step_count` * `system_step_multiplier`
+        intervals. This will result in higher accuracy, but more compute time.
+        Additionaly, each cost function that requires evaluation at each
+        time step will also be evaluated at `control_step_count`
+        * `system_step_multiplier` time steps.
 
     Returns:
-    result
+    result :: GrapeSchroedingerResult
     """
     # Initialize the controls.
     initial_controls, max_control_norms = initialize_controls(complex_controls,
