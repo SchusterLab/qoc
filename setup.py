@@ -9,6 +9,7 @@ NAME = "qoc"
 VERSION = "0.1alpha"
 DEPENDENCIES = [
     "autograd",
+    "h5py",
     "numpy",
     "scipy",
 ]
