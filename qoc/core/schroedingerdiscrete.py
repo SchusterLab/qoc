@@ -185,7 +185,7 @@ def grape_schroedinger_discrete(control_count, control_step_count,
         information about program execution will be stored.
         E.g. "./out/foo.h5"
     save_iteration_step :: int - This value determines how often qoc
-    saves progress to the save file specified by `save_file_path`.
+        saves progress to the save file specified by `save_file_path`.
         This value is specified in units of system steps, of which
         there are `control_step_count` * `system_step_multiplier`.
         Set this value to 0 to disable saving.
@@ -201,7 +201,7 @@ def grape_schroedinger_discrete(control_count, control_step_count,
         * `system_step_multiplier` time steps.
 
     Returns:
-    result :: GrapeSchroedingerResult
+    result :: qoc.models.schroedingermodels.GrapeSchroedingerResult
     """
     # Initialize the controls.
     initial_controls, max_control_norms = initialize_controls(complex_controls,
