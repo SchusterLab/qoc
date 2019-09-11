@@ -160,6 +160,23 @@ def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
     return _matrix
 
 
+def rms_norm(array):
+    """
+    Compute the rms norm of the array that is adjusted for the array's size.
+
+    Arguments:
+    array :: ndarray (N) - The array to compute the norm of.
+
+    Returns:
+    norm :: float - The rms norm of the array.
+    """
+    l2_norm_ = anp.sum(array * anp.conjugate(array))
+    size = anp.prod(anp.shape(array))
+    rms_norm_ = anp.sqrt(l2_norm_ / size)
+    
+    return rms_norm_
+
+
 def stack_gpu(gpuarray_list):
     """
     This function is equivalent to np.stack(*args, axis=0) for

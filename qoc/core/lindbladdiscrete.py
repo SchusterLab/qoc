@@ -283,29 +283,34 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
                                            interpolation_policy,
                                            lindblad_data,)
 
-    for system_step in range(final_system_step + 1):
-        control_step, _ = divmod(system_step, system_step_multiplier)
-        is_final_control_step = control_step == final_control_step
-        is_final_system_step = system_step == final_system_step
-        time = system_step * dt
+    densities = integrate_rkdp5(rhs_lindbladian, evolution_time, 0, densities)
+    total_error = costs[0].cost(controls, densities, 0)
+    reporter.final_densities = densities
+    reporter.total_error = total_error
 
-        # Evolve the density matrices.
-        densities = integrate_rkdp5(rhs_lindbladian, time + dt, time, densities)
+    # for system_step in range(final_system_step + 1):
+    #     control_step, _ = divmod(system_step, system_step_multiplier)
+    #     is_final_control_step = control_step == final_control_step
+    #     is_final_system_step = system_step == final_system_step
+    #     time = system_step * dt
 
-        # Compute the costs.
-        if is_final_system_step:
-            for i, cost in enumerate(costs):
-                error = cost.cost(controls, densities, system_step)
-                total_error = total_error + error
-            #ENDFOR
-            reporter.final_densities = densities
-            reporter.total_error = total_error
-        else:
-            for i, step_cost in enumerate(step_costs):
-                error = step_cost.cost(controls, densities, system_step)
-                total_error = total_error + error
-            #ENDFOR
-    #ENDFOR
+    #     # Evolve the density matrices.
+    #     densities = integrate_rkdp5(rhs_lindbladian, time + dt, time, densities)
+
+    #     # Compute the costs.
+    #     if is_final_system_step:
+    #         for i, cost in enumerate(costs):
+    #             error = cost.cost(controls, densities, system_step)
+    #             total_error = total_error + error
+    #         #ENDFOR
+    #         reporter.final_densities = densities
+    #         reporter.total_error = total_error
+    #     else:
+    #         for i, step_cost in enumerate(step_costs):
+    #             error = step_cost.cost(controls, densities, system_step)
+    #             total_error = total_error + error
+    #         #ENDFOR
+    # #ENDFOR
 
     return total_error
 

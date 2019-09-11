@@ -6,6 +6,8 @@ form the ground state to the first excited state
 when the system is subject to noise.
 """
 
+import os
+
 import autograd.numpy as anp
 from qoc import grape_lindblad_discrete
 from qoc.standard import (TargetDensityInfidelity,
@@ -13,7 +15,13 @@ from qoc.standard import (TargetDensityInfidelity,
                           get_annihilation_operator,
                           get_creation_operator,
                           SIGMA_Z, SIGMA_PLUS,
-                          generate_save_file_path,)
+                          generate_save_file_path,
+                          LBFGSB, Adam,)
+
+# Notify numpy of machine capability.
+CORE_COUNT = 8
+os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
+os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
 
 # Define the system.
 HILBERT_SIZE = 2
@@ -51,7 +59,8 @@ COSTS = [TargetDensityInfidelity(TARGET_DENSITIES)]
 COMPLEX_CONTROLS = True
 CONTROL_COUNT = 1
 EVOLUTION_TIME = CONTROL_STEP_COUNT = 10 # nanoseconds
-ITERATION_COUNT = int(1e4)
+ITERATION_COUNT = int(1e6)
+OPTIMIZER = Adam()
 
 # Define output.
 LOG_ITERATION_STEP = 1
@@ -70,6 +79,7 @@ def main():
                                      iteration_count=ITERATION_COUNT,
                                      lindblad_data=lindblad_data,
                                      log_iteration_step=LOG_ITERATION_STEP,
+                                     optimizer=OPTIMIZER,
                                      save_file_path=SAVE_FILE_PATH,
                                      save_iteration_step=SAVE_ITERATION_STEP,)
 

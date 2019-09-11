@@ -8,7 +8,8 @@ import numpy as np
 from qoc.models.operationpolicy import OperationPolicy
 from qoc.standard.functions.convenience import (commutator, conjugate_transpose,
                                                 l2_norm,
-                                                matmuls,)
+                                                matmuls,
+                                                rms_norm,)
 
 ### INTERPOLATION METHODS ###
 
@@ -102,7 +103,7 @@ def magnus_m4(a1, a2, dt, operation_policy=OperationPolicy.CPU):
     m4 :: numpy.ndarray - magnus expansion
     """
     return ((dt / 2) * (a1 + a2) +
-            _M4_C0 * np.power(dt, 2) * commutator(a2, a1,
+            _M4_C0 * (dt ** 2) * commutator(a2, a1,
                                                   operation_policy=operation_policy))
     
 
@@ -189,29 +190,29 @@ def get_lindbladian(densities, dissipators=None, hamiltonian=None,
 # RKDP5(4) Butcher tableau constants.
 # From table 5.2 on pp. 178 of [1] or [3].
 C2 = 1 / 5
-C3 = 3 / 10
-C4 = 4 / 5
-C5 = 8 / 9
-C6 = C7 = 1
 A21 = 1 / 5
+C3 = 3 / 10
 A31 = 3 / 40
-A41 = 44 / 45
-A51 = 19372 / 6561
-A61 = 9017 / 3168
-A71 = B1 = 35 / 384
 A32 = 9 / 40
+C4 = 4 / 5
+A41 = 44 / 45
 A42 = -56 / 15
-A52 = -25360 / 2187
-A62 = -355 / 33
-A72 = B2 = 0
 A43 = 32 / 9
+C5 = 8 / 9
+A51 = 19372 / 6561
+A52 = -25360 / 2187
 A53 = 64448 / 6561
-A63 = 46732 / 5247
-A73 = B3 = 500 / 1113
 A54 = -212 / 729
+C6 = C7 = 1
+A61 = 9017 / 3168
+A62 = -355 / 33
+A63 = 46732 / 5247
 A64 = 49 / 176
-A74 = B4 = 125 / 192
 A65 = -5103 / 18656
+A71 = B1 = 35 / 384
+A72 = B2 = 0
+A73 = B3 = 500 / 1113
+A74 = B4 = 125 / 192
 A75 = B5 = -2187 / 6784
 A76 = B6 = 11 / 84
 B7 = 0
@@ -222,11 +223,18 @@ B4H = 393 / 640
 B5H = -92097 / 339200
 B6H = 187 / 2100
 B7H = 1 / 40
+E1 = B1 - B1H
+E2 = B2 - B2H
+E3 = B3 - B3H
+E4 = B4 - B4H
+E5 = B5 - B5H
+E6 = B6 - B6H
+E7 = B7 - B7H
 # Other constants.
 P = 5
 PH = 4
 Q = np.minimum(P, PH)
-STEP_UPDATE_FACTOR_EXP = 1 / (Q + 1)
+ERROR_EXP = -1 / (Q + 1)
 
 
 def integrate_rkdp5_step(h, rhs, x, y, k1=None):
@@ -257,14 +265,15 @@ def integrate_rkdp5_step(h, rhs, x, y, k1=None):
 
 
 def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
-                    atol=np.finfo(np.float64).eps, rtol=0.,
-                    step_rejections_max=4,
+                    atol=1e-12, rtol=0.,
+                    step_rejections_max=np.inf,
                     step_safety_factor=0.9,
-                    step_update_factor_max=2.5, step_update_factor_min=1e-1,):
+                    step_update_factor_max=10, step_update_factor_min=2e-1,):
     """
     Integrate using the RKDP5(4) method. For quick intuition, consult [2] and [3].
     See table 5.2 on pp. 178 of [1] or [3] for the Butcher tableau. See pp. 167-169 of [1]
-    for automatic step size control and starting step size.
+    for automatic step size control and starting step size. Scipy's RK45 implementation
+    in python [4] was used as a reference.
 
     References:
     [1] E. Hairer, S.P. Norsett and G. Wanner, Solving Ordinary Differential Equations
@@ -272,6 +281,7 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
     Springer-Verlag (1993)
     [2] https://en.wikipedia.org/wiki/Runge–Kutta_methods
     [3] https://en.wikipedia.org/wiki/Dormand–Prince_method
+    [4] https://github.com/scipy/scipy/blob/master/scipy/integrate/_ivp/rk.py
     
     Arguments:
     atol :: float or array(N) - the absolute tolerance of the component-wise
@@ -320,19 +330,33 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
     y_component_count = anp.prod(y_initial.shape)
     k1 = f0
     while x_current < x_final:
-        step_rejections = 0
-        err = 2
-        while step_rejections < step_rejections_max and err > 1:
+        step_rejected = False
+        step_accepted = False
+        while not step_accepted:
             k7, y1, y1h = integrate_rkdp5_step(step_current, rhs, x_current, y_current,
                                                k1=k1)
-            sc = atol + anp.maximum(anp.abs(y1), anp.abs(y_current)) * rtol
-            err = anp.sqrt(l2_norm((y1 - y1h) / sc) / y_component_count)
-            step_update_factor = step_safety_factor * anp.power((1 / err),
-                                                               STEP_UPDATE_FACTOR_EXP)
-            step_current = step_current * anp.minimum(step_update_factor_max,
-                                              anp.maximum(step_update_factor_min,
-                                                         step_update_factor))
-            step_rejections = step_rejections + 1
+            scale = atol + anp.maximum(anp.abs(y1), anp.abs(y1h)) * rtol
+            error_norm = rms_norm((y1 - y1h) / scale)
+            if error_norm < 1:
+                step_accepted = True
+
+                # Avoide division by zero in update.
+                if error_norm == 0:
+                    step_update_factor = step_update_factor_max
+                else:
+                    step_update_factor = anp.minimum(step_update_factor_max,
+                                                    step_safety_factor * anp.power(error_norm, ERROR_EXP))
+                
+                # Avoid extraneous update.
+                if step_rejected:
+                    step_update_factor = anp.minimum(1, step_update_factor)
+
+                step_current = step_current * step_update_factor
+            else:
+                step_rejected = True
+                step_update_factor = anp.maximum(step_update_factor_min,
+                                                step_safety_factor * anp.power(error_norm, ERROR_EXP))
+                step_current = step_current * step_update_factor
         #ENDWHILE
         x_current = x_current + step_current
         y_current = y1
@@ -364,7 +388,7 @@ def _test():
         y1 = line(x1)
         y2 = line(x2)
         lx3 = line(x3)
-        itx3 = interpolate_linear(y1, y2, x1, x2, x3)
+        itx3 = interpolate_linear(x1, x2, x3, y1, y2,)
         assert(np.isclose(lx3, itx3))
     #ENDFOR
 
@@ -404,5 +428,62 @@ def _test():
     assert(np.allclose(lindbladian, expected_lindbladian))
 
 
+def _test_rkdp5():
+    """
+    Test rkdp5 using a system of odes with known solutions stated in [1].
+
+    References:
+    [1] http://tutorial.math.lamar.edu/Classes/DE/Exact.aspx
+    """
+    from scipy.integrate import ode, solve_ivp
+
+    PRINT = False
+
+    # Problem setup.
+    x0 = 0
+    x1 = 10
+    y0 = np.array((-3,))
+    y_sol = lambda x: 0.5 * (-(x ** 2 + 1) - (np.sqrt(x ** 4 + 12 * x ** 3 + 2 * x ** 2 + 25)))
+    def rhs(x, y):
+        return ((-2 * x * y + 9 * x ** 2) / (2 * y + x ** 2 + 1))
+
+    # Analytical solution.
+    y_1_expected = y_sol(x1)
+
+    # Scipy fortran solutions.
+    r = ode(rhs).set_integrator("vode", method="bdf")
+    r.set_initial_value(y0, x0)
+    y_1_scipy_vode = r.integrate(x1)
+
+    r = ode(rhs).set_integrator("dopri5")
+    r.set_initial_value(y0, x0)
+    y_1_scipy_dopri5_f = r.integrate(x1)
+
+    # Scipy python solutions.
+    res = solve_ivp(rhs, [x0, x1], y0, method="RK45")
+    y_1_scipy_dopri5_py = res.y[:, -1]
+
+    res = solve_ivp(rhs, [x0, x1], y0, method="Radau")
+    y_1_scipy_radau_py = res.y[:, -1]
+
+    # QOC solution.
+    # The value atol=3e-13 is hand-optimized for this problem.
+    y_1 = integrate_rkdp5(rhs, x1, x0, y0, atol=3e-13)
+
+    # 1e-2 is not bad considering the solutions of the other implementations.
+    assert(np.allclose(y_1, y_1_expected, atol=1e-2))
+
+    if PRINT:
+        print("y_1_expected:\n{}"
+              "".format(y_1_expected))
+        print("y_1_scipy_dopri5_f:\n{}"
+              "".format(y_1_scipy_dopri5_f))
+        print("y_1_scipy_dopri5_py:\n{}"
+              "".format(y_1_scipy_dopri5_py))
+        print("y_1_qoc:\n{}"
+              "".format(y_1))
+
+
 if __name__ == "__main__":
     _test()
+    _test_rkdp5()
