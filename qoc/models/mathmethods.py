@@ -2,10 +2,12 @@
 mathmethods.py - mathematical methods in physics
 """
 
+import autograd.numpy as anp
 import numpy as np
 
 from qoc.models.operationpolicy import OperationPolicy
 from qoc.standard.functions.convenience import (commutator, conjugate_transpose,
+                                                l2_norm,
                                                 matmuls,)
 
 ### INTERPOLATION METHODS ###
@@ -31,6 +33,40 @@ def interpolate_linear(x1, x2, x3, y1, y2,
                 is that resulting from composition of y1 and y2
     """
     return y1 + (((y2 - y1) / (x2 - x1)) * (x3 - x1))
+
+
+def get_linear_interpolator(xs, ys):
+    """
+    Construct a function that will determine a linearly interpolated value `y`
+    given a value `x` based on the given sets `xs` and `ys`.
+    
+    Arguments:
+    xs :: ndarray - An array of independent variables that correspond to the y values in `ys`.
+    ys :: ndarray - An array of dependent variables that correspond to the x values in `xs`.
+
+    Returns:
+    interpolate_y :: (x :: ndarray) -> y :: ndarray
+        - A function that linearly interpolates a y value given an x value.
+    """
+    def interpolate_y(x):
+        # If the x value is below the zone in which data is specified,
+        # interpolate using the lowest two data points.
+        if x <= xs[0]:
+            y = interpolate_linear(xs[0], xs[1], x, ys[0], ys[1])
+        # If the x value is above the zone in which data is specified,
+        # interpolate using the highest two data points.
+        elif x >= xs[-1]:
+            y = interpolate_linear(xs[-2], xs[-1], x, ys[-2], ys[-1])
+        # Otherwise, interpolate between the closest two data points
+        # to x.
+        else:
+            # Index is the first occurence where x is l.e. an element of xs.
+            index = anp.argmax(x <= xs)
+            y = interpolate_linear(xs[index - 1], xs[index], x, ys[index - 1], ys[index])
+        
+        return y
+    
+    return interpolate_y
 
 
 ### MAGNUS EXPANSION METHODS ###
@@ -148,6 +184,164 @@ def get_lindbladian(densities, dissipators=None, hamiltonian=None,
     return lindbladian
 
 
+### ODE METHODS ###
+
+# RKDP5(4) Butcher tableau constants.
+# From table 5.2 on pp. 178 of [1] or [3].
+C2 = 1 / 5
+C3 = 3 / 10
+C4 = 4 / 5
+C5 = 8 / 9
+C6 = C7 = 1
+A21 = 1 / 5
+A31 = 3 / 40
+A41 = 44 / 45
+A51 = 19372 / 6561
+A61 = 9017 / 3168
+A71 = B1 = 35 / 384
+A32 = 9 / 40
+A42 = -56 / 15
+A52 = -25360 / 2187
+A62 = -355 / 33
+A72 = B2 = 0
+A43 = 32 / 9
+A53 = 64448 / 6561
+A63 = 46732 / 5247
+A73 = B3 = 500 / 1113
+A54 = -212 / 729
+A64 = 49 / 176
+A74 = B4 = 125 / 192
+A65 = -5103 / 18656
+A75 = B5 = -2187 / 6784
+A76 = B6 = 11 / 84
+B7 = 0
+B1H = 5179 / 57600
+B2H = 0
+B3H = 7571 / 16695
+B4H = 393 / 640
+B5H = -92097 / 339200
+B6H = 187 / 2100
+B7H = 1 / 40
+# Other constants.
+P = 5
+PH = 4
+Q = np.minimum(P, PH)
+STEP_UPDATE_FACTOR_EXP = 1 / (Q + 1)
+
+
+def integrate_rkdp5_step(h, rhs, x, y, k1=None):
+    """
+    Use the Butcher tableau for RKDP5(4) to compute y1 and y1h.
+
+    Returns:
+    k7 :: array(N)
+    y1 :: array(N)
+    y1h :: array(N)
+    """
+    k1 = rhs(x, y)
+    k2 = rhs(x + C2 * h, y + h * A21 * k1)
+    k3 = rhs(x + C3 * h, y + h * (A31 * k1 + A32 * k2))
+    k4 = rhs(x + C4 * h, y + h * (A41 * k1 + A42 * k2 + A43 * k3))
+    k5 = rhs(x + C5 * h, y + h * (A51 * k1 + A52 * k2 + A53 * k3
+                                  + A54 * k4))
+    k6 = rhs(x + C6 * h, y + h * (A61 * k1 + A62 * k2 + A63 * k3
+                                  + A64 * k4 + A65 * k5))
+    k7 = rhs(x + C7 * h, y + h * (A71 * k1 + A72 * k2 + A73 * k3
+                                  + A74 * k4 + A75 * k5 + A76 * k6))
+    y1 = y + h * (B1 * k1 + B2 * k2 + B3 * k3 + B4 * k4 + B5 * k5
+          + B6 * k6 + B7 * k7)
+    y1h = y + h * (B1H * k1 + B2H * k2 + B3H * k3 + B4H * k4 + B5H * k5
+          + B6H * k6 + B7H * k7)
+    
+    return k7, y1, y1h
+
+
+def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
+                    atol=np.finfo(np.float64).eps, rtol=0.,
+                    step_rejections_max=4,
+                    step_safety_factor=0.9,
+                    step_update_factor_max=2.5, step_update_factor_min=1e-1,):
+    """
+    Integrate using the RKDP5(4) method. For quick intuition, consult [2] and [3].
+    See table 5.2 on pp. 178 of [1] or [3] for the Butcher tableau. See pp. 167-169 of [1]
+    for automatic step size control and starting step size.
+
+    References:
+    [1] E. Hairer, S.P. Norsett and G. Wanner, Solving Ordinary Differential Equations
+    i. Nonstiff Problems. 2nd edition. Springer Series in Computational Mathematics,
+    Springer-Verlag (1993)
+    [2] https://en.wikipedia.org/wiki/Runge–Kutta_methods
+    [3] https://en.wikipedia.org/wiki/Dormand–Prince_method
+    
+    Arguments:
+    atol :: float or array(N) - the absolute tolerance of the component-wise
+        local error, i.e. "Atoli" in e.q. 4.10 on pp. 167 of [1]
+    step_rejections_max :: int - the number of allowed attempts at each
+        integration step to choose a step size that satisfies the
+        component-wise local error
+    rhs :: (x :: float, y :: array(N)) -> dy_dx :: array(N)
+        - the right-hand side of the equation dy_dx = rhs(x, y)
+        that defines the first order differential equation
+    rtol :: float or array(N) - the relative tolerance of the component-wise
+        local error, i.e. "Rtoli" in e.q. 4.10 on pp. 167 of [1]
+    step_safety_factor :: float - the safety multiplication factor used in the
+        step update rule, i.e. "fac" in e.q. 4.13 on pp. 168 of [1]
+    step_update_factor_max :: float - the maximum step multiplication factor used in the
+        step update rule, i.e. "facmax" in e.q. 4.13 on pp. 168 of [1]
+    step_update_factor_min :: float - the minimum step multiplication factor used in the
+        step update rule, i.e. "facmin"in e.q.e 4.13 on pp. 168 of [1]
+    x_final :: float - the final value of x (inclusive) that concludes the integration interval
+    x_initial :: float - the initial value of x (inclusive) that begins the integration interval
+    y_initial :: array(N) - the initial value of y
+
+    Returns:
+    y_final :: array(N) - the final value of y
+    """
+    # Compute initial step size per pp. 169 of [1].
+    f0 = rhs(x_initial, y_initial)
+    d0 = l2_norm(y_initial)
+    d1 = l2_norm(f0)
+    if d0 < 1e-5 or d1 < 1e-5:
+        h0 = 1e-6
+    else:
+        h0 = 0.01 * d0 / d1
+    y1 = y_initial + h0 * f0
+    f1 = rhs(x_initial + h0, y1)
+    d2 = l2_norm(f1 - f0) / h0
+    if anp.maximum(d1, d2) <= 1e-15:
+        h1 = anp.maximum(1e-6, h0 * 1e-3)
+    else:
+        h1 = anp.power(0.01 / anp.maximum(d1, d2), 1 / (P + 1))
+    step_current = anp.minimum(100 * h0, h1)
+
+    # Integrate.
+    x_current = x_initial
+    y_current = y_initial
+    y_component_count = anp.prod(y_initial.shape)
+    k1 = f0
+    while x_current < x_final:
+        step_rejections = 0
+        err = 2
+        while step_rejections < step_rejections_max and err > 1:
+            k7, y1, y1h = integrate_rkdp5_step(step_current, rhs, x_current, y_current,
+                                               k1=k1)
+            sc = atol + anp.maximum(anp.abs(y1), anp.abs(y_current)) * rtol
+            err = anp.sqrt(l2_norm((y1 - y1h) / sc) / y_component_count)
+            step_update_factor = step_safety_factor * anp.power((1 / err),
+                                                               STEP_UPDATE_FACTOR_EXP)
+            step_current = step_current * anp.minimum(step_update_factor_max,
+                                              anp.maximum(step_update_factor_min,
+                                                         step_update_factor))
+            step_rejections = step_rejections + 1
+        #ENDWHILE
+        x_current = x_current + step_current
+        y_current = y1
+        k1 = k7
+    #ENDWHILE
+    
+    return y_current
+
+
 ### MODULE TESTS ###
 
 _BIG = int(1e3)
@@ -212,4 +406,3 @@ def _test():
 
 if __name__ == "__main__":
     _test()
-

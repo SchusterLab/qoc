@@ -6,6 +6,7 @@ control parameters.
 """
 
 from autograd.extend import Box
+import numpy as np
 
 from qoc.core.common import (clip_control_norms,
                              initialize_controls,
@@ -13,6 +14,8 @@ from qoc.core.common import (clip_control_norms,
 from qoc.models import (Dummy,
                         EvolveLindbladDiscreteState,
                         EvolveLindbladResult,
+                        get_linear_interpolator,
+                        integrate_rkdp5,
                         interpolate_linear,
                         InterpolationPolicy,
                         OperationPolicy,
@@ -262,8 +265,10 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
     costs = pstate.costs
     densities = pstate.initial_densities
     dt = pstate.dt
+    evolution_time = pstate.evolution_time
     hamiltonian = pstate.hamiltonian
     final_control_step = pstate.final_control_step
+    control_step_count = final_control_step + 1
     final_system_step = pstate.final_system_step
     interpolation_policy = pstate.interpolation_policy
     lindblad_data = pstate.lindblad_data
@@ -271,6 +276,12 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
     step_costs = pstate.step_costs
     system_step_multiplier = pstate.system_step_multiplier
     total_error = 0
+    rhs_lindbladian = _get_rhs_lindbladian(control_step_count,
+                                           controls,
+                                           evolution_time,
+                                           hamiltonian,
+                                           interpolation_policy,
+                                           lindblad_data,)
 
     for system_step in range(final_system_step + 1):
         control_step, _ = divmod(system_step, system_step_multiplier)
@@ -279,12 +290,7 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
         time = system_step * dt
 
         # Evolve the density matrices.
-        densities = _evolve_step_lindblad_discrete(densities, dt,
-                                                   time, is_final_control_step, control_step,
-                                                   controls, hamiltonian,
-                                                   interpolation_policy,
-                                                   lindblad_data,
-                                                   operation_policy)
+        densities = integrate_rkdp5(rhs_lindbladian, time + dt, time, densities)
 
         # Compute the costs.
         if is_final_system_step:
@@ -304,110 +310,62 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
     return total_error
 
 
-def _evolve_step_lindblad_discrete(densities, dt,
-                                   time, control_sentinel=False,
-                                   control_step=0, 
-                                   controls=None,
-                                   hamiltonian=None,
-                                   interpolation_policy=InterpolationPolicy.LINEAR,
-                                   lindblad_data=None,
-                                   operation_policy=OperationPolicy.CPU,):
+def _get_rhs_lindbladian(control_step_count=None,
+                         controls=None,
+                         evolution_time=None,
+                         hamiltonian=None,
+                         interpolation_policy=InterpolationPolicy.LINEAR,
+                         lindblad_data=None,):
     """
-    Use Runge-Kutta 4th order to evolve the density matrices to the next time step
-    under the lindblad master equation for time-discrete controls.
-    This RK4 implementation follows the definition:
-    https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods. Runge-Kutta was
-    chosen over matrix exponential by the suggestion of: https://arxiv.org/abs/1609.03170.
+    Produce a function that returns the lindbladian at any point in time.
 
-    NOTATION:
-     - t is time, c is controls, h is hamiltonian, g is dissipation constants,
-       l is lindblad operators, k are the runge-kutta increments
-
-    Args:
-    control_sentinel :: bool - set to True if this is the final control step,
-        in which case control interpolation is performed on the last two
-        control sets in the controls array
-    control_step :: int - the index into the control array at which control
-        interpolation should be performed
-    controls :: ndarray - the controls that should be provided to the
-        hamiltonian for the evolution    
-    densities :: ndarray - the probability density matrices to evolve
-    dt :: float - the time step
-    hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
-        - an autograd compatible function to generate the hamiltonian
-          for the given controls and time
-    interpolation_policy :: qoc.InterpolationPolicy - how parameters
-        should be interpolated for intermediate time steps
-    lindblad_data :: (time :: float) -> (dissipartors :: ndarray, operators :: ndarray)
-        - a function to generate the dissipation constants and lindblad operators
-          for a given time
-    operation_policy :: qoc.OperationPolicy - how computations should be
-        performed, e.g. CPU, GPU, sparse, etc.
-    time :: float - the current evolution time
+    Arguments:
+    control_step_count
+    controls
+    dt
+    hamiltonian
+    interpolation_policy
+    lindblad_data
 
     Returns:
-    densities :: ndarray - the densities evolved to `time + dt`
+    rhs_lindbladian :: (time :: float, densities :: ndarray (density_count x hilbert_size x hilbert_size))
+                       -> lindbladian :: ndarray (hilbert_size x hilbert_size)
+        - A function that returns the right-hand side of the lindblad master equation
+        dp_dt = rhs(p, t)
     """
-    # Get the times.
-    t1 = time
-    t2 = t3 = time + 0.5 * dt
-    t4 = time + dt
-
-    # Get the controls.
-    if controls is None:
-        c1 = c2 = c3 = c4 = None
-    else:
+    # Construct an interpolator for the controls if controls were specified.
+    # Otherwise, construct a dummy function.
+    if ((not (controls is None))
+      and (not (control_step_count is None))
+      and (not (evolution_time is None))):
         if interpolation_policy == InterpolationPolicy.LINEAR:
-            if control_sentinel:
-                control_left = controls[control_step - 1]
-                control_right = controls[control_step]
-                time_left = time - dt
-                time_right = time
-                c1 = control_right
-                c2 = c3 = interpolate_linear(time_left, time_right, t2, control_left, control_right)
-                c4 = interpolate_linear(time_left, time_right, t4, control_left, control_right)
-            else:
-                control_left = controls[control_step]
-                control_right = controls[control_step + 1]
-                c1 = control_left
-                c2 = c3 = interpolate_linear(t1, t4, t2, control_left, control_right)
-                c4 = control_right
+            dt_controls = evolution_time / control_step_count
+            control_times = dt_controls * np.arange(control_step_count)
+            get_controls = get_linear_interpolator(control_times, controls)
         else:
-            raise NotImplementedError("The interpolation policy {} is not "
-                                      "implemented for this method."
+            raise NotImplementedError("This operation does not yet support the interpolation "
+                                      "policy {}."
                                       "".format(interpolation_policy))
-    #ENDIF
+    else:
+        get_controls = lambda time: None
 
-    # Get the hamiltonians.
+    # Construct dummy functions if the hamiltonian or lindblad functions were not specified.
     if hamiltonian is None:
-        h1 = h2 = h3 = h4 = None
-    else:
-        h1 = hamiltonian(c1, t1)
-        h2 = h3 = hamiltonian(c2, t2)
-        h4 = hamiltonian(c4, t4)
-    
-    # Get the lindblad dissipators and operators.
-    if lindblad_data is None:
-        (g1, l1) =  (g2, l2) = (g3, l3) = (g4, l4) = (None, None)
-    else:
-        g1, l1 = lindblad_data(t1)
-        g2, l2 = g3, l3 = lindblad_data(t2)
-        g4, l4 = lindblad_data(t4)
-    #ENDIF
+        hamiltonian = lambda controls, time: None
         
-    # Perform RK4 update.
-    k1 = dt * get_lindbladian(densities, g1, h1, l1,
-                              operation_policy=operation_policy)
-    k2 = dt * get_lindbladian(densities + 0.5 * k1, g2, h2, l2,
-                              operation_policy=operation_policy)
-    k3 = dt * get_lindbladian(densities + 0.5 * k2, g3, h3, l3,
-                              operation_policy=operation_policy)
-    k4 = dt * get_lindbladian(densities + k3, g4, h4, l4,
-                              operation_policy=operation_policy)
+    if lindblad_data is None:
+        lindblad_data = lambda time: (None, None)
+        
+    def rhs(time, densities):
+        controls_ = get_controls(time)
+        hamiltonian_ = hamiltonian(controls_, time)
+        dissipators, operators = lindblad_data(time)
+        lindbladian = get_lindbladian(densities, dissipators, hamiltonian_, operators)
+        
+        return lindbladian
+    #ENDDEF
 
-    densities = densities + (1 / 6) * (k1 + 2 * k2 + 2 * k3 + k4)
-    
-    return densities
+    return rhs
 
 
 ### MODULE TESTS ###
@@ -456,6 +414,11 @@ def _test_evolve_lindblad_discrete():
     result = evolve_lindblad_discrete(control_step_count, evolution_time,
                                       initial_densities, hamiltonian=hamiltonian)
     final_densities = result.final_densities
+    print("target_densities:\n{}"
+          "".format(target_densities))
+    print("final_densities:\n{}"
+          "".format(final_densities))
+    exit(0)
     assert(np.allclose(final_densities, target_densities))
     # Note that qutip only gets this result within 1e-5 error.
     tlist = np.linspace(0, evolution_time, control_step_count)

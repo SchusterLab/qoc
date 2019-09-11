@@ -89,6 +89,19 @@ def krons(*matrices, operation_policy=OperationPolicy.CPU):
     return _krons
 
 
+def l2_norm(array):
+    """
+    Compute the l2 norm of an array.
+
+    Arguments:
+    array :: ndarray(N) - The array to take the l2 norm of.
+
+    Returns:
+    l2_norm :: float - The l2 norm of `array`.
+    """
+    return anp.sum(anp.square(anp.abs(array)))
+
+
 def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
     """
     Compute the kronecker product of a list of matrices.
