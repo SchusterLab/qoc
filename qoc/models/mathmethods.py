@@ -170,7 +170,7 @@ def _test():
         y1 = line(x1)
         y2 = line(x2)
         lx3 = line(x3)
-        itx3 = interpolate_linear(y1, y2, x1, x2, x3)
+        itx3 = interpolate_linear(x1, x2, x3, y1, y2)
         assert(np.isclose(lx3, itx3))
     #ENDFOR
 
@@ -180,8 +180,8 @@ def _test():
     dt = 1.
     identity = np.eye(2)
     assert(np.allclose(magnus_m2(identity, dt), identity))
-    assert(np.allclose(magnus_m4(*([identity] * 2), dt), identity))
-    assert(np.allclose(magnus_m6(*([identity] * 3), dt), identity))
+    assert(np.allclose(magnus_m4(identity, identity, dt), identity))
+    assert(np.allclose(magnus_m6(identity, identity, identity, dt), identity))
     dt = 2.
     a1 = np.array([[2., 3.], [4., 5.]])
     a2 = np.array([[9., 6.], [8., 7.]])
