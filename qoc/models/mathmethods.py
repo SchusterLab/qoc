@@ -224,64 +224,117 @@ B4H = 393 / 640
 B5H = -92097 / 339200
 B6H = 187 / 2100
 B7H = 1 / 40
-E1 = B1 - B1H
-E2 = B2 - B2H
-E3 = B3 - B3H
-E4 = B4 - B4H
-E5 = B5 - B5H
-E6 = B6 - B6H
-E7 = B7 - B7H
-# Other constants.
+# RKDP5(4) dense output constants from [5].
+D1 = -12715105075 / 11282082432
+D2 = 0
+D3 = 87487479700 / 32700410799
+D4 = -10690763975 / 1880347072
+D5 = 701980252875 / 199316789632
+D6 = -1453857185 / 822651844
+D7 = 69997945 / 29380423
+# RKDP5(4) method constants.
 P = 5
 PH = 4
 Q = np.minimum(P, PH)
 ERROR_EXP = -1 / (Q + 1)
 
 
-def integrate_rkdp5_step(h, rhs, x, y, k1=None):
+def rkdp5_dense(ks, x0, x1, x_eval, y0, y1):
+    """
+    Interpolate values between a step using a quartic polynomial.
+    See [5] for the disambiguation of where this method comes from.
+    
+    Arguments:
+    ks :: ndarray (7) - the k values for this step
+    x0 :: float - the initial x value for this step
+    x1 :: float - the final x value for this step
+    x_eval :: ndarray (_eval_count) - This is an array of 
+        x values whose corresponding y value should
+        be obtained. The values in this array may not
+        necessarily have fallen in this step. Only
+        those that did fall in this step will be evaluated.
+        It is assumed that this list does not contain duplicates,
+        and that the values are sorted in increasing order.
+    y0 :: ndarray (N) - the y value corresponding to `x0`
+    y1 :: ndarray (N) - the y value corresponding to `x1`
+
+    Returns:
+    x_evald_indices :: ndarray - The indices of the points
+        in `x_eval` that were interpolated.
+    y_evald :: ndarray (evald_count) - The y values corresponding
+        to the x values that were evaluated.
+    """
+    # Evaluate all x values that fall between x0 and x1.
+    x_evald_indices = anp.nonzero(np.logical_and(x0 <= x_eval, x_eval <= x1))[0]
+    x_evald = x_eval[x_evald_indices]
+
+    # Interpolate.
+    h = x1 - x0
+    r1 = y0
+    r2 = y1 - y0
+    r3 = y0 + h * ks[0] - y1
+    r4 = 2 * (y1 - y0) - h * (ks[0] + ks[6])
+    # Note that D2=0. Therefore, we may compute r5 like so:
+    r5 = h * (D1 * ks[0] + D3 * ks[2] + D4 * ks[3] + D5 * ks[4]
+              + D6 * ks[5] + D7 * ks[6])
+    theta = (x_evald - x0) / h
+    theta2 = theta ** 2
+    theta3 = theta ** 3
+    theta4 = theta2 ** 2
+    y_evald = (r1
+              + theta * (r2 + r3)
+              - theta2 * (r3 - r4 -r5)
+              - theta3 * (r4 + 2 * r5)
+              + theta4 * r5)
+
+    return x_evald_indices, y_evald
+
+
+def integrate_rkdp5_step(h, rhs, x0, y0, k1=None):
     """
     Use the Butcher tableau for RKDP5(4) to compute y1 and y1h.
 
     Arguments:
     h :: float - the step size
     rhs :: (x :: float, y :: ndarray (N)) -> dy_dx :: ndarray (N)
-    x :: float - starting x position in the mesh
-    y :: float - starting y position in the mesh
-    k1 :: ndarray (N) - this value is rhs(x, y), which is equivalent
+    x0 :: float - starting x position in the mesh
+    y0 :: ndarray (N) - starting y position in the mesh
+    k1 :: ndarray (N) - this value is rhs(x0, y0), which is equivalent
         to the value of k7 in the previous step via the First-Same-As-Last
         (FSAL) property.
 
     Returns:
-    k7 :: ndarray (N)
-    y1 :: ndarray (N) - 5th order evaluation at `x` + `h` in the mesh
-    y1h :: ndarray (N) - 4th order evaluation at `x` + `h` in the mesh
+    ks :: ndarray (N x 7) - the k values for this step
+    y1 :: ndarray (N) - 5th order evaluation at `x0` + `h` in the mesh
+    y1h :: ndarray (N) - 4th order evaluation at `x0` + `h` in the mesh
     """
     if k1 is None:
         # Note that C1 = 0. Therefore, k1 may be evaluated like so:
-        k1 = rhs(x, y)
-    k2 = rhs(x + C2 * h, y + h * A21 * k1)
-    k3 = rhs(x + C3 * h, y + h * (A31 * k1 + A32 * k2))
-    k4 = rhs(x + C4 * h, y + h * (A41 * k1 + A42 * k2 + A43 * k3))
-    k5 = rhs(x + C5 * h, y + h * (A51 * k1 + A52 * k2 + A53 * k3
-                                  + A54 * k4))
-    k6 = rhs(x + C6 * h, y + h * (A61 * k1 + A62 * k2 + A63 * k3
-                                  + A64 * k4 + A65 * k5))
+        k1 = rhs(x0, y0)
+    k2 = rhs(x0 + C2 * h, y0 + h * A21 * k1)
+    k3 = rhs(x0 + C3 * h, y0 + h * (A31 * k1 + A32 * k2))
+    k4 = rhs(x0 + C4 * h, y0 + h * (A41 * k1 + A42 * k2 + A43 * k3))
+    k5 = rhs(x0 + C5 * h, y0 + h * (A51 * k1 + A52 * k2 + A53 * k3
+                                    + A54 * k4))
+    k6 = rhs(x0 + C6 * h, y0 + h * (A61 * k1 + A62 * k2 + A63 * k3
+                                    + A64 * k4 + A65 * k5))
     # Note that B2 = B7 = 0. Therefore, y1 may be evaluated like so:
-    y1 = y + h * (B1 * k1 + B3 * k3 + B4 * k4 + B5 * k5
-                  + B6 * k6)
+    y1 = y0 + h * (B1 * k1 + B3 * k3 + B4 * k4 + B5 * k5
+                   + B6 * k6)
     # Note that B$ = A7$ (FSAL).
-    # Therefore, y1 = y + h * (B dot K) = y + h * (A7 dot K)
+    # Therefore, y1 = y0 + h * (B dot K) = y0 + h * (A7 dot K)
     # Note also that C7 = 1.
     # Therefore, k7 may be evaluated like so:
-    k7 = rhs(x + h, y1)
+    k7 = rhs(x0 + h, y1)
     # Note that B2H = 0. Therefore, y1h may be evaluated like so:
-    y1h = y + h * (B1H * k1 + B3H * k3 + B4H * k4 + B5H * k5
-                   + B6H * k6 + B7H * k7)
+    y1h = y0 + h * (B1H * k1 + B3H * k3 + B4H * k4 + B5H * k5
+                    + B6H * k6 + B7H * k7)
     
-    return k7, y1, y1h
+    ks = (k1, k2, k3, k4, k5, k6, k7)
+    return ks, y1, y1h
 
 
-def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
+def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
                     atol=1e-12, rtol=0.,
                     step_safety_factor=0.9,
                     step_update_factor_max=10,
@@ -299,13 +352,11 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
     [2] https://en.wikipedia.org/wiki/Runge–Kutta_methods
     [3] https://en.wikipedia.org/wiki/Dormand–Prince_method
     [4] https://github.com/scipy/scipy/blob/master/scipy/integrate/_ivp/rk.py
+    [5] https://math.stackexchange.com/questions/2947231/how-can-i-derive-the-dense-output-of-ode45/2948244
     
     Arguments:
     atol :: float or array(N) - the absolute tolerance of the component-wise
         local error, i.e. "Atoli" in e.q. 4.10 on pp. 167 of [1]
-    step_rejections_max :: int - the number of allowed attempts at each
-        integration step to choose a step size that satisfies the
-        component-wise local error
     rhs :: (x :: float, y :: array(N)) -> dy_dx :: array(N)
         - the right-hand side of the equation dy_dx = rhs(x, y)
         that defines the first order differential equation
@@ -317,13 +368,25 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
         step update rule, i.e. "facmax" in e.q. 4.13 on pp. 168 of [1]
     step_update_factor_min :: float - the minimum step multiplication factor used in the
         step update rule, i.e. "facmin"in e.q.e 4.13 on pp. 168 of [1]
+    x_eval :: ndarray (eval_count) - an array of points `x` whose
+        corresponding `y` value should be evaluated. It is assumed
+        that this list does not contain duplicates, that
+        the values are sorted in increasing order, and that
+        all values are greater than `x_initial`.
     x_final :: float - the final value of x (inclusive) that concludes the integration interval
     x_initial :: float - the initial value of x (inclusive) that begins the integration interval
     y_initial :: array(N) - the initial value of y
 
     Returns:
-    y_final :: array(N) - the final value of y
+    y_evald :: ndarray (eval_count x N) - an array of points `y` whose
+        corresponding `x` value is specified in x_eval
     """
+    # Determine how far to integrate to.
+    if len(x_eval) == 0:
+        raise ValueError("No output was specified.")
+    else:
+        x_final = x_eval[-1]
+    
     # Compute initial step size per pp. 169 of [1].
     f0 = rhs(x_initial, y_initial)
     d0 = l2_norm(y_initial)
@@ -342,10 +405,11 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
     step_current = anp.minimum(100 * h0, h1)
 
     # Integrate.
+    y_evald_list = list()
     x_current = x_initial
     y_current = y_initial
     k1 = f0
-    while x_current < x_final:
+    while x_current <= x_final:
         step_rejected = False
         step_accepted = False
         # Repeatedly attempt to move to the next position in the mesh
@@ -353,7 +417,7 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
         # is within an acceptable tolerance.
         while not step_accepted:
             # Attempt to step by `step_current`.
-            k7, y1, y1h = integrate_rkdp5_step(step_current, rhs, x_current, y_current,
+            ks, y1, y1h = integrate_rkdp5_step(step_current, rhs, x_current, y_current,
                                                k1=k1)
             # Before the step size is updated for the next step, note where
             # the current attempted step size places us in the mesh.
@@ -384,13 +448,18 @@ def integrate_rkdp5(rhs, x_final, x_initial, y_initial,
                                                  step_safety_factor * anp.power(error_norm, ERROR_EXP))
                 step_current = step_current * step_update_factor
         #ENDWHILE
+        # Interpolate any output points that ocurred in the step.
+        x_evald_indices, y_evald = rkdp5_dense(ks, x_current, x_new, x_eval, y_current, y1)
+        for y_eval in y_evald:
+            y_evald_list.append(y_eval)
+        
         # Update the position in the mesh.
         x_current = x_new
         y_current = y1
-        k1 = k7
+        k1 = ks[6] # k[6] = k7
     #ENDWHILE
     
-    return y_current
+    return anp.stack(y_evald_list)
 
 
 ### MODULE TESTS ###
@@ -480,25 +549,23 @@ def _test_rkdp5():
     # Scipy fortran solutions.
     r = ode(rhs).set_integrator("vode", method="bdf")
     r.set_initial_value(y0, x0)
-    y_1_scipy_vode = r.integrate(x1)
+    y_1_scipy_vode = r.integrate(x1)[0]
 
     r = ode(rhs).set_integrator("dopri5")
     r.set_initial_value(y0, x0)
-    y_1_scipy_dopri5_f = r.integrate(x1)
+    y_1_scipy_dopri5_f = r.integrate(x1)[0]
 
     # Scipy python solutions.
     res = solve_ivp(rhs, [x0, x1], y0, method="RK45")
-    y_1_scipy_dopri5_py = res.y[:, -1]
+    y_1_scipy_dopri5_py = res.y[:, -1][0]
 
     res = solve_ivp(rhs, [x0, x1], y0, method="Radau")
-    y_1_scipy_radau_py = res.y[:, -1]
+    y_1_scipy_radau_py = res.y[:, -1][0]
 
     # QOC solution.
-    # The value atol=3e-13 is hand-optimized for this problem.
-    y_1 = integrate_rkdp5(rhs, x1, x0, y0)
+    y_1 = integrate_rkdp5(rhs, np.array([x1]), x0, y0)[0]
 
-    # 1e-2 is not bad considering the solutions of the other implementations.
-    # assert(np.allclose(y_1, y_1_expected, atol=1e-2))
+    assert(np.allclose(y_1, y_1_expected))
 
     if PRINT:
         print("y_1_expected:\n{}"
