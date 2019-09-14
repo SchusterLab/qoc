@@ -239,7 +239,7 @@ Q = np.minimum(P, PH)
 ERROR_EXP = -1 / (Q + 1)
 
 
-def rkdp5_dense(ks, x0, x1, x_eval, y0, y1):
+def rkdp5_dense(ks, x0, x1, x_eval_step, y0, y1):
     """
     Interpolate values between a step using a quartic polynomial.
     See [5] for the disambiguation of where this method comes from.
@@ -248,26 +248,19 @@ def rkdp5_dense(ks, x0, x1, x_eval, y0, y1):
     ks :: ndarray (7) - the k values for this step
     x0 :: float - the initial x value for this step
     x1 :: float - the final x value for this step
-    x_eval :: ndarray (_eval_count) - This is an array of 
+    x_eval_step :: ndarray (eval_step_count) - This is an array of 
         x values whose corresponding y value should
-        be obtained. The values in this array may not
-        necessarily have fallen in this step. Only
-        those that did fall in this step will be evaluated.
-        It is assumed that this list does not contain duplicates,
+        be obtained. It is assumed that the values in this
+        array lie between x0 and x1 inclusive,
+        that this array does not contain duplicates,
         and that the values are sorted in increasing order.
     y0 :: ndarray (N) - the y value corresponding to `x0`
     y1 :: ndarray (N) - the y value corresponding to `x1`
 
     Returns:
-    x_evald_indices :: ndarray - The indices of the points
-        in `x_eval` that were interpolated.
-    y_evald :: ndarray (evald_count) - The y values corresponding
-        to the x values that were evaluated.
+    y_eval_step :: ndarray (eval_step_count) - The y values corresponding
+        to the x values in `x_eval_step`.
     """
-    # Evaluate all x values that fall between x0 and x1.
-    x_evald_indices = anp.nonzero(np.logical_and(x0 <= x_eval, x_eval <= x1))[0]
-    x_evald = x_eval[x_evald_indices]
-
     # Interpolate.
     h = x1 - x0
     r1 = y0
@@ -277,17 +270,17 @@ def rkdp5_dense(ks, x0, x1, x_eval, y0, y1):
     # Note that D2=0. Therefore, we may compute r5 like so:
     r5 = h * (D1 * ks[0] + D3 * ks[2] + D4 * ks[3] + D5 * ks[4]
               + D6 * ks[5] + D7 * ks[6])
-    theta = (x_evald - x0) / h
+    theta = (x_eval_step - x0) / h
     theta2 = theta ** 2
     theta3 = theta ** 3
     theta4 = theta2 ** 2
-    y_evald = (r1
-              + theta * (r2 + r3)
-              - theta2 * (r3 - r4 -r5)
-              - theta3 * (r4 + 2 * r5)
-              + theta4 * r5)
+    y_eval_step = (r1
+                   + theta * (r2 + r3)
+                   - theta2 * (r3 - r4 -r5)
+                   - theta3 * (r4 + 2 * r5)
+                   + theta4 * r5)
 
-    return x_evald_indices, y_evald
+    return y_eval_step
 
 
 def integrate_rkdp5_step(h, rhs, x0, y0, k1=None):
@@ -331,6 +324,7 @@ def integrate_rkdp5_step(h, rhs, x0, y0, k1=None):
                     + B6H * k6 + B7H * k7)
     
     ks = (k1, k2, k3, k4, k5, k6, k7)
+
     return ks, y1, y1h
 
 
@@ -405,7 +399,7 @@ def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
     step_current = anp.minimum(100 * h0, h1)
 
     # Integrate.
-    y_evald_list = list()
+    y_eval_list = list()
     x_current = x_initial
     y_current = y_initial
     k1 = f0
@@ -449,9 +443,12 @@ def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
                 step_current = step_current * step_update_factor
         #ENDWHILE
         # Interpolate any output points that ocurred in the step.
-        x_evald_indices, y_evald = rkdp5_dense(ks, x_current, x_new, x_eval, y_current, y1)
-        for y_eval in y_evald:
-            y_evald_list.append(y_eval)
+        x_eval_step_indices = anp.nonzero(anp.logical_and(x_current <= x_eval, x_eval <= x_new))[0]
+        x_eval_step = x_eval[x_eval_step_indices]
+        if len(x_eval_step) != 0:
+            y_eval_step = rkdp5_dense(ks, x_current, x_new, x_eval_step, y_current, y1)
+            for y_eval_ in y_eval_step:
+                y_eval_list.append(y_eval_)
         
         # Update the position in the mesh.
         x_current = x_new
@@ -459,7 +456,7 @@ def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
         k1 = ks[6] # k[6] = k7
     #ENDWHILE
     
-    return anp.stack(y_evald_list)
+    return anp.stack(y_eval_list)
 
 
 ### MODULE TESTS ###
@@ -533,7 +530,7 @@ def _test_rkdp5():
     """
     from scipy.integrate import ode, solve_ivp
 
-    PRINT = False
+    COMPARE = False
 
     # Problem setup.
     x0 = 0
@@ -546,30 +543,32 @@ def _test_rkdp5():
     # Analytical solution.
     y_1_expected = y_sol(x1)
 
-    # Scipy fortran solutions.
-    r = ode(rhs).set_integrator("vode", method="bdf")
-    r.set_initial_value(y0, x0)
-    y_1_scipy_vode = r.integrate(x1)[0]
-
-    r = ode(rhs).set_integrator("dopri5")
-    r.set_initial_value(y0, x0)
-    y_1_scipy_dopri5_f = r.integrate(x1)[0]
-
-    # Scipy python solutions.
-    res = solve_ivp(rhs, [x0, x1], y0, method="RK45")
-    y_1_scipy_dopri5_py = res.y[:, -1][0]
-
-    res = solve_ivp(rhs, [x0, x1], y0, method="Radau")
-    y_1_scipy_radau_py = res.y[:, -1][0]
-
     # QOC solution.
     y_1 = integrate_rkdp5(rhs, np.array([x1]), x0, y0)[0]
 
     assert(np.allclose(y_1, y_1_expected))
 
-    if PRINT:
+    if COMPARE:
+        # Scipy fortran solutions.
+        r = ode(rhs).set_integrator("vode", method="bdf")
+        r.set_initial_value(y0, x0)
+        y_1_scipy_vode = r.integrate(x1)[0]
+
+        r = ode(rhs).set_integrator("dopri5")
+        r.set_initial_value(y0, x0)
+        y_1_scipy_dopri5_f = r.integrate(x1)[0]
+
+        # Scipy python solutions.
+        res = solve_ivp(rhs, [x0, x1], y0, method="RK45")
+        y_1_scipy_dopri5_py = res.y[:, -1][0]
+
+        res = solve_ivp(rhs, [x0, x1], y0, method="Radau")
+        y_1_scipy_radau_py = res.y[:, -1][0]
+
         print("y_1_expected:\n{}"
               "".format(y_1_expected))
+        print("y_1_scipy_vode:\n{}"
+              "".format(y_1_scipy_vode))
         print("y_1_scipy_dopri5_f:\n{}"
               "".format(y_1_scipy_dopri5_f))
         print("y_1_scipy_dopri5_py:\n{}"

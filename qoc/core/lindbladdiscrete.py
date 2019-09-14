@@ -283,34 +283,29 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
                                            interpolation_policy,
                                            lindblad_data,)
 
-    densities = integrate_rkdp5(rhs_lindbladian, evolution_time, 0, densities)
-    total_error = costs[0].cost(controls, densities, 0)
-    reporter.final_densities = densities
-    reporter.total_error = total_error
+    for system_step in range(final_system_step + 1):
+        control_step, _ = divmod(system_step, system_step_multiplier)
+        is_final_control_step = control_step == final_control_step
+        is_final_system_step = system_step == final_system_step
+        time = system_step * dt
 
-    # for system_step in range(final_system_step + 1):
-    #     control_step, _ = divmod(system_step, system_step_multiplier)
-    #     is_final_control_step = control_step == final_control_step
-    #     is_final_system_step = system_step == final_system_step
-    #     time = system_step * dt
+        # Evolve the density matrices.
+        densities = integrate_rkdp5(rhs_lindbladian, np.array([time + dt]), time, densities)
 
-    #     # Evolve the density matrices.
-    #     densities = integrate_rkdp5(rhs_lindbladian, time + dt, time, densities)
-
-    #     # Compute the costs.
-    #     if is_final_system_step:
-    #         for i, cost in enumerate(costs):
-    #             error = cost.cost(controls, densities, system_step)
-    #             total_error = total_error + error
-    #         #ENDFOR
-    #         reporter.final_densities = densities
-    #         reporter.total_error = total_error
-    #     else:
-    #         for i, step_cost in enumerate(step_costs):
-    #             error = step_cost.cost(controls, densities, system_step)
-    #             total_error = total_error + error
-    #         #ENDFOR
-    # #ENDFOR
+        # Compute the costs.
+        if is_final_system_step:
+            for i, cost in enumerate(costs):
+                error = cost.cost(controls, densities, system_step)
+                total_error = total_error + error
+            #ENDFOR
+            reporter.final_densities = densities
+            reporter.total_error = total_error
+        else:
+            for i, step_cost in enumerate(step_costs):
+                error = step_cost.cost(controls, densities, system_step)
+                total_error = total_error + error
+            #ENDFOR
+    #ENDFOR
 
     return total_error
 
@@ -366,6 +361,8 @@ def _get_rhs_lindbladian(control_step_count=None,
         hamiltonian_ = hamiltonian(controls_, time)
         dissipators, operators = lindblad_data(time)
         lindbladian = get_lindbladian(densities, dissipators, hamiltonian_, operators)
+        # print("time: {}\nhamiltonian:\n{}\ndissipators:\n{}\noperators:\n{}\nlindbladian:\n{}\b"
+        #       "".format(time, hamiltonian_, dissipators, operators, lindbladian))
         
         return lindbladian
     #ENDDEF
@@ -419,11 +416,6 @@ def _test_evolve_lindblad_discrete():
     result = evolve_lindblad_discrete(control_step_count, evolution_time,
                                       initial_densities, hamiltonian=hamiltonian)
     final_densities = result.final_densities
-    print("target_densities:\n{}"
-          "".format(target_densities))
-    print("final_densities:\n{}"
-          "".format(final_densities))
-    exit(0)
     assert(np.allclose(final_densities, target_densities))
     # Note that qutip only gets this result within 1e-5 error.
     tlist = np.linspace(0, evolution_time, control_step_count)
@@ -448,7 +440,8 @@ def _test_evolve_lindblad_discrete():
     hilbert_size = 2
     gamma = 2
     lindblad_dissipators = np.array((gamma,))
-    lindblad_operators = np.stack((SIGMA_MINUS,))
+    sigma_plus = np.array([[0, 1], [0, 0]])
+    lindblad_operators = np.stack((sigma_plus,))
     lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
     evolution_time = 1.
     control_step_count = int(1e3)
@@ -467,7 +460,7 @@ def _test_evolve_lindblad_discrete():
                                       initial_densities,
                                       lindblad_data=lindblad_data)
     final_density = result.final_densities[0]
-#    assert(np.allclose(final_density, expected_final_density))
+    assert(np.allclose(final_density, expected_final_density))
 
     # Test that evolution WITH a random hamiltonian and WITH random lindblad operators
     # yields a similar result to qutip.
@@ -480,12 +473,12 @@ def _test_evolve_lindblad_discrete():
         lindblad_operator_count = np.random.randint(1, matrix_size)
         lindblad_operators = np.stack([_generate_complex_matrix(matrix_size)
                                       for _ in range(lindblad_operator_count)])
-        lindblad_dissipators = np.ones((lindblad_operator_count))
+        lindblad_dissipators = np.ones((lindblad_operator_count,))
         lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
         density_matrix = _generate_hermitian_matrix(matrix_size)
         initial_densities = np.stack((density_matrix,))
-        evolution_time = 1
-        control_step_count = int(1e4)
+        evolution_time = 5
+        control_step_count = 1
         result = evolve_lindblad_discrete(control_step_count, evolution_time,
                                           initial_densities,
                                           hamiltonian=hamiltonian,
@@ -498,16 +491,14 @@ def _test_evolve_lindblad_discrete():
         lindblad_operators_qutip = [Qobj(lindblad_operator)
                                     for lindblad_operator in lindblad_operators]
         e_ops_qutip = list()
-        tlist = np.linspace(0, evolution_time, control_step_count)
-        options = Options(nsteps=control_step_count)
+        tlist = np.array((0, evolution_time,))
         result_qutip = mesolve(hamiltonian_qutip,
                                initial_density_qutip,
                                tlist,
                                lindblad_operators_qutip,
                                e_ops_qutip,)
         final_density_qutip = result_qutip.states[-1].full()
-        
-        assert(np.allclose(final_density, final_density_qutip, atol=1e-6))
+        assert(np.allclose(final_density, final_density_qutip))
     #ENDFOR
 
 
@@ -541,7 +532,7 @@ def _test_grape_lindblad_discrete():
     max_norm = 1e-10
     max_control_norms = np.repeat(max_norm, control_count)
     costs = [ForbidDensities(forbidden_densities, control_step_count)]
-    iteration_count = 100
+    iteration_count = 5
     log_iteration_step = 0
     result = grape_lindblad_discrete(control_count, control_step_count,
                                      costs, evolution_time,
@@ -560,7 +551,7 @@ def _test():
     Run tests on the module.
     """
     _test_evolve_lindblad_discrete()
-    # _test_grape_lindblad_discrete()
+    _test_grape_lindblad_discrete()
 
 
 if __name__ == "__main__":

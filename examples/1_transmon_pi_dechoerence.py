@@ -39,8 +39,7 @@ hamiltonian = lambda controls, time: (H_SYSTEM_0
 LINDBLAD_OPERATORS = anp.stack((SIGMA_PLUS,))
 GAMMA_1 = 1
 LINDBLAD_DISSIPATORS = anp.stack((GAMMA_1,))
-#lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
-lindblad_data = None
+lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
 
 # Define the problem.
 INITIAL_STATE_0 = anp.array([[1], [0]])
