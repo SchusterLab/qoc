@@ -16,33 +16,7 @@ class EvolveLindbladDiscreteState(ProgramState):
     optimization error for one round.
 
     Fields:
-    costs :: iterable(qoc.models.Cost) - the cost functions that
-        define the cost model for evolution
-    dt :: float - the time step used for evolution, it is the time
-        inbetween system steps
-    final_control_step :: int - the ultimate index into the control array
-    final_system_step :: int - the last time step
-    hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
-        - an autograd compatible function to generate the hamiltonian
-          for the given controls and time
-    initial_densities :: ndarray - the probability density matrices
-        to evolve
-    interpolation_policy :: qoc.InterpolationPolicy - how parameters
-        should be interpolated for intermediate time steps
-    lindblad_data :: (time :: float) -> (dissapartors :: ndarray, operators :: ndarray)
-        - a function to generate the dissapation constants and lindblad operators
-          for a given time,
-          an array of dissipators and operators should be returned even if there
-          are zero or one dissapator and operator pairs
-    operation_policy :: qoc.models.OperationPolicy - defines how
-        computations should be performed, e.g. CPU, GPU, sparse, etc.
-    step_costs :: iterable(qoc.models.Cost) - the cost functions that
-        define the cost model for evolution that should be evaluated
-        at every time step
-    step_cost_indices :: iterable(int)- a list of the indices in the costs
-        array which are step costs
-    system_step_multiplier :: int - this value times `control_step_count`
-        determines how many time steps are used in evolution
+    
     """
     
     def __init__(self, control_step_count,

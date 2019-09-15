@@ -28,47 +28,38 @@ from qoc.standard import (Adam, ans_jacobian, commutator, conjugate,
 
 ### MAIN METHODS ###
 
-def evolve_lindblad_discrete(control_step_count, evolution_time,
-                             initial_densities,
-                             controls=None, costs=list(),
+def evolve_lindblad_discrete(evolution_time, initial_densities,
+                             system_eval_count,
+                             control_eval_count=None,
+                             controls=None,
+                             cost_eval_step=1,
+                             costs=list(),
                              hamiltonian=None,
                              interpolation_policy=InterpolationPolicy.LINEAR,
                              lindblad_data=None,
-                             operation_policy=OperationPolicy.CPU,
-                             system_step_multiplier=1,):
+                             save_file_path=None,
+                             save_intermediate_densities=False):
     """
     Evolve a set of density matrices under the lindblad equation
     and compute the optimization error.
 
     Args:
-    control_step_count :: int - the number of time intervals in the 
-        evolution time in which the controls are spaced, or, if no controls
-        are specified, the number of time steps in which the evolution time
-        interval should be broken up
-    controls :: ndarray - the controls that should be provided to the
-        hamiltonian for the evolution
-    costs :: iterable(qoc.models.Cost) - the cost functions to guide
-        optimization
-    evolution_time :: float - the length of time the system should evolve for
-    hamiltonian :: (controls :: ndarray, time :: float) -> hamiltonian :: ndarray
-        - an autograd compatible function to generate the hamiltonian
-          for the given controls and time
-    initial_densities :: ndarray (density_count x hilbert_size x hilbert_size)
-    interpolation_policy :: qoc.InterpolationPolicy - how parameters
-        should be interpolated for intermediate time steps
-    lindblad_data :: (time :: float) -> (tuple(operators :: ndarray, dissipators :: ndarray))
-        - a function to generate the dissipation constants and lindblad operators for a given time,
-          an array of operators should be returned even if there 
-          are zero or one dissipator and operator pairs
-    operation_policy :: qoc.OperationPolicy - how computations should be
-        performed, e.g. CPU, GPU, sparse, etc.
-    system_step_multiplier :: int - the multiple of control_step_count at which
-        the system should evolve, control parameters will be interpolated at
-        these steps
+    evolution_time
+    initial_densities
+    system_eval_count
+
+    control_eval_count
+    controls
+    cost_eval_step
+    costs
+    hamiltonian
+    interpolation_policy
+    lindblad_data
+    save_file_path
+    save_intermediate_densities
 
     Returns:
-    result :: qoc.models.EvolveLindbladResult - information
-        about the evolution
+    result
     """
     pstate = EvolveLindbladDiscreteState(control_step_count,
                                          costs,
@@ -84,9 +75,11 @@ def evolve_lindblad_discrete(control_step_count, evolution_time,
     return result
 
 
-def grape_lindblad_discrete(control_count, control_step_count,
+def grape_lindblad_discrete(control_count, control_eval_count,
                             costs, evolution_time, initial_densities,
+                            system_eval_count,
                             complex_controls=False,
+                            cost_eval_step=1,
                             hamiltonian=None,
                             initial_controls=None,
                             interpolation_policy=InterpolationPolicy.LINEAR,
@@ -94,35 +87,34 @@ def grape_lindblad_discrete(control_count, control_step_count,
                             lindblad_data=None,
                             log_iteration_step=10,
                             max_control_norms=None,
-                            minimum_error=0,
-                            operation_policy=OperationPolicy.CPU,
+                            min_error=0,
                             optimizer=Adam(),
-                            save_file_path=None, save_iteration_step=0,
-                            system_step_multiplier=1,):
+                            save_file_path=None, save_iteration_step=0,):
     """
     This method optimizes the evolution of a set of states under the lindblad
     equation for time-discrete control parameters.
 
     Args:
-    complex_controls
     control_count
-    control_step_count
+    control_eval_count
     costs
     evolution_time
+    initial_densities
+    system_eval_count
+
+    complex_controls
+    cost_eval_step
     hamiltonian
     initial_controls
-    initial_densities
     interpolation_policy
     iteration_count
     lindblad_data
     log_iteration_step
     max_control_norms
-    minimum_error
-    operation_policy
+    min_error
     optimizer
     save_file_path
     save_iteration_step
-    system_step_multiplier
 
     Returns:
     result
