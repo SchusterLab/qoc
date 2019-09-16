@@ -7,17 +7,12 @@ from autograd.extend import (primitive, Box, VSpace, vspace)
 from autograd.wrap_util import (unary_to_nary,)
 import numpy as np
 
-from qoc.standard.functions.convenience import stack_gpu
-
-### DIFFERENTIAL OPERATORS ###
-
-# This differential operator follows autograd's jacobian implementation.
-# https://github.com/HIPS/autograd/blob/master/autograd/differential_operators.py
 @unary_to_nary
 def ans_jacobian(function, argnum):
     """
     Get the value and the jacobian of a function.
-    This differential operator supports numpy and pycuda arrays.
+    This differential operator follows autograd's jacobian implementation:
+    https://github.com/HIPS/autograd/blob/master/autograd/differential_operators.py
 
     Args:
     function :: any -> any - the function to differentiate
@@ -33,5 +28,4 @@ def ans_jacobian(function, argnum):
     jacobian_shape = ans_vspace.shape + vspace(argnum).shape
     grads = list(map(vjp, ans_vspace.standard_basis()))
     jacobian = np.reshape(np.stack(grads), jacobian_shape)
-
     return ans, jacobian

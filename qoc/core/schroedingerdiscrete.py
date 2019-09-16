@@ -49,7 +49,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
     save_intermediate_states
 
     Returns:
-    result
+    result :: qoc.models.schroedingermodels.EvolveSchroedingerResult
     """
     if controls is not None:
         control_eval_count = controls.shape[0]
@@ -116,7 +116,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
     system_eval_count
 
     Returns:
-    result
+    result :: qoc.models.schroedingermodels.GrapeSchroedingerResult
     """
     # Initialize the controls.
     initial_controls, max_control_norms = initialize_controls(complex_controls,

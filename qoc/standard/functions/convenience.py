@@ -177,30 +177,6 @@ def rms_norm(array):
     return rms_norm_
 
 
-def stack_gpu(gpuarray_list):
-    """
-    This function is equivalent to np.stack(*args, axis=0) for
-    gpu arrays.
-    
-    Arguments:
-    gpuarray_list :: list(pycuda.gpuarray.GPUArray) - the list of
-        gpu arrays to stack
-
-    Returns:
-    stack :: pycuda.gpuarray.GPUArray - an array where each of the arrays
-        in gpuarray_list is stacked along axis 0
-    """
-    array_shape = gpuarray_list[0].shape
-    array_count = len(gpuarray_list)
-    stack_shape = (array_count, *array_shape)
-    stack_dtype = gpuarray_list[0].dtype
-    stack = pycuda.gpuarray.empty(stack_shape, stack_dtype)
-    for i, gpuarray in enumerate(gpuarray_list):
-        stack[i] = gpuarray
-    
-    return stack
-
-
 def transpose(matrix, operation_policy=OperationPolicy.CPU):
     """
     Obtain the transpose of the matrix.
@@ -231,21 +207,6 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
-
-# Take a flat array of scalars from C to R2.
-complex_to_real_imag_flat = lambda x: np.hstack((np.real(x), np.imag(x)))
-
-
-def real_imag_to_complex_flat(x):
-    """
-    Take a flat array of scalars from R2 to C.
-    Args:
-    x :: numpy.ndarray - the flat array of real scalars to map
-    Returns:
-    x_c :: numpy.ndarray - the complex scalars mapped from x
-    """
-    real, imag = np.split(x, 2)
-    return real + 1j * imag
 
 
 ### MODULE TESTS ###
