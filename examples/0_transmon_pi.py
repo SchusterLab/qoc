@@ -35,7 +35,8 @@ COSTS = [TargetStateInfidelity(TARGET_STATES)]
 # Define the optimization.
 COMPLEX_CONTROLS = True
 CONTROL_COUNT = 1
-EVOLUTION_TIME = CONTROL_STEP_COUNT = 10 # nanoseconds
+EVOLUTION_TIME = 10 # nanoseconds
+CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME + 1
 ITERATION_COUNT = 1000
 
 # Define output.
@@ -47,9 +48,9 @@ SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
 
 
 def main():
-    result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_STEP_COUNT,
+    result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
                                          COSTS, EVOLUTION_TIME, hamiltonian,
-                                         INITIAL_STATES,
+                                         INITIAL_STATES, SYSTEM_EVAL_COUNT,
                                          complex_controls=COMPLEX_CONTROLS,
                                          iteration_count=ITERATION_COUNT,
                                          log_iteration_step=LOG_ITERATION_STEP,

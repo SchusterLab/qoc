@@ -14,9 +14,8 @@ from qoc.core.common import (clip_control_norms,
 from qoc.models import (Dummy,
                         EvolveLindbladDiscreteState,
                         EvolveLindbladResult,
-                        get_linear_interpolator,
                         integrate_rkdp5,
-                        interpolate_linear,
+                        interpolate_linear_set,
                         InterpolationPolicy,
                         OperationPolicy,
                         get_lindbladian,
@@ -30,7 +29,7 @@ from qoc.standard import (Adam, ans_jacobian, commutator, conjugate,
 
 def evolve_lindblad_discrete(evolution_time, initial_densities,
                              system_eval_count,
-                             control_eval_count=None,
+                             control_eval_count=0,
                              controls=None,
                              cost_eval_step=1,
                              costs=list(),
@@ -43,7 +42,7 @@ def evolve_lindblad_discrete(evolution_time, initial_densities,
     Evolve a set of density matrices under the lindblad equation
     and compute the optimization error.
 
-    Args:
+    Arguments:
     evolution_time
     initial_densities
     system_eval_count
@@ -61,14 +60,14 @@ def evolve_lindblad_discrete(evolution_time, initial_densities,
     Returns:
     result
     """
-    pstate = EvolveLindbladDiscreteState(control_step_count,
-                                         costs,
-                                         evolution_time,
-                                         hamiltonian, initial_densities,
+    pstate = EvolveLindbladDiscreteState(control_eval_count,
+                                         cost_eval_step, costs,
+                                         evolution_time, hamiltonian,
+                                         initial_densities,
                                          interpolation_policy,
-                                         lindblad_data,
-                                         operation_policy,
-                                         system_step_multiplier,)
+                                         lindblad_data, save_file_path,
+                                         save_intermediate_densities,
+                                         system_eval_count)
     result = EvolveLindbladResult()
     _ = _evaluate_lindblad_discrete(controls, pstate, result)
 
@@ -81,6 +80,7 @@ def grape_lindblad_discrete(control_count, control_eval_count,
                             complex_controls=False,
                             cost_eval_step=1,
                             hamiltonian=None,
+                            impose_control_conditions=None,
                             initial_controls=None,
                             interpolation_policy=InterpolationPolicy.LINEAR,
                             iteration_count=1000,
@@ -94,7 +94,7 @@ def grape_lindblad_discrete(control_count, control_eval_count,
     This method optimizes the evolution of a set of states under the lindblad
     equation for time-discrete control parameters.
 
-    Args:
+    Arguments:
     control_count
     control_eval_count
     costs
@@ -105,6 +105,7 @@ def grape_lindblad_discrete(control_count, control_eval_count,
     complex_controls
     cost_eval_step
     hamiltonian
+    impose_control_conditions
     initial_controls
     interpolation_policy
     iteration_count
@@ -122,25 +123,24 @@ def grape_lindblad_discrete(control_count, control_eval_count,
     # Initialize the controls.
     initial_controls, max_control_norms = initialize_controls(complex_controls,
                                                               control_count,
-                                                              control_step_count,
+                                                              control_eval_count,
                                                               evolution_time,
                                                               initial_controls,
                                                               max_control_norms,)
     # Construct the program state.
-    pstate = GrapeLindbladDiscreteState(complex_controls, control_count,
-                                        control_step_count, costs,
+    pstate = GrapeLindbladDiscreteState(complex_controls,
+                                        control_count,
+                                        control_eval_count, cost_eval_step, costs,
                                         evolution_time, hamiltonian,
+                                        impose_control_conditions,
                                         initial_controls,
                                         initial_densities,
-                                        interpolation_policy,
-                                        iteration_count,
+                                        interpolation_policy, iteration_count,
                                         lindblad_data,
-                                        log_iteration_step,
-                                        max_control_norms, minimum_error,
-                                        operation_policy,
-                                        optimizer,
+                                        log_iteration_step, max_control_norms,
+                                        min_error, optimizer,
                                         save_file_path, save_iteration_step,
-                                        system_step_multiplier,)
+                                        system_eval_count,)
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -177,12 +177,17 @@ def _eld_wrap(controls, pstate, reporter, result):
     result
 
     Returns:
-    total_error
+    error
     """
     # Convert the controls from optimizer format to cost function format.
     controls = slap_controls(pstate.complex_controls, controls,
                              pstate.controls_shape)
-    clip_control_norms(pstate.max_control_norms, controls)
+    # Rescale the controls to their maximum norm.
+    clip_control_norms(controls,
+                       pstate.max_control_norms)
+    # Impose user boundary conditions.
+    if pstate.impose_control_conditions:
+        controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the cost function.
     return _evaluate_lindblad_discrete(controls, pstate, reporter)
@@ -205,30 +210,34 @@ def _eldj_wrap(controls, pstate, reporter, result):
     # Convert the controls from optimizer format to cost function format.
     controls = slap_controls(pstate.complex_controls, controls,
                              pstate.controls_shape)
-    clip_control_norms(pstate.max_control_norms, controls)
+    # Rescale the controls to thier maximum norm.
+    clip_control_norms(controls, pstate.max_control_norms)
+    # Impose user boundary conditions.
+    if pstate.impose_control_conditions:
+        controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
-    total_error, grads = (ans_jacobian(_evaluate_lindblad_discrete, 0)
-                          (controls, pstate, reporter))
+    error, grads = (ans_jacobian(_evaluate_lindblad_discrete, 0)
+                    (controls, pstate, reporter))
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
     if pstate.complex_controls:
         grads = conjugate(grads)
 
-    # The states need to be unwrapped from their autograd box.
+    # The densities need to be unwrapped from their autograd box.
     if isinstance(reporter.final_densities, Box):
         final_densities = reporter.final_densities._value
 
     # Update best configuration.
-    if total_error < result.best_total_error:
+    if error < result.best_error:
         result.best_controls = controls
+        result.best_error = error
         result.best_final_densities = final_densities
         result.best_iteration = reporter.iteration
-        result.best_total_error = total_error
     
     # Save and log optimization progress.
-    pstate.log_and_save(controls, final_densities, total_error,
+    pstate.log_and_save(controls, error, final_densities,
                         grads, reporter.iteration,)
     reporter.iteration += 1
 
@@ -244,65 +253,77 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
     and compute associated optimization costs for time-discrete
     control parameters.
 
-    Args:
+    Arguments:
     controls :: ndarray - the control parameters
     pstate :: qoc.models.GrapeLindbladDiscreteState
         or qoc.models.EvolveLindbladDiscreteState - the program state
     reporter :: any - the object to keep track of relevant information
 
     Returns:
-    total_error :: float - the optimization cost for the provided controls
+    error :: float - total error of the evolution
     """
     # Initialize local variables (heap -> stack).
+    control_eval_times = pstate.control_eval_times
+    cost_eval_step = pstate.cost_eval_step
     costs = pstate.costs
     densities = pstate.initial_densities
     dt = pstate.dt
     evolution_time = pstate.evolution_time
+    final_system_eval_step = pstate.final_system_eval_step
     hamiltonian = pstate.hamiltonian
-    final_control_step = pstate.final_control_step
-    control_step_count = final_control_step + 1
-    final_system_step = pstate.final_system_step
     interpolation_policy = pstate.interpolation_policy
     lindblad_data = pstate.lindblad_data
-    operation_policy = pstate.operation_policy
+    save_intermediate_densities = pstate.save_intermediate_densities_
     step_costs = pstate.step_costs
-    system_step_multiplier = pstate.system_step_multiplier
-    total_error = 0
-    rhs_lindbladian = _get_rhs_lindbladian(control_step_count,
+    system_eval_count = pstate.system_eval_count
+    error = 0
+    rhs_lindbladian = _get_rhs_lindbladian(control_eval_times,
                                            controls,
                                            evolution_time,
                                            hamiltonian,
                                            interpolation_policy,
                                            lindblad_data,)
 
-    for system_step in range(final_system_step + 1):
-        control_step, _ = divmod(system_step, system_step_multiplier)
-        is_final_control_step = control_step == final_control_step
-        is_final_system_step = system_step == final_system_step
-        time = system_step * dt
+    # Evolve the densities to `evolution_time`.
+    # Compute step-costs along the way.
+    for system_eval_step in range(system_eval_count):
+        # Save the current densities.
+        if save_intermediate_densities:
+            pstate.save_intermediate_densities(densities, system_eval_step)
 
-        # Evolve the density matrices.
-        densities = integrate_rkdp5(rhs_lindbladian, np.array([time + dt]), time, densities)
+        # Determine where we are in the mesh.
+        cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
+        is_cost_step = cost_step_remainder == 0
+        is_first_system_eval_step = system_eval_step == 0
+        is_final_system_eval_step = system_eval_step == final_system_eval_step
+        time = system_eval_step * dt
 
-        # Compute the costs.
-        if is_final_system_step:
-            for i, cost in enumerate(costs):
-                error = cost.cost(controls, densities, system_step)
-                total_error = total_error + error
-            #ENDFOR
-            reporter.final_densities = densities
-            reporter.total_error = total_error
-        else:
+        # Compute step costs every `cost_step`.
+        if is_cost_step and not is_first_system_eval_step:
             for i, step_cost in enumerate(step_costs):
-                error = step_cost.cost(controls, densities, system_step)
-                total_error = total_error + error
-            #ENDFOR
+                cost_error = step_cost.cost(controls, densities, system_eval_step)
+                error = error + cost_error
+        
+        # Evolve the densities to the next time step.
+        if not is_final_system_eval_step:
+            densities = integrate_rkdp5(rhs_lindbladian, np.array([time + dt]),
+                                        time, densities)
     #ENDFOR
 
-    return total_error
+    # Compute non-step-costs.
+    for i, cost in enumerate(costs):
+        if not cost.requires_step_evaluation:
+            cost_error = cost.cost(controls, densities, system_eval_step)
+            error = error + cost_error
+    
+    # Report results.
+    reporter.error = error  
+    reporter.final_densities = densities
+
+    return error
 
 
-def _get_rhs_lindbladian(control_step_count=None,
+def _get_rhs_lindbladian(control_eval_times=None,
                          controls=None,
                          evolution_time=None,
                          hamiltonian=None,
@@ -312,7 +333,7 @@ def _get_rhs_lindbladian(control_step_count=None,
     Produce a function that returns the lindbladian at any point in time.
 
     Arguments:
-    control_step_count
+    control_eval_times
     controls
     dt
     hamiltonian
@@ -327,19 +348,15 @@ def _get_rhs_lindbladian(control_step_count=None,
     """
     # Construct an interpolator for the controls if controls were specified.
     # Otherwise, construct a dummy function.
-    if ((not (controls is None))
-      and (not (control_step_count is None))
-      and (not (evolution_time is None))):
+    if controls is not None and control_eval_times is not None:
         if interpolation_policy == InterpolationPolicy.LINEAR:
-            dt_controls = evolution_time / control_step_count
-            control_times = dt_controls * np.arange(control_step_count)
-            get_controls = get_linear_interpolator(control_times, controls)
+            interpolate = interpolate_linear_set
         else:
             raise NotImplementedError("This operation does not yet support the interpolation "
                                       "policy {}."
                                       "".format(interpolation_policy))
     else:
-        get_controls = lambda time: None
+        interpolate = lambda x, xs, ys: None
 
     # Construct dummy functions if the hamiltonian or lindblad functions were not specified.
     if hamiltonian is None:
@@ -349,13 +366,11 @@ def _get_rhs_lindbladian(control_step_count=None,
         lindblad_data = lambda time: (None, None)
         
     def rhs(time, densities):
-        controls_ = get_controls(time)
+        controls_ = interpolate(time, control_eval_times, controls)
         hamiltonian_ = hamiltonian(controls_, time)
         dissipators, operators = lindblad_data(time)
         lindbladian = get_lindbladian(densities, dissipators, hamiltonian_, operators)
-        # print("time: {}\nhamiltonian:\n{}\ndissipators:\n{}\noperators:\n{}\nlindbladian:\n{}\b"
-        #       "".format(time, hamiltonian_, dissipators, operators, lindbladian))
-        
+
         return lindbladian
     #ENDDEF
 
@@ -371,7 +386,7 @@ def _test_evolve_lindblad_discrete():
     Run end-to-end tests on evolve_lindblad_discrete.
     """
     import numpy as np
-    from qutip import mesolve, Qobj, Options
+    from qutip import mesolve, Qobj
     
     from qoc.standard import (conjugate_transpose,
                               SIGMA_X, SIGMA_Y,
@@ -403,22 +418,22 @@ def _test_evolve_lindblad_discrete():
     system_hamiltonian = ((1/ 2) * (np.kron(SIGMA_X, SIGMA_X)
                               + np.kron(SIGMA_Y, SIGMA_Y)))
     hamiltonian = lambda controls, time: system_hamiltonian
-    control_step_count = int(1e3)
+    system_eval_count = 2
     evolution_time = np.pi / 2
-    result = evolve_lindblad_discrete(control_step_count, evolution_time,
-                                      initial_densities, hamiltonian=hamiltonian)
+    result = evolve_lindblad_discrete(evolution_time,
+                                      initial_densities,
+                                      system_eval_count,
+                                      hamiltonian=hamiltonian)
     final_densities = result.final_densities
     assert(np.allclose(final_densities, target_densities))
     # Note that qutip only gets this result within 1e-5 error.
-    tlist = np.linspace(0, evolution_time, control_step_count)
+    tlist = np.array([0, evolution_time])
     c_ops = list()
     e_ops = list()
-    options = Options(nsteps=control_step_count)
     for i, initial_density in enumerate(initial_densities):
         result = mesolve(Qobj(system_hamiltonian),
                          Qobj(initial_density),
-                         tlist, c_ops, e_ops,
-                         options=options)
+                         tlist, c_ops, e_ops,)
         final_density = result.states[-1].full()
         target_density = target_densities[i]
         assert(np.allclose(final_density, target_density, atol=1e-5))
@@ -436,7 +451,7 @@ def _test_evolve_lindblad_discrete():
     lindblad_operators = np.stack((sigma_plus,))
     lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
     evolution_time = 1.
-    control_step_count = int(1e3)
+    system_eval_count = 2
     inv_sqrt_2 = 1 / np.sqrt(2)
     a0 = np.random.rand()
     c0 = 1 - a0
@@ -448,8 +463,9 @@ def _test_evolve_lindblad_discrete():
     gt = gamma * evolution_time
     expected_final_density = np.array(((1 - c0 * np.exp(- gt),    b0 * np.exp(-gt/2)),
                                        (b0_star * np.exp(-gt/2), c0 * np.exp(-gt))))
-    result = evolve_lindblad_discrete(control_step_count, evolution_time,
+    result = evolve_lindblad_discrete(evolution_time,
                                       initial_densities,
+                                      system_eval_count,
                                       lindblad_data=lindblad_data)
     final_density = result.final_densities[0]
     assert(np.allclose(final_density, expected_final_density))
@@ -470,9 +486,10 @@ def _test_evolve_lindblad_discrete():
         density_matrix = _generate_hermitian_matrix(matrix_size)
         initial_densities = np.stack((density_matrix,))
         evolution_time = 5
-        control_step_count = 1
-        result = evolve_lindblad_discrete(control_step_count, evolution_time,
+        system_eval_count = 2
+        result = evolve_lindblad_discrete(evolution_time,
                                           initial_densities,
+                                          system_eval_count,
                                           hamiltonian=hamiltonian,
                                           lindblad_data=lindblad_data)
         final_density = result.final_densities[0]
@@ -520,15 +537,16 @@ def _test_grape_lindblad_discrete():
     forbidden_densities = np.matmul(forbidden_states, conjugate_transpose(forbidden_states))
     control_count = 1
     evolution_time = 10
-    control_step_count = 10
+    system_eval_count = control_eval_count = 11
     max_norm = 1e-10
     max_control_norms = np.repeat(max_norm, control_count)
-    costs = [ForbidDensities(forbidden_densities, control_step_count)]
+    costs = [ForbidDensities(forbidden_densities, system_eval_count)]
     iteration_count = 5
     log_iteration_step = 0
-    result = grape_lindblad_discrete(control_count, control_step_count,
+    result = grape_lindblad_discrete(control_count, control_eval_count,
                                      costs, evolution_time,
                                      initial_densities,
+                                     system_eval_count,
                                      hamiltonian=hamiltonian,
                                      iteration_count=iteration_count,
                                      log_iteration_step=log_iteration_step,

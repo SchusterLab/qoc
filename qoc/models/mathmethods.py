@@ -13,7 +13,7 @@ from qoc.standard.functions.convenience import (commutator, conjugate_transpose,
 
 ### INTERPOLATION METHODS ###
 
-def interpolate_linear(x1, x2, x3, y1, y2,
+def interpolate_linear_points(x1, x2, x3, y1, y2,
                        operation_policy=OperationPolicy.CPU):
     """
     Perform a linear interpolation of the point
@@ -36,104 +36,135 @@ def interpolate_linear(x1, x2, x3, y1, y2,
     return y1 + (((y2 - y1) / (x2 - x1)) * (x3 - x1))
 
 
-def get_linear_interpolator(xs, ys):
+def interpolate_linear_set(x, xs, ys):
     """
-    Construct a function that will determine a linearly interpolated value `y`
-    given a value `x` based on the given sets `xs` and `ys`.
+    Interpolate a `y` value corresponding to the value `x` based on
+    the corresponding values `xs` and `ys`
     
     Arguments:
-    xs :: ndarray - An array of independent variables that correspond to the y values in `ys`.
-    ys :: ndarray - An array of dependent variables that correspond to the x values in `xs`.
+    x :: float - The value to interpolate a `y` value for.
+    xs :: ndarray (N) - An array of independent variables that correspond to the y values in `ys`.
+        It is assumed that `xs` is sorted.
+    ys :: ndarray (N x y_shape)- An array of dependent variables that correspond to the x values in `xs`.
+        It is assumed that `ys` is sorted such that each index corresponds to the y value that
+        matches the corresponding x value at the same index in `xs`.
 
     Returns:
-    interpolate_y :: (x :: ndarray) -> y :: ndarray
-        - A function that linearly interpolates a y value given an x value.
+    y :: ndarray (y_shape) - the `y` value that corresponds to `x`.
     """
-    def interpolate_y(x):
-        # If the x value is below the zone in which data is specified,
-        # interpolate using the lowest two data points.
-        if x <= xs[0]:
-            y = interpolate_linear(xs[0], xs[1], x, ys[0], ys[1])
-        # If the x value is above the zone in which data is specified,
-        # interpolate using the highest two data points.
-        elif x >= xs[-1]:
-            y = interpolate_linear(xs[-2], xs[-1], x, ys[-2], ys[-1])
-        # Otherwise, interpolate between the closest two data points
-        # to x.
-        else:
-            # Index is the first occurence where x is l.e. an element of xs.
-            index = anp.argmax(x <= xs)
-            y = interpolate_linear(xs[index - 1], xs[index], x, ys[index - 1], ys[index])
+    # If the x value is below the zone in which data is specified,
+    # interpolate using the lowest two data points.
+    if x <= xs[0]:
+        y = interpolate_linear_points(xs[0], xs[1], x, ys[0], ys[1])
+    # If the x value is above the zone in which data is specified,
+    # interpolate using the highest two data points.
+    elif x >= xs[-1]:
+        y = interpolate_linear_points(xs[-2], xs[-1], x, ys[-2], ys[-1])
+    # Otherwise, interpolate between the closest two data points
+    # to x.
+    else:
+        # Index is the first occurence where x is l.e. an element of xs.
+        index = anp.argmax(x <= xs)
+        y = interpolate_linear_points(xs[index - 1], xs[index], x, ys[index - 1], ys[index])
         
-        return y
-    
-    return interpolate_y
+    return y
 
 
 ### MAGNUS EXPANSION METHODS ###
 
-def magnus_m2(a1, dt, operation_policy=OperationPolicy.CPU):
+_M2_C1 = 0.5
+
+def magnus_m2(a, dt, time):
     """
-    a magnus expansion method of order two
-    as seen in https://arxiv.org/abs/1709.06483
-
-    Args:
-    a1 :: numpy.ndarray - see paper
-    dt :: float - see paper
-    operation_policy
-
-    Returns:
-    m2 :: numpy.ndarray - magnus expansion
-    """
-    return dt * a1
-
-
-_M4_C0 = np.divide(np.sqrt(3), 12)
-def magnus_m4(a1, a2, dt, operation_policy=OperationPolicy.CPU):
-    """
-    a magnus expansion method of order four
-    as seen in https://arxiv.org/abs/1709.06483
-    Args:
-    a1 :: numpy.ndarray - see paper
-    a2 :: numpy.ndarray - see paper
-    dt :: float - see paper
-    operation_policy
-
-    Returns:
-    m4 :: numpy.ndarray - magnus expansion
-    """
-    return ((dt / 2) * (a1 + a2) +
-            _M4_C0 * (dt ** 2) * commutator(a2, a1,
-                                                  operation_policy=operation_policy))
+    Construct a magnus expasion of `a` of order two.
     
+    References:
+    [1] https://arxiv.org/abs/1709.06483
 
-_M6_C0 = np.divide(np.sqrt(15), 3)
-_M6_C1 = np.divide(10, 3)
-_M6_C2 = np.divide(1, 2)
-_M6_C3 = np.divide(1, 240)
-_M6_C4 = np.divide(1, 60)
-def magnus_m6(a1, a2, a3, dt, operation_policy=OperationPolicy.CPU):
-    """
-    a magnus expansion method of order six
-    as seen in https://arxiv.org/abs/1709.06483
-    Args:
-    a1 :: numpy.ndarray - see paper
-    a2 :: numpy.ndarray - see paper
-    a3 :: numpy.ndarray - see paper
-    dt :: float - see paper
+    Arguments:
+    a :: (time :: float) -> ndarray (a_shape)
+        - the matrix to expand
+    dt :: float - the time step
+    time :: float - the current time
+
     Returns:
-    m6 :: numpy.ndarray - magnus expansion
+    m2 :: ndarray (a_shape) - magnus expansion
     """
+    t1 = time + dt * _M2_C1
+    a1 = a(t1)
+    m2 = dt * a1
+    return m2
+
+
+_M4_C1 = 0.5 - np.divide(np.sqrt(3), 6)
+_M4_C2 = 0.5 + np.divide(np.sqrt(3), 6)
+_M4_F0 = np.divide(np.sqrt(3), 12)
+
+def magnus_m4(a, dt, time):
+    """
+    Construct a magnus expasion of `a` of order four.
+    
+    References:
+    [1] https://arxiv.org/abs/1709.06483
+
+    Arguments:
+    a :: (time :: float) -> ndarray (a_shape)
+        - the matrix to expand
+    dt :: float - the time step
+    time :: float - the current time
+
+    Returns:
+    m4 :: ndarray (a_shape) - magnus expansion
+    """
+    t1 = time + dt * _M4_C1
+    t2 = time + dt * _M4_C2
+    a1 = a(t1)
+    a2 = a(t2)
+    m4 = ((dt / 2) * (a1 + a2)
+          + _M4_F0 * (dt ** 2) * commutator(a2, a1))
+    return m4
+
+
+_M6_C1 = 0.5 - np.divide(np.sqrt(15), 10)
+_M6_C2 = 0.5
+_M6_C3 = 0.5 + np.divide(np.sqrt(15), 10)
+_M6_F0 = np.divide(np.sqrt(15), 3)
+_M6_F1 = np.divide(10, 3)
+_M6_F2 = np.divide(1, 2)
+_M6_F3 = np.divide(1, 240)
+_M6_F4 = np.divide(1, 60)
+
+def magnus_m6(a, dt, time):
+    """
+    Construct a magnus expasion of `a` of order six.
+    
+    References:
+    [1] https://arxiv.org/abs/1709.06483
+
+    Arguments:
+    a :: (time :: float) -> ndarray (a_shape)
+        - the matrix to expand
+    dt :: float - the time step
+    time :: float - the current time
+
+    Returns:
+    m6 :: ndarray (a_shape) - magnus expansion
+    """
+    t1 = time + dt * _M6_C1
+    t2 = time + dt * _M6_C2
+    t3 = time + dt * _M6_C3
+    a1 = a(t1)
+    a2 = a(t2)
+    a3 = a(t3)
     b1 = dt * a2
-    b2 = _M6_C0 * dt * (a3 - a1)
-    b3 = _M6_C1 * dt * (a3 - 2 * a2 + a1)
-    b1_b2_commutator = commutator(b1, b2, operation_policy=operation_policy)
-    return (b1 + _M6_C2 * b3 + _M6_C3
+    b2 = _M6_F0 * dt * (a3 - a1)
+    b3 = _M6_F1 * dt * (a3 - 2 * a2 + a1)
+    b1_b2_commutator = commutator(b1, b2)
+    m6 = (b1 + _M6_F2 * b3 + _M6_F3
             * commutator(-20 * b1 - b3 + b1_b2_commutator,
-                         b2 - _M6_C4
-                         * commutator(b1, 2 * b3 + b1_b2_commutator,
-                                      operation_policy=operation_policy),
-                         operation_policy=operation_policy))
+                         b2 - _M6_F4
+                         * commutator(b1, 2 * b3 + b1_b2_commutator)))
+    return m6
 
 
 ### LINDBLAD METHODS ###

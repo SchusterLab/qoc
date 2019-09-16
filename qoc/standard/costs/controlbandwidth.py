@@ -6,7 +6,7 @@ over the evolution time.
 
 import autograd.numpy as anp
 
-from qoc.models import (Cost, OperationPolicy)
+from qoc.models import Cost
 
 class ControlBandwidth(Cost):
     """
@@ -39,14 +39,12 @@ class ControlBandwidth(Cost):
         self.normalized_max_control_bandwidths = max_control_bandwidths / (2 * max_control_norms)
 
 
-    def cost(self, controls, states, system_step,
-             operation_policy=OperationPolicy.CPU):
+    def cost(self, controls, states, system_step):
         """
         Compute the penalty.
 
         Args:
         controls
-        operation_policy
         states
         system_step
         
@@ -57,28 +55,24 @@ class ControlBandwidth(Cost):
         max_control_norms = self.max_control_norms
         normalized_controls = controls / max_control_norms
         
-        if operation_policy == OperationPolicy.CPU:
-            cost = 0
-            for i in range(control_count):
-                max_control_norm = max_control_norms[i]
-                normalized_control = normalized_controls[:, i]
-                normalized_max_control_bandwidth = self.normalized_max_control_bandwidths[i]
-                normalized_max_control_value = anp.max(normalized_control)
-                normalized_min_control_value = anp.min(normalized_control)
-                normalized_control_bandwidth = ((normalized_max_control_value
-                                                 - normalized_min_control_value) / 2)
-                max_control_value = anp.max(controls[:, i])
-                min_control_value = anp.min(controls[:, i])
-                if normalized_control_bandwidth >= normalized_max_control_bandwidth:
-                    control_cost = anp.square(anp.abs(normalized_control_bandwidth
-                                                      - normalized_max_control_bandwidth))
-                else:
-                    control_cost = 0
-                cost = cost + control_cost
-        else:
-            raise ValueError("This cost function does not support "
-                             "the operation policy {}."
-                             "".format(operation_policy))
+        cost = 0
+        for i in range(control_count):
+            max_control_norm = max_control_norms[i]
+            normalized_control = normalized_controls[:, i]
+            normalized_max_control_bandwidth = self.normalized_max_control_bandwidths[i]
+            normalized_max_control_value = anp.max(normalized_control)
+            normalized_min_control_value = anp.min(normalized_control)
+            normalized_control_bandwidth = ((normalized_max_control_value
+                                             - normalized_min_control_value) / 2)
+            max_control_value = anp.max(controls[:, i])
+            min_control_value = anp.min(controls[:, i])
+            if normalized_control_bandwidth >= normalized_max_control_bandwidth:
+                control_cost = anp.square(anp.abs(normalized_control_bandwidth
+                                                  - normalized_max_control_bandwidth))
+            else:
+                control_cost = 0
+            cost = cost + control_cost
+        #ENDFOR
         normalized_cost = cost / control_count
         
         return normalized_cost * self.cost_multiplier

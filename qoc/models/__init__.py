@@ -11,9 +11,9 @@ from .lindbladmodels import (EvolveLindbladDiscreteState,
                              GrapeLindbladResult,)
 from .magnuspolicy import MagnusPolicy
 from .mathmethods import (get_lindbladian,
-                          get_linear_interpolator,
                           integrate_rkdp5,
-                          interpolate_linear,
+                          interpolate_linear_points,
+                          interpolate_linear_set,
                           magnus_m2, magnus_m4,
                           magnus_m6,)
 from .operationpolicy import OperationPolicy
@@ -31,9 +31,10 @@ __all__ = [
     "GrapeLindbladDiscreteState",
     "GrapeLindbladResult",
     "MagnusPolicy",
-    "get_lindbladian", "get_linear_interpolator",
+    "get_lindbladian",
     "integrate_rkdp5",
-    "interpolate_linear",
+    "interpolate_linear_points",
+    "interpolate_linear_set",
     "magnus_m2", "magnus_m4", "magnus_m6",
     "OperationPolicy",
     "PerformancePolicy", "ProgramState",

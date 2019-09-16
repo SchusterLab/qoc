@@ -13,15 +13,12 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         EvolveSchroedingerResult,
                         GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerResult,
-                        interpolate_linear,
+                        interpolate_linear_set,
                         InterpolationPolicy,
                         magnus_m2, magnus_m4, magnus_m6,
-                        MagnusPolicy, OperationPolicy,
-                        PerformancePolicy,)
+                        MagnusPolicy)
 from qoc.standard import (Adam, ans_jacobian,
-                          conjugate, expm,
-                          conjugate_transpose,
-                          matmuls,)
+                          conjugate, expm, matmuls)
 
 ### MAIN METHODS ###
 
@@ -78,7 +75,10 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 costs, evolution_time, hamiltonian,
                                 initial_states, system_eval_count,
                                 complex_controls=False,
+                                control_condition_indices=None,
+                                control_conditions=None,
                                 cost_eval_step=1,
+                                impose_control_conditions=None,
                                 initial_controls=None,
                                 interpolation_policy=InterpolationPolicy.LINEAR,
                                 iteration_count=1000, 
@@ -102,6 +102,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
 
     complex_controls
     cost_eval_step
+    impose_control_conditions
     initial_controls
     interpolation_policy
     iteration_count
@@ -120,24 +121,23 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
     # Initialize the controls.
     initial_controls, max_control_norms = initialize_controls(complex_controls,
                                                               control_count,
-                                                              control_step_count,
+                                                              control_eval_count,
                                                               evolution_time,
                                                               initial_controls,
-                                                              max_control_norms,)
+                                                              max_control_norms)
     # Construct the program state.
     pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
-                                            control_step_count, costs,
-                                            evolution_time, hamiltonian,
+                                            control_eval_count, cost_eval_step,
+                                            costs, evolution_time, hamiltonian,
+                                            impose_control_conditions,
                                             initial_controls,
-                                            initial_states,
-                                            interpolation_policy,
+                                            initial_states, interpolation_policy,
                                             iteration_count,
-                                            log_iteration_step, magnus_policy,
-                                            max_control_norms, minimum_error,
-                                            operation_policy,
-                                            optimizer, performance_policy,
+                                            log_iteration_step,
+                                            max_control_norms, magnus_policy,
+                                            min_error, optimizer,
                                             save_file_path, save_iteration_step,
-                                            system_step_multiplier,)
+                                            system_eval_count,)
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -172,13 +172,17 @@ def _esd_wrap(controls, pstate, reporter, result):
     result
 
     Returns:
-    total_error
+    error
     """
     # Convert the controls from optimizer format to cost function format.
     controls = slap_controls(pstate.complex_controls, controls,
                              pstate.controls_shape)
-    clip_control_norms(pstate.max_control_norms, controls)
-    # TODO(tpr0p): Impose boundary conditions here.
+    # Rescale the controls to their maximum norm.
+    clip_control_norms(controls,
+                       pstate.max_control_norms)
+    # Impose user boundary conditions.
+    if pstate.impose_control_conditions:
+        controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the cost function.
     return _evaluate_schroedinger_discrete(controls, pstate, reporter)
@@ -201,10 +205,15 @@ def _esdj_wrap(controls, pstate, reporter, result):
     # Convert the controls from optimizer format to cost function format.
     controls = slap_controls(pstate.complex_controls, controls,
                              pstate.controls_shape)
-    clip_control_norms(pstate.max_control_norms, controls)
+    # Rescale the controls to their maximum norm.
+    clip_control_norms(controls,
+                       pstate.max_control_norms)
+    # Impose user boundary conditions.
+    if pstate.impose_control_conditions:
+        controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
-    total_error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+    error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
                           (controls, pstate, reporter))
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
@@ -217,15 +226,15 @@ def _esdj_wrap(controls, pstate, reporter, result):
         final_states = reporter.final_states._value
 
     # Update best configuration.
-    if total_error < result.best_total_error:
+    if error < result.best_error:
         result.best_controls = controls
+        result.best_error = error
         result.best_final_states = final_states
         result.best_iteration = reporter.iteration
-        result.best_total_error = total_error
     
     # Save and log optimization progress.
-    pstate.log_and_save(controls, total_error, grads, reporter.iteration,
-                        final_states)
+    pstate.log_and_save(controls, error, final_states,
+                        grads, reporter.iteration)
     reporter.iteration += 1
 
     # Convert the gradients from cost function to optimizer format.
@@ -249,6 +258,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     error :: float - total error of the evolution
     """
     # Initialize local variables (heap -> stack).
+    control_eval_times = pstate.control_eval_times
     cost_eval_step = pstate.cost_eval_step
     costs = pstate.costs
     dt = pstate.dt
@@ -257,16 +267,16 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     hamiltonian = pstate.hamiltonian
     interpolation_policy = pstate.interpolation_policy
     magnus_policy = pstate.magnus_policy
-    save_intermediate_states = pstate.save_intermediate_states
+    save_intermediate_states = pstate.save_intermediate_states_
     states = pstate.initial_states
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
     error = 0
-    
+
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
     for system_eval_step in range(system_eval_count):
-        # Save the current state.
+        # Save the current states.
         if save_intermediate_states:
             pstate.save_intermediate_states(states, system_eval_step)
         
@@ -286,8 +296,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
 
         # Evolve the states to the next time step.
         if not is_final_system_eval_step:
-            states = _evolve_step_schroedinger_discrete(dt, hamiltonian, states,
-                                                        time,
+            states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
+                                                        states, time,
+                                                        control_eval_times=control_eval_times,
+                                                        controls=controls,
                                                         interpolation_policy=interpolation_policy,
                                                         magnus_policy=magnus_policy,)
     #ENDFOR
@@ -305,114 +317,66 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     return error
 
 
-_M4_T1 = 0.5 - np.divide(np.sqrt(3), 6)
-_M4_T2 = 0.5 + np.divide(np.sqrt(3), 6)
-_M6_T1 = 0.5 - np.divide(np.sqrt(15), 10)
-_M6_T2 = 0.5
-_M6_T3 = 0.5 + np.divide(np.sqrt(15), 10)
-
-def _evolve_step_schroedinger_discrete(dt, hamiltonian, states, time,
-                                       control_step=0,
+def _evolve_step_schroedinger_discrete(dt, hamiltonian,
+                                       states, time,
+                                       control_eval_times=None,
                                        controls=None,
                                        interpolation_policy=InterpolationPolicy.LINEAR,
-                                       magnus_policy=MagnusPolicy.M2,
-                                       operation_policy=OperationPolicy.CPU,):
+                                       magnus_policy=MagnusPolicy.M2,):
     """
     Use the exponential series method via magnus expansion to evolve the state vectors
     to the next time step under the schroedinger equation for time-discrete controls.
     Magnus expansions are implemented using the methods described in
     https://arxiv.org/abs/1709.06483.
 
-    Args:
-    control_step
-    controls
+    Arguments:
     dt
     hamiltonian
-    interpolation_policy
-    magnus_policy
-    operation_policy
     states
     time
+
+    control_eval_times
+    controls
+    interpolation_policy
+    magnus_policy
     
     Returns:
     states
     """
-    controls_exist = controls is not None
+    # Choose an interpolator.
+    if interpolation_policy == InterpolationPolicy.LINEAR:
+        interpolate = interpolate_linear_set
+    else:
+        raise NotImplementedError("The interpolation policy {} "
+                                  "is not yet supported for this method."
+                                  "".format(interpolation_policy))
+
+    # Choose a control interpolator.
+    if controls is not None and control_eval_times is not None:
+        interpolate_controls = interpolate
+    else:
+        interpolate_controls = lambda x, xs, ys: None
+
+    # Construct a function to interpolate the hamiltonian
+    # for all time.
+    def get_hamiltonian(time_):
+        controls_ = interpolate_controls(time_, control_eval_times, controls)
+        hamiltonian_ = hamiltonian(controls_, time_)
+        return -1j * hamiltonian_
     
     if magnus_policy == MagnusPolicy.M2:
-        if controls_exist:
-            c1 = controls[control_step]
-        else:
-            c1 = None
-        a1 = -1j * hamiltonian(c1, time)
-        magnus = magnus_m2(a1, dt, operation_policy=operation_policy)
+        magnus = magnus_m2(get_hamiltonian, dt, time)
     elif magnus_policy == MagnusPolicy.M4:
-        t1 = time + dt * _M4_T1
-        t2 = time + dt * _M4_T2
-        if controls_exist:
-            if control_sentinel:
-                controls_left = controls[control_step - 1]
-                controls_right = controls[control_step]
-                time_left = time - dt
-                time_right = time
-            else:
-                controls_left = controls[control_step]
-                controls_right = controls[control_step + 1]
-                time_left = time
-                time_right = time + dt
-            if interpolation_policy == InterpolationPolicy.LINEAR:
-                c1 = interpolate_linear(time_left, time_right, t1,
-                                        controls_left, controls_right)
-                c2 = interpolate_linear(time_left, time_right, t2, controls_left,
-                                        controls_right)
-            else:
-                raise ValueError("The interpolation policy {} is not implemented"
-                                 "for this method.".format(interpolation_policy))
-        else:
-            c1 = c2 = None
-        a1 = -1j * hamiltonian(c1, t1)
-        a2 = -1j * hamiltonian(c2, t2)
-        magnus = magnus_m4 (a1, a2, dt)
+        magnus = magnus_m4(get_hamiltonian, dt, time)
     elif magnus_policy == MagnusPolicy.M6:
-        t1 = time + dt * _M6_T1
-        t2 = time + dt * _M6_T2
-        t3 = time + dt * _M6_T3
-        if controls_exist:
-            if control_sentinel:
-                controls_left = controls[control_step - 1]
-                controls_right = controls[control_step]
-                time_left = time - dt
-                time_right = time
-            else:
-                controls_left = controls[control_step]
-                controls_right = controls[control_step + 1]
-                time_left = time
-                time_right = time + dt
-            if interpolation_policy == InterpolationPolicy.LINEAR:
-                c1 = interpolate_linear(time_left, time_right, t1,
-                                        controls_left, controls_right,
-                                        operation_policy=operation_policy)
-                c2 = interpolate_linear(time_left, time_right, t2, controls_left,
-                                        controls_right,
-                                        operation_policy=operation_policy)
-                c3 = interpolate_linear(time_left, time_right, t2, controls_left,
-                                        controls_right,
-                                        operation_policy=operation_policy)
-            else:
-                raise ValueError("The interpolation policy {} is not implemented"
-                                 "for this method.".format(interpolation_policy))
-        else:
-            c1 = c2 = c3 = None
-        a1 = -1j * hamiltonian(c1, t1)
-        a2 = -1j * hamiltonian(c2, t2)
-        a3 = -1j * hamiltonian(c3, t3)
-        magnus = magnus_m6(a1, a2, a3, dt,
-                           operation_policy=operation_policy)
+        magnus = magnus_m6(get_hamiltonian, dt, time)
+    else:
+        raise ValueError("Unrecognized magnus policy {}."
+                         "".format(magnus_policy))
     #ENDIF
 
-    step_unitary = expm(magnus, operation_policy=operation_policy)
-    states = matmuls(step_unitary, states,
-                     operation_policy=operation_policy)
+    step_unitary = expm(magnus)
+    states = matmuls(step_unitary, states)
 
     return states
 
@@ -434,6 +398,7 @@ def _random_hermitian_matrix(matrix_size):
     """
     Generate a random, square, hermitian matrix of size `matrix_size`.
     """
+    from qoc.standard import conjugate_transpose
     matrix = _random_complex_matrix(matrix_size)
     return np.divide(matrix + conjugate_transpose(matrix), 2)
 
@@ -471,7 +436,7 @@ def _test_evolve_schroedinger_discrete():
         final_states = result.final_states
         assert(np.allclose(final_states, target_states))
     #ENDFOR
-    # Note that qutip only gets the same result within 1e-5 error.
+    # Note that qutip only gets the same result within 1e-6 error.
     tlist = np.array([0, evolution_time])
     c_ops = list()
     e_ops = list()
@@ -483,7 +448,7 @@ def _test_evolve_schroedinger_discrete():
                          tlist, c_ops, e_ops,)
         final_state = result.states[-1].full()
         target_state = target_states[i]
-        assert(np.allclose(final_state, target_state))
+        assert(np.allclose(final_state, target_state, atol=1e-6))
     #ENDFOR
 
     # Test that evolving states under a random hamiltonian yields
@@ -497,15 +462,13 @@ def _test_evolve_schroedinger_discrete():
     evolution_time = 1
     tlist = np.array([0, evolution_time])
     c_ops = e_ops = list()
-    options = Options(nsteps=control_step_count)
     for _ in range(_BIG):
         hamiltonian_matrix = _random_hermitian_matrix(hilbert_size)
         hamiltonian = lambda controls, time: hamiltonian_matrix
         hamiltonian_qutip = Qobj(hamiltonian_matrix)
         result = mesolve(hamiltonian_qutip,
                          initial_state_qutip,
-                         tlist, c_ops, e_ops,
-                         options=options)
+                         tlist, c_ops, e_ops,)
         final_state_qutip = result.states[-1].full()
         for magnus_policy in _MAGNUS_POLICIES:
             result = evolve_schroedinger_discrete(evolution_time, hamiltonian,
@@ -538,15 +501,16 @@ def _test_grape_schroedinger_discrete():
     forbidden_states = np.array([[[[0], [1], [0], [0]]]])
     control_count = 1
     evolution_time = 10
-    control_step_count = 10
+    control_eval_count = system_eval_count = 11
     max_norm = 1e-10
     max_control_norms = np.repeat(max_norm, control_count)
-    costs = [ForbidStates(forbidden_states, control_step_count)]
+    costs = [ForbidStates(forbidden_states, system_eval_count)]
     iteration_count = 100
     log_iteration_step = 0
-    result = grape_schroedinger_discrete(control_count, control_step_count,
+    result = grape_schroedinger_discrete(control_count, control_eval_count,
                                          costs, evolution_time,
                                          hamiltonian, initial_states,
+                                         system_eval_count,
                                          iteration_count=iteration_count,
                                          log_iteration_step=log_iteration_step,
                                          max_control_norms=max_control_norms)
@@ -560,7 +524,7 @@ def _test():
     Run tests on the module.
     """
     _test_evolve_schroedinger_discrete() 
-    # _test_grape_schroedinger_discrete()
+    _test_grape_schroedinger_discrete()
 
 
 if __name__ == "__main__":

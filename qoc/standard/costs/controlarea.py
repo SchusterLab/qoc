@@ -5,7 +5,7 @@ the "area under the curve" of the control pulse.
 
 import autograd.numpy as anp
 
-from qoc.models import (Cost, OperationPolicy)
+from qoc.models import (Cost,)
 
 class ControlArea(Cost):
     """
@@ -36,14 +36,12 @@ class ControlArea(Cost):
         self.normalization_constant = control_count * control_step_count
 
 
-    def cost(self, controls, states, system_step,
-             operation_policy=OperationPolicy.CPU):
+    def cost(self, controls, states, system_step):
         """
         Compute the penalty.
 
         Args:
         controls
-        operation_policy
         states
         system_step
         
@@ -51,14 +49,9 @@ class ControlArea(Cost):
         cost
         """
         normalized_controls = controls / self.max_control_norms
-        if operation_policy == OperationPolicy.CPU:
-            cost = 0
-            for i in range(self.control_count):
-                cost = cost + anp.abs(anp.sum(normalized_controls[:, i]))
-        else:
-            raise ValueError("This cost function does not support "
-                             "the operation policy {}."
-                             "".format(operation_policy))
+        cost = 0
+        for i in range(self.control_count):
+            cost = cost + anp.abs(anp.sum(normalized_controls[:, i]))
         cost_normalized = cost / self.normalization_constant
 
         return cost_normalized * self.cost_multiplier

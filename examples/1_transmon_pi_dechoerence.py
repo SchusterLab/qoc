@@ -57,7 +57,8 @@ COSTS = [TargetDensityInfidelity(TARGET_DENSITIES)]
 # Define the optimization.
 COMPLEX_CONTROLS = True
 CONTROL_COUNT = 1
-EVOLUTION_TIME = CONTROL_STEP_COUNT = 10 # nanoseconds
+EVOLUTION_TIME = 10 # nanoseconds
+CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME + 1
 ITERATION_COUNT = int(1e6)
 OPTIMIZER = Adam()
 
@@ -70,9 +71,10 @@ SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
 
 
 def main():
-    result = grape_lindblad_discrete(CONTROL_COUNT, CONTROL_STEP_COUNT,
+    result = grape_lindblad_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
                                      COSTS, EVOLUTION_TIME,
                                      INITIAL_DENSITIES,
+                                     SYSTEM_EVAL_COUNT,
                                      complex_controls=COMPLEX_CONTROLS,
                                      hamiltonian=hamiltonian,
                                      iteration_count=ITERATION_COUNT,
