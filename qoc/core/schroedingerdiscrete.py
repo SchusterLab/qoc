@@ -18,7 +18,7 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         magnus_m2, magnus_m4, magnus_m6,
                         MagnusPolicy)
 from qoc.standard import (Adam, ans_jacobian,
-                          conjugate, expm, matmuls)
+                          expm, matmuls)
 
 ### MAIN METHODS ###
 
@@ -219,7 +219,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
     if pstate.complex_controls:
-        grads = conjugate(grads)
+        grads = np.conjugate(grads)
 
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_states, Box):

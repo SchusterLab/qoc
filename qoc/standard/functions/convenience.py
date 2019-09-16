@@ -11,47 +11,25 @@ import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
 
-from qoc.models.operationpolicy import OperationPolicy
-
 ### COMPUTATIONS ###
 
-def commutator(a, b, operation_policy=OperationPolicy.CPU):
+def commutator(a, b):
     """
     Compute the commutator of two matrices.
-    Args:
+
+    Arguments:
     a :: numpy.ndarray - the left matrix
     b :: numpy.ndarray - the right matrix
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
+
     Returns:
     _commutator :: numpy.ndarray - the commutator of a and b
     """
-    if operation_policy == OperationPolicy.CPU:
-        _commutator = anp.matmul(a, b) - anp.matmul(b, a)
-    else:
-        pass
+    commutator_ = anp.matmul(a, b) - anp.matmul(b, a)
 
-    return _commutator
+    return commutator_
 
 
-def conjugate(x, operation_policy=OperationPolicy.CPU):
-    """
-    Compute the conjugate of a value.
-    
-    Args:
-    x :: ndarray - the value to compute the conjugate of
-    
-    Returns:
-    conj :: ndarray - the conjugate of x
-    """
-    if operation_policy == OperationPolicy.CPU:
-        conj = anp.conjugate(x)
-    else:
-        pass
-
-    return conj
-
-def conjugate_transpose(matrix, operation_policy=OperationPolicy.CPU):
+def conjugate_transpose(matrix):
     """
     Compute the conjugate transpose of a matrix.
     Args:
@@ -63,16 +41,12 @@ def conjugate_transpose(matrix, operation_policy=OperationPolicy.CPU):
     _conjugate_tranpose :: numpy.ndarray the conjugate transpose
         of matrix
     """
-    if operation_policy == OperationPolicy.CPU:
-        _conjugate_transpose = anp.conjugate(transpose(matrix,
-                                                       operation_policy))
-    else:
-        pass
+    conjugate_transpose_ = anp.conjugate(anp.swapaxes(matrix, -1, -2))
     
-    return _conjugate_transpose
+    return conjugate_transpose_
 
 
-def krons(*matrices, operation_policy=OperationPolicy.CPU):
+def krons(*matrices):
     """
     Compute the kronecker product of a list of matrices.
     Args:
@@ -81,28 +55,12 @@ def krons(*matrices, operation_policy=OperationPolicy.CPU):
     operation_policy :: qoc.OperationPolicy - what data type is
         used to perform the operation and with which method
     """
-    if operation_policy == OperationPolicy.CPU:
-        _krons = reduce(anp.kron, matrices)
-    else:
-        pass
+    krons_ = reduce(anp.kron, matrices)
 
-    return _krons
+    return krons_
 
 
-def l2_norm(array):
-    """
-    Compute the l2 norm of an array.
-
-    Arguments:
-    array :: ndarray(N) - The array to take the l2 norm of.
-
-    Returns:
-    l2_norm :: float - The l2 norm of `array`.
-    """
-    return anp.sum(anp.square(anp.abs(array)))
-
-
-def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
+def matmuls(*matrices):
     """
     Compute the kronecker product of a list of matrices.
     Args:
@@ -111,58 +69,14 @@ def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
     operation_policy :: qoc.OperationPolicy - what data type is
         used to perform the operation and with which method
     """
-    if operation_policy == OperationPolicy.CPU:
-        _matmuls = reduce(anp.matmul, matrices)
-    else:
-        pass
+    matmuls_ = reduce(anp.matmul, matrices)
 
-    return _matmuls
-
-
-def mult_cols(matrix, vector, operation_policy=OperationPolicy.CPU):
-    """
-    Multiply each column vector in `matrix` by the corresponding
-    element in `vector`.
-    Args:
-    matrix :: numpy.ndarray - an N x N matrix
-    vector :: numpy.ndarray - an N vector
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
-    Returns:
-    _matrix :: numpy.ndarray - the requested matrix
-    """
-    if operation_policy == OperationPolicy.CPU:
-        _matrix = matrix * vector
-    else:
-        pass
-
-    return _matrix
-
-
-def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
-    """
-    Multiply each row vector in `matrix` by the corresponding element
-    in `vector`.
-    Args:
-    matrix :: numpy.ndarray - an N x N matrix
-    vector :: numpy.ndarray - an N vector
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
-    Returns:
-    _matrix :: numpy.ndarray - the requested matrix
-    """
-    if operation_policy == OperationPolicy.CPU:
-        _matrix = transpose(transpose(matrix, operation_policy)
-                            * vector, operation_policy)
-    else:
-        pass
-
-    return _matrix
+    return matmuls_
 
 
 def rms_norm(array):
     """
-    Compute the rms norm of the array that is adjusted for the array's size.
+    Compute the rms norm of the array.
 
     Arguments:
     array :: ndarray (N) - The array to compute the norm of.
@@ -170,30 +84,11 @@ def rms_norm(array):
     Returns:
     norm :: float - The rms norm of the array.
     """
-    l2_norm_ = anp.sum(array * anp.conjugate(array))
+    square_norm = anp.sum(array * anp.conjugate(array))
     size = anp.prod(anp.shape(array))
-    rms_norm_ = anp.sqrt(l2_norm_ / size)
+    rms_norm_ = anp.sqrt(square_norm / size)
     
     return rms_norm_
-
-
-def transpose(matrix, operation_policy=OperationPolicy.CPU):
-    """
-    Obtain the transpose of the matrix.
-    Args:
-    matrix :: numpy.ndarray - an N x M matrix
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
-    Returns:
-    matrix_transpose :: numpy.ndarray - an M x N matrix that is the
-        transpose of `matrix`
-    """
-    if operation_policy == OperationPolicy.CPU:
-        matrix_transpose = anp.swapaxes(matrix, -1, -2)
-    else:
-        pass
-
-    return matrix_transpose
 
 
 ### ISOMORPHISMS ###
@@ -216,29 +111,8 @@ _BIG = 100
 def _tests():
     """
     Run tests on the module.
-    Args: none
-    Returns: nothing
     """
-
-    # Test row and column manipulations.
-    matrix = np.random.rand(matrix_size, matrix_size)
-    vector = np.random.rand(matrix_size)
-
-    col_mult_matrix = np.zeros_like(matrix)
-    for col_index in range(matrix_size):
-        col_mult_matrix[:, col_index] = matrix[:, col_index] * vector[col_index]
-
-    row_mult_matrix = np.zeros_like(matrix)
-    for row_index in range(matrix_size):
-        row_mult_matrix[row_index, :] = matrix[row_index, :] * vector[row_index]
-
-    assert(np.allclose(col_mult_matrix, mult_cols(matrix, vector)))
-    assert(np.allclose(row_mult_matrix, mult_rows(matrix, vector)))
-    
-    # Test complex number mapping.
-    rand_complex = np.random.rand(_BIG) + 1j * np.random.rand(_BIG)
-    rand_complex_mapped = real_imag_to_complex_flat(complex_to_real_imag_flat(rand_complex))
-    assert(np.allclose(rand_complex, rand_complex_mapped))
+    pass
 
 
 if __name__ == "__main__":

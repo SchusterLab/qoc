@@ -21,7 +21,7 @@ from qoc.models import (Dummy,
                         get_lindbladian,
                         GrapeLindbladDiscreteState,
                         GrapeLindbladResult,)
-from qoc.standard import (Adam, ans_jacobian, commutator, conjugate,
+from qoc.standard import (Adam, ans_jacobian, commutator,
                           conjugate_transpose,
                           matmuls,)
 
@@ -223,7 +223,7 @@ def _eldj_wrap(controls, pstate, reporter, result):
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
     if pstate.complex_controls:
-        grads = conjugate(grads)
+        grads = np.conjugate(grads)
 
     # The densities need to be unwrapped from their autograd box.
     if isinstance(reporter.final_densities, Box):

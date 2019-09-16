@@ -18,13 +18,11 @@ from .costs import (ControlArea,
                     TargetStateInfidelity,
                     TargetStateInfidelityTime,)
 
-from .functions import (commutator, conjugate, conjugate_transpose,
-                        expm, krons, l2_norm, matmuls,
-                        mult_cols, mult_rows, rms_norm, transpose,
+from .functions import (commutator, conjugate_transpose,
+                        expm, krons, matmuls,
+                        rms_norm,
                         column_vector_list_to_matrix,
-                        matrix_to_column_vector_list,
-                        complex_to_real_imag_flat,
-                        real_imag_to_complex_flat,)
+                        matrix_to_column_vector_list,)
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 
@@ -42,11 +40,9 @@ __all__ = [
     "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
-    "commutator", "conjugate", "conjugate_transpose", "expm", "krons",
-    "l2_norm",
-    "mult_cols", "mult_rows", "rms_norm", "transpose",
+    "commutator", "conjugate_transpose", "expm", "krons",
+    "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
-    "complex_to_real_imag_flat", "real_imag_to_complex_flat",
     "Adam", "LBFGSB", "SGD",
     "ans_jacobian", "CustomJSONEncoder", "generate_save_file_path",
 ]

@@ -2,16 +2,13 @@
 expm.py - a module for all things e^M
 """
 
-from autograd import jacobian
 from autograd.extend import (defvjp as autograd_defvjp,
                              primitive as autograd_primitive)
 import numpy as np
 import scipy.linalg as la
 
-from qoc.models.operationpolicy import OperationPolicy
-
 @autograd_primitive
-def expm(matrix, operation_policy=OperationPolicy.CPU):
+def expm(matrix):
     """
     Compute the matrix exponential of a matrix.
     Args:
@@ -21,15 +18,12 @@ def expm(matrix, operation_policy=OperationPolicy.CPU):
     Returns:
     exp_matrix :: numpy.ndarray - the exponentiated matrix
     """
-    if operation_policy == OperationPolicy.CPU:
-        exp_matrix = la.expm(matrix)
-    else:
-        pass
+    exp_matrix = la.expm(matrix)
 
     return exp_matrix
 
 
-def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
+def _expm_vjp(exp_matrix, matrix):
     """
     Construct the left-multiplying vector jacobian product function
     for the matrix exponential.
@@ -59,29 +53,24 @@ def _expm_vjp(exp_matrix, matrix, operation_policy=OperationPolicy.CPU):
         the jacobian of the final function with respect to `exp_matrix`
         to the jacobian of the final function with respect to `matrix`
     """
-    if operation_policy == OperationPolicy.CPU:
-        matrix_size = matrix.shape[0]
+    matrix_size = matrix.shape[0]
         
-        def _expm_vjp_cpu(dfinal_dexpm):
-            dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
+    def _expm_vjp_(dfinal_dexpm):
+        dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
 
-            # Compute a first order approximation of the frechet derivative of the matrix
-            # exponential in every unit direction Eij.
-            for i in range(matrix_size):
-                for j in range(matrix_size):
-                    dexpm_dmij_rowi = exp_matrix[j,:]
-                    dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
-                #ENDFOR
+        # Compute a first order approximation of the frechet derivative of the matrix
+        # exponential in every unit direction Eij.
+        for i in range(matrix_size):
+            for j in range(matrix_size):
+                dexpm_dmij_rowi = exp_matrix[j,:]
+                dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
             #ENDFOR
+        #ENDFOR
 
-            return dfinal_dmatrix
-        #ENDDEF
+        return dfinal_dmatrix
+    #ENDDEF
 
-        vjp_function = _expm_vjp_cpu
-    else:
-        pass
-
-    return vjp_function
+    return _expm_vjp_
 
 
 autograd_defvjp(expm, _expm_vjp)
@@ -111,7 +100,7 @@ def _tests():
     Args: none
     Returns: none
     """
-
+    from autograd import jacobian
     # Test that the end-to-end gradient of the matrix exponential is working.
     m = np.array([[1., 0.],
                   [0., 1.]])

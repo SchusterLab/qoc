@@ -3,8 +3,8 @@ autogutil.py - This module provides utilities for interfacing with autograd.
 """
 
 from autograd.core import make_vjp as _make_vjp
-from autograd.extend import (primitive, Box, VSpace, vspace)
-from autograd.wrap_util import (unary_to_nary,)
+from autograd.extend import vspace
+from autograd.wrap_util import unary_to_nary
 import numpy as np
 
 @unary_to_nary

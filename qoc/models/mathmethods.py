@@ -5,16 +5,13 @@ mathmethods.py - mathematical methods in physics
 import autograd.numpy as anp
 import numpy as np
 
-from qoc.models.operationpolicy import OperationPolicy
 from qoc.standard.functions.convenience import (commutator, conjugate_transpose,
-                                                l2_norm,
                                                 matmuls,
                                                 rms_norm,)
 
 ### INTERPOLATION METHODS ###
 
-def interpolate_linear_points(x1, x2, x3, y1, y2,
-                       operation_policy=OperationPolicy.CPU):
+def interpolate_linear_points(x1, x2, x3, y1, y2):
     """
     Perform a linear interpolation of the point
     (x3, y3) using two points (x1, y1), (x2, y2).
@@ -170,8 +167,7 @@ def magnus_m6(a, dt, time):
 ### LINDBLAD METHODS ###
 
 def get_lindbladian(densities, dissipators=None, hamiltonian=None,
-                    operators=None,
-                    operation_policy=OperationPolicy.CPU):
+                    operators=None,):
     """
     Compute the action of the lindblad equation on a single (set of)
     density matrix (matrices). This implementation uses the definiton:
@@ -188,29 +184,23 @@ def get_lindbladian(densities, dissipators=None, hamiltonian=None,
     Returns:
     lindbladian :: ndarray - the lindbladian operator acting on the densities
     """
-    if not (hamiltonian is None):
-        lindbladian = -1j * commutator(hamiltonian, densities,
-                                       operation_policy=operation_policy)
+    if hamiltonian is not None:
+        lindbladian = -1j * commutator(hamiltonian, densities,)
     else:
         lindbladian = 0
-    if ((not (operators is None))
-      and (not (dissipators is None))):
-        operators_dagger = conjugate_transpose(operators,
-                                               operation_policy=operation_policy)
-        operators_product = matmuls(operators_dagger, operators,
-                                    operation_policy=operation_policy)
+        
+    if dissipators is not None and operators is not None:
+        operators_dagger = conjugate_transpose(operators,)
+        operators_product = matmuls(operators_dagger, operators,)
         for i, operator in enumerate(operators):
             dissipator = dissipators[i]
             operator_dagger = operators_dagger[i]
             operator_product = operators_product[i]
             lindbladian = (lindbladian
                            + (dissipator
-                              * (matmuls(operator, densities, operator_dagger,
-                                         operation_policy=operation_policy)
-                                 - 0.5 * matmuls(operator_product, densities,
-                                                 operation_policy=operation_policy)
-                                 - 0.5 * matmuls(densities, operator_product,
-                                                 operation_policy=operation_policy))))
+                              * (matmuls(operator, densities, operator_dagger,)
+                                 - 0.5 * matmuls(operator_product, densities,)
+                                 - 0.5 * matmuls(densities, operator_product,))))
         #ENDFOR
     #ENDIF
     return lindbladian
@@ -414,15 +404,15 @@ def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
     
     # Compute initial step size per pp. 169 of [1].
     f0 = rhs(x_initial, y_initial)
-    d0 = l2_norm(y_initial)
-    d1 = l2_norm(f0)
+    d0 = rms_norm(y_initial)
+    d1 = rms_norm(f0)
     if d0 < 1e-5 or d1 < 1e-5:
         h0 = 1e-6
     else:
         h0 = 0.01 * d0 / d1
     y1 = y_initial + h0 * f0
     f1 = rhs(x_initial + h0, y1)
-    d2 = l2_norm(f1 - f0) / h0
+    d2 = rms_norm(f1 - f0) / h0
     if anp.maximum(d1, d2) <= 1e-15:
         h1 = anp.maximum(1e-6, h0 * 1e-3)
     else:
@@ -559,8 +549,6 @@ def _test_rkdp5():
     References:
     [1] http://tutorial.math.lamar.edu/Classes/DE/Exact.aspx
     """
-    from scipy.integrate import ode, solve_ivp
-
     COMPARE = False
 
     # Problem setup.
@@ -580,6 +568,8 @@ def _test_rkdp5():
     assert(np.allclose(y_1, y_1_expected))
 
     if COMPARE:
+        from scipy.integrate import ode, solve_ivp
+
         # Scipy fortran solutions.
         r = ode(rhs).set_integrator("vode", method="bdf")
         r.set_initial_value(y0, x0)

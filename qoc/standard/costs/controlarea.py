@@ -20,11 +20,10 @@ class ControlArea(Cost):
     """
 
     def __init__(self, control_count,
-                 control_step_count,
                  max_control_norms,
                  cost_multiplier=1.):
         """
-        See class docstring for arguments not listed here.
+        See class fields for arguments not listed here.
         
         Args:
         control_step_count

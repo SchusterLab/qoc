@@ -16,7 +16,7 @@ class ForbidDensities(Cost):
     the occupation of forbidden densities.
 
     Fields:
-    cost_multiplier :: float - the wieght factor for this cost
+    cost_multiplier
     density_normalization_constants :: ndarray - the number of densities
         that each evolving density is forbidden from
     hilbert_size :: int - the dimension of the hilbert space
@@ -35,7 +35,7 @@ class ForbidDensities(Cost):
 
     def __init__(self, forbidden_densities, system_step_count, cost_multiplier=1.):
         """
-        See class definition for arguments not listed here.
+        See class fields for arguments not listed here.
 
         Args:
         forbidden_densities :: ndarray - an array where each entry
@@ -108,7 +108,7 @@ def _test():
     fd = ForbidDensities(forbidden_densities, system_step_count)
     
     cost = fd.cost(None, densities, None)
-    expected_cost = np.divide(7, 640)
+    expected_cost = 7 / 640
     assert(np.allclose(cost, expected_cost,))
 
 
