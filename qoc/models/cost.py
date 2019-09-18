@@ -1,21 +1,13 @@
 """
-cost.py - a module to define a class to encapsulate a cost funciton
+cost.py - This module defines the parent cost function class.
 """
 
-from autograd import elementwise_grad, jacobian
-import autograd.numpy as anp
-import numpy as np
-
 class Cost(object):
-    """a class to encapsulate a cost function
+    """
+    This class is the parent class for all cost functions.
+    
     Fields:
     cost_multiplier :: float - the weight factor for this cost
-    dcost_dparams :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
-                      -> dcost_dparams :: numpy.ndarray
-        - the gradient of the cost function with respect to the parameters
-    dcost_dstates :: (params :: numpy.ndarray, states :: numpy.ndarray, step :: int)
-                      -> dcost_dstates :: numpy.ndarray
-        - the gradient of the cost function with respect to the states
     name :: str - a unique identifier for this cost
     requires_step_evaluation :: bool - True if the cost needs to be computed
                                        at each optimization time step, False
@@ -31,16 +23,6 @@ class Cost(object):
         """
         super().__init__()
         self.cost_multiplier = cost_multiplier
-
-        # Define the gradient of the cost function.
-        cost_wrapper = (lambda *args, **kwargs:
-                        anp.real(self.cost(*args, **kwargs)))
-        self.dcost_dparams = (lambda *args, **kwargs:
-                              jacobian(cost_wrapper, 0)
-                              (*args, **kwargs))
-        self.dcost_dstates = (lambda *args, **kwargs:
-                              jacobian(cost_wrapper, 1)
-                              (*args, **kwargs))
 
 
     def __str__(self):
@@ -65,4 +47,5 @@ class Cost(object):
         Returns:
         cost :: float - the cost for the given parameters, states, and time step
         """
-        return 0.
+        raise NotImplementedError("The cost {} has not implemented an evaluation function."
+                                  "".format(self))

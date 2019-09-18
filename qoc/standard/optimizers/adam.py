@@ -98,7 +98,7 @@ class Adam(object):
         self.iteration_count = 0
         self.gradient_moment = np.zeros_like(initial_params)
         self.gradient_square_moment = np.zeros_like(initial_params)
-        
+
         params = initial_params
         for i in range(iteration_count):
             grads = jacobian(params, *args)

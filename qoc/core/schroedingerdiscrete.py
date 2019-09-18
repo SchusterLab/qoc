@@ -9,13 +9,15 @@ import numpy as np
 from qoc.core.common import (initialize_controls,
                              slap_controls, strip_controls,
                              clip_control_norms,)
+from qoc.core.mathmethods import (interpolate_linear_set,
+                                  magnus_m2,
+                                  magnus_m4,
+                                  magnus_m6,)
 from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         EvolveSchroedingerResult,
                         GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerResult,
-                        interpolate_linear_set,
                         InterpolationPolicy,
-                        magnus_m2, magnus_m4, magnus_m6,
                         MagnusPolicy)
 from qoc.standard import (Adam, ans_jacobian,
                           expm, matmuls)
@@ -75,8 +77,6 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 costs, evolution_time, hamiltonian,
                                 initial_states, system_eval_count,
                                 complex_controls=False,
-                                control_condition_indices=None,
-                                control_conditions=None,
                                 cost_eval_step=1,
                                 impose_control_conditions=None,
                                 initial_controls=None,
@@ -209,7 +209,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
     clip_control_norms(controls,
                        pstate.max_control_norms)
     # Impose user boundary conditions.
-    if pstate.impose_control_conditions:
+    if pstate.impose_control_conditions is not None:
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
@@ -379,153 +379,3 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     states = matmuls(step_unitary, states)
 
     return states
-
-
-### MODULE TESTS ###
-
-_BIG = 10
-_MAGNUS_POLICIES = (MagnusPolicy.M2, MagnusPolicy.M4, MagnusPolicy.M6,)
-
-def _random_complex_matrix(matrix_size):
-    """
-    Generate a random, square, complex matrix of size `matrix_size`.
-    """
-    return (np.random.rand(matrix_size, matrix_size)
-            + 1j * np.random.rand(matrix_size, matrix_size))
-
-
-def _random_hermitian_matrix(matrix_size):
-    """
-    Generate a random, square, hermitian matrix of size `matrix_size`.
-    """
-    from qoc.standard import conjugate_transpose
-    matrix = _random_complex_matrix(matrix_size)
-    return np.divide(matrix + conjugate_transpose(matrix), 2)
-
-
-def _test_evolve_schroedinger_discrete():
-    """
-    Run end-to-end test on the evolve_schroedinger_discrete
-    function.
-    """
-    from qutip import mesolve, Qobj, Options
-    
-    from qoc.standard import (matrix_to_column_vector_list,
-                              SIGMA_X, SIGMA_Y,)
-
-    # Test that evolving states under a hamiltonian yields
-    # a known result. Use e.q. 109 of 
-    # https://arxiv.org/abs/1904.06560.
-    hilbert_size = 4
-    identity_matrix = np.eye(hilbert_size, dtype=np.complex128)
-    iswap_unitary = np.array(((1,   0,   0, 0),
-                              (0,   0, -1j, 0),
-                              (0, -1j,   0, 0),
-                              (0,   0,   0, 1)))
-    hamiltonian_matrix = np.divide(1, 2) * (np.kron(SIGMA_X, SIGMA_X)
-                                     + np.kron(SIGMA_Y, SIGMA_Y))
-    hamiltonian = lambda controls, time: hamiltonian_matrix
-    initial_states = matrix_to_column_vector_list(identity_matrix)
-    target_states = matrix_to_column_vector_list(iswap_unitary)
-    evolution_time = np.divide(np.pi, 2)
-    system_eval_count = int(1e3)
-    for magnus_policy in _MAGNUS_POLICIES:
-        result = evolve_schroedinger_discrete(evolution_time, hamiltonian,
-                                              initial_states, system_eval_count,
-                                              magnus_policy=magnus_policy)
-        final_states = result.final_states
-        assert(np.allclose(final_states, target_states))
-    #ENDFOR
-    # Note that qutip only gets the same result within 1e-6 error.
-    tlist = np.array([0, evolution_time])
-    c_ops = list()
-    e_ops = list()
-    hamiltonian_qutip = Qobj(hamiltonian_matrix)
-    for i, initial_state in enumerate(initial_states):
-        initial_state_qutip = Qobj(initial_state)
-        result = mesolve(hamiltonian_qutip,
-                         initial_state_qutip,
-                         tlist, c_ops, e_ops,)
-        final_state = result.states[-1].full()
-        target_state = target_states[i]
-        assert(np.allclose(final_state, target_state, atol=1e-6))
-    #ENDFOR
-
-    # Test that evolving states under a random hamiltonian yields
-    # a result similar to qutip.
-    hilbert_size = 4
-    initial_state = np.divide(np.ones((hilbert_size, 1)),
-                              np.sqrt(hilbert_size))
-    initial_states = np.stack((initial_state,))
-    initial_state_qutip = Qobj(initial_state)
-    system_eval_count = int(1e3)
-    evolution_time = 1
-    tlist = np.array([0, evolution_time])
-    c_ops = e_ops = list()
-    for _ in range(_BIG):
-        hamiltonian_matrix = _random_hermitian_matrix(hilbert_size)
-        hamiltonian = lambda controls, time: hamiltonian_matrix
-        hamiltonian_qutip = Qobj(hamiltonian_matrix)
-        result = mesolve(hamiltonian_qutip,
-                         initial_state_qutip,
-                         tlist, c_ops, e_ops,)
-        final_state_qutip = result.states[-1].full()
-        for magnus_policy in _MAGNUS_POLICIES:
-            result = evolve_schroedinger_discrete(evolution_time, hamiltonian,
-                                                  initial_states, system_eval_count,
-                                                  magnus_policy=magnus_policy)
-            final_state = result.final_states[0]
-            assert(np.allclose(final_state, final_state_qutip, atol=1e-4))
-        #ENDFOR
-    #ENDFOR
-        
-
-def _test_grape_schroedinger_discrete():
-    """
-    Run end-to-end test on the grape_schroedinger_discrete function.
-
-    NOTE: We mostly care about the tests for evolve_schroedinger_discrete.
-    For grape_schroedinger_discrete we care that everything is being passed
-    through functions properly, but autograd has a really solid testing
-    suite and we trust that their gradients are being computed
-    correctly.
-    """
-    from qoc.standard import (ForbidStates, SIGMA_X, SIGMA_Y,)
-    
-    # Test that parameters are clipped if they grow too large.
-    hilbert_size = 4
-    hamiltonian_matrix = np.divide(1, 2) * (np.kron(SIGMA_X, SIGMA_X)
-                                            + np.kron(SIGMA_Y, SIGMA_Y))
-    hamiltonian = lambda controls, t: (controls[0] * hamiltonian_matrix)
-    initial_states = np.array([[[0], [1], [0], [0]]])
-    forbidden_states = np.array([[[[0], [1], [0], [0]]]])
-    control_count = 1
-    evolution_time = 10
-    control_eval_count = system_eval_count = 11
-    max_norm = 1e-10
-    max_control_norms = np.repeat(max_norm, control_count)
-    costs = [ForbidStates(forbidden_states, system_eval_count)]
-    iteration_count = 100
-    log_iteration_step = 0
-    result = grape_schroedinger_discrete(control_count, control_eval_count,
-                                         costs, evolution_time,
-                                         hamiltonian, initial_states,
-                                         system_eval_count,
-                                         iteration_count=iteration_count,
-                                         log_iteration_step=log_iteration_step,
-                                         max_control_norms=max_control_norms)
-    for i in range(result.best_controls.shape[1]):
-        assert(np.less_equal(np.abs(result.best_controls[:,i]),
-                             max_control_norms[i]).all())
-
-
-def _test():
-    """
-    Run tests on the module.
-    """
-    _test_evolve_schroedinger_discrete() 
-    _test_grape_schroedinger_discrete()
-
-
-if __name__ == "__main__":
-    _test()

@@ -1,83 +1,84 @@
 """
-forbidstates.py - a module to encapsulate the forbidden states cost function
+forbidstates.py - This module defines a cost function that penalizes
+the occupation of a set of forbidden states.
 """
 
 import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose
+from qoc.standard.functions.convenience import conjugate_transpose
 
 class ForbidStates(Cost):
     """
-    This class encapsulates a cost function that penalizes
-    the occupation of forbidden states.
+    This cost penalizes the occupation of a set of forbidden states.
 
     Fields:
-    cost_multiplier :: float - the wieght factor for this cost
-    forbidden_states_dagger :: ndarray - the conjugate transpose of
-        the forbidden states
-    name :: str - a unique identifier for this cost
-    normalization_constant :: int - used to normalize the cost
-    requires_step_evaluation :: bool - True if the cost needs
-        to be computed at each optimization time step, False
-        if it should be computed only at the final optimization
-        time step
-    state_normalization_constants :: ndarray - the number of states
-        that each evolving state is forbidden from
+    cost_multiplier
+    cost_normalization_constant
+    forbidden_states_count
+    forbidden_states_dagger
+    name
+    requires_step_evalution
     """
     name = "forbid_states"
     requires_step_evaluation = True
 
 
-    def __init__(self, forbidden_states, system_step_count, cost_multiplier=1.):
+    def __init__(self, forbidden_states,
+                 system_eval_count,
+                 cost_eval_step=1,
+                 cost_multiplier=1.,):
         """
-        See class definition for arguments not listed here.
+        See class fields for arguments not listed here.
 
-        Args:
-        forbidden_states :: ndarray - an array where each entry
-            in the first axis is an array of states that the corresponding
-            evolving state is forbidden from, that is, each evolving
-            state has its own list of forbidden states
-        system_step_count :: int - the number of system steps in the evolution
+        Arguments:
+        cost_eval_step
+        forbidden_states
+        system_eval_count
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.forbidden_states_dagger = conjugate_transpose(forbidden_states)
         state_count = forbidden_states.shape[0]
-        self.normalization_constant = state_count * system_step_count
-        self.state_normalization_constants = np.array([state_forbidden_states.shape[0]
-                                                       for state_forbidden_states
-                                                       in forbidden_states])
+        cost_evaluation_count, _ = np.divmod(system_eval_count - 1, cost_eval_step)
+        self.cost_normalization_constant = cost_evaluation_count * state_count
+        self.forbidden_states_count = np.array([forbidden_states_.shape[0]
+                                                for forbidden_states_
+                                                in forbidden_states])
+        self.forbidden_states_dagger = conjugate_transpose(forbidden_states)
 
 
-    def cost(self, controls, states, system_step):
+    def cost(self, controls, states, system_eval_step):
         """
-        Args:
-        controls :: ndarray - the control parameters for all time steps
-        states :: ndarray - an array of the initial states evolved to
-            the current time step
-        system_step :: int - the system time step
+        Compute the penalty.
+
+        Arguments:
+        controls
+        states
+        system_eval_step
 
         Returns:
-        cost :: float - the penalty
+        cost
         """
+        # The cost is the overlap (fidelity) of the evolved state and each
+        # forbidden state.
         cost = 0
-        # Compute the fidelity for each evolution state and its forbidden states.
-        for i, state_forbidden_states_dagger in enumerate(self.forbidden_states_dagger):
+        for i, forbidden_states_dagger_ in enumerate(self.forbidden_states_dagger):
             state = states[i]
             state_cost = 0
-            for forbidden_state_dagger in state_forbidden_states_dagger:
+            for forbidden_state_dagger in forbidden_states_dagger_:
                 inner_product = anp.matmul(forbidden_state_dagger, state)[0, 0]
-                state_cost = state_cost + anp.square(anp.abs(inner_product))
+                fidelity = anp.real(inner_product * anp.conjugate(inner_product))
+                state_cost = state_cost + fidelity
             #ENDFOR
-            cost = cost + anp.divide(state_cost, self.state_normalization_constants[i])
+            state_cost_normalized = state_cost / self.forbidden_states_count[i]
+            cost = cost + state_cost_normalized
         #ENDFOR
         
         # Normalize the cost for the number of evolving states
-        # and the number of time evolution steps.
-        cost = (cost / self.normalization_constant)
+        # and the number of times the cost is computed.
+        cost_normalized = cost / self.cost_normalization_constant
         
-        return self.cost_multiplier * cost
+        return cost_normalized * self.cost_multiplier
 
 
 def _test():

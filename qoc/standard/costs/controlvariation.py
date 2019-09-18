@@ -1,6 +1,6 @@
 """
 controlvariation.py - This module defines a cost function
-that penalizes variations in control parameters.
+that penalizes variations of the control parameters.
 """
 
 import autograd.numpy as anp
@@ -10,89 +10,64 @@ from qoc.models import Cost
 
 class ControlVariation(Cost):
     """
-    This cost penalizes the rapid variations of control parameters.
+    This cost penalizes the variations of the control parameters
+    from one `control_eval_step` to the next.
 
     Fields:
-    control_count :: int - the number of controls at each
-        time step
-    control_step_count :: int - the number of time steps,
-        we require control_step_count >= order + 1
-    cost_multiplier :: float - the weight factor for this cost
-    max_control_norms :: ndarray (control_count) - the maximum norms
-        for each control for all time
-    name :: str - a unique identifier for this cost
-    normalization_constant :: float - used to normalize the cost
-    order :: int - the order with which to take the differences
-        of controls - i.e. de/dt = order 1, de^2/dt^2 = order 2, etc.
+    control_size
+    cost_multiplier
+    max_control_norms
+    name
+    order
+    requires_step_evaluation
     """
     name = "control_variation"
     requires_step_evaluation = False
 
-    def __init__(self, control_count, control_step_count,
-                 max_control_norms, cost_multiplier=1.,
+    def __init__(self, control_count,
+                 control_eval_count,
+                 cost_multiplier=1.,
+                 max_control_norms=None,
                  order=1):
         """
-        See class definition for arguments not listed here.
+        See class fields for arguments not listed here.
+
+        Arguments:
+        control_count
+        control_eval_count
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.control_count = control_count
-        self.control_step_count = control_step_count
         self.max_control_norms = max_control_norms
-        self.normalization_constant = control_count * (control_step_count - order)
+        self.diffs_size = control_count * (control_eval_count - order)
         self.order = order
 
 
-    def cost(self, controls, states, system_step):
+    def cost(self, controls, states, system_eval_step):
         """
-        Args:
-        controls :: ndarray (control_step_count, control_count)
-            - the control parameters for all time steps
-        states :: ndarray - an array of the initial states (or densities) evolved to
-            the current time step
-        system_step :: int - the system time step
+        Compute the penalty.
+
+        Arguments:
+        controls
+        states
+        system_eval_step
 
         Returns:
-        cost :: float - the penalty
+        cost
         """
-        # Normalize the controls.
-        normalized_controls = anp.divide(controls, self.max_control_norms)
+        if self.max_control_norms is None:
+            normalized_controls = controls / self.max_control_norms
+        else:
+            normalized_controls = controls
 
-        # Penalize the difference in variations from the value of a control
-        # at one step to the next step.
+        # Penalize the square of the absolute value of the difference
+        # in value of the control parameters from one step to the next.
         diffs = anp.diff(normalized_controls, axis=0, n=self.order)
-        diffs_total = anp.sum(anp.square(anp.abs(diffs)))
-        diffs_total_normalized = anp.divide(diffs_total, self.normalization_constant)
+        cost = anp.sum(anp.real(diffs_normalized * anp.conjugate(diffs_normalized)))
+        # You can prove that the square of the complex modulus of the difference
+        # between two complex values is l.t.e. 2 if the complex modulus
+        # of the two complex values is l.t.e. 1 respectively using the
+        # triangle inequality. This fact generalizes for higher order differences.
+        # Therefore, a factor of 2 should be used to normalize the diffs.
+        cost_normalized = cost / (self.diffs_size * (2 ** self.order))
 
-        return self.cost_multiplier * diffs_total_normalized
-
-
-def _test():
-    """
-    Run test on the module.
-    """
-    controls = np.array(((1+2j, 7+8j,), (3+4j, 9+10j,), (11+12j, 5+6j,),))
-    control_count = controls.shape[1]
-    control_step_count = controls.shape[0]
-    max_control_norms = np.array((np.sqrt(265), np.sqrt(181),))
-    
-    cvo1 = ControlVariation(control_count, control_step_count,
-                            max_control_norms,
-                            order=1)
-    cost = cvo1.cost(controls, None, None)
-    expected_cost = 0.18355050557698324
-
-    assert(np.allclose(cost, expected_cost))
-
-    cvo2 = ControlVariation(control_count,
-                            control_step_count,
-                            max_control_norms,
-                            order=2)
-    cost = cvo2.cost(controls, None, None)
-    expected_cost = 0.33474408422808305
-    
-    assert(np.allclose(cost, expected_cost))
-
-
-if __name__ == "__main__":
-    _test()
-            
+        return cost_normalized * self.cost_multiplier

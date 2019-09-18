@@ -1,6 +1,7 @@
 """
-targetdensityinfidelitytime.py - This module defines the target density
-infidelity cost function computed each step.
+targetdensityinfidelitytime.py - This module defines a cost function
+that penalizes the infidelity of evolved densities and their
+respective target densities at each cost evaluation step.
 """
 
 import autograd.numpy as anp
@@ -11,66 +12,60 @@ from qoc.standard.functions import conjugate_transpose
 
 class TargetDensityInfidelityTime(Cost):
     """
-    This class encapsulates the target density infidelity cost function
-    computed each system step.
-    The penalty of this function is calculated using the Frobenius inner product.
+    This class penalizes the infidelity of evolved states
+    and their respective target states at each cost evaluation step.
+    The intended result is that a lower infidelity is
+    achieved earlier in the system evolution.
 
     Fields:
-    cost_multiplier :: float - the wieght factor for this cost
-    density_count :: int - the number of evolving densities
-    hilbert_size :: int - the dimension of the hilbert space
-    name :: str - a unique identifier for this cost
-    requires_step_evaluation :: bool - True if the cost needs
-        to be computed at each optimization time step, False
-        if it should be computed only at the final optimization
-        time step
-    system_step_count :: int - the 
-    target_densities_dagger :: ndarray (density_count x hilbert_size x hilbert_size)
-        - the hermitian conjugate of the target densities
+    cost_eval_count
+    cost_multiplier
+    density_count
+    hilbert_size
+    name
+    requires_step_evaluation
+    target_densities_dagger
     """
     name = "target_density_infidelity_time"
     requires_step_evaluation = False
 
-    def __init__(self, system_step_count, target_densities, cost_multiplier=1.):
+    def __init__(self, system_eval_count, target_densities,
+                 cost_eval_step=1, cost_multiplier=1.,):
         """
-        See class definition for arguments not listed here.
+        See class fields for arguments not listed here.
 
-        Args:
-        target_densities :: ndarray (density_count x hilbert_size x hilbert_size)
-            - an array of densities
-            that correspond to the target density for each of the initial densities
-            used in optimization
+        Arguments:
+        target_densities
         """
         super().__init__(cost_multiplier=cost_multiplier)
+        self.cost_eval_count, _ = np.divmod(system_eval_count - 1, cost_eval_step)
         self.density_count = target_densities.shape[0]
-        self.hilbert_size = target_densities.shape[-1]
-        self.system_step_count = system_step_count
+        self.hilbert_size = target_densities.shape[1]
         self.target_densities_dagger = conjugate_transpose(np.stack(target_densities))
 
 
-    def cost(self, controls, densities, sytem_step):
+    def cost(self, controls, densities, sytem_eval_step):
         """
-        Args:
-        controls :: ndarray (control_step_count x control_count)
-            - the control parameters for all time steps
-        densities :: ndarray (density_count x hilbert_size x hilbert_size)
-            - an array of the densities evolved to
-            the current time step
-        system_step :: int - the system time step
+        Compute the penalty.
+
+        Arguments:
+        controls
+        densities
+        system_eval_step
 
         Returns:
-        cost :: float - the penalty
+        cost
         """
-        hilbert_size = self.hilbert_size
-        fidelity = 0
-        for i, target_density_dagger in enumerate(self.target_densities_dagger):
-            density = densities[i]
-            inner_product = anp.trace(anp.matmul(target_density_dagger, density))
-            inner_product_normalized = inner_product / hilbert_size
-            fidelity = fidelity + anp.square(anp.abs(inner_product_normalized))
-        infidelity = 1 - (fidelity / self.density_count)
-        infidelity_normalized = infidelity / self.system_step_count
-        return self.cost_multiplier * infidelity
+        # The cost is the infidelity of each evolved density and its target density.
+        inner_products = (anp.trace(anp.matmul(self.target_densities_dagger, densities)[:, 0, 0],
+                                    axis1=-1, axis2=-2) / self.hilbert_size)
+        fidelities = anp.real(inner_products * anp.conjugate(inner_products))
+        fidelity_normalized = anp.sum(fidelities) / self.density_count
+        infidelity = 1 - fidelity_normalized
+        # Normalize the cost for the number of times the cost is evaluated.
+        cost_normalized = infidelity / self.cost_eval_count
+
+        return cost_normalized * self.cost_multiplier
 
 
 def _tests():

@@ -1,6 +1,6 @@
 """
-controlnorm.py - a module to define a cost on the
-norm of controls
+controlnorm.py - This module defines a cost function that penalizes
+the value of the norm of the control parameters.
 """
 
 import autograd.numpy as anp
@@ -10,70 +10,54 @@ from qoc.models import Cost
 
 class ControlNorm(Cost):
     """
-    a cost to penalize high control norms
+    This cost penalizes the value of the norm of the control parameters.
 
     Fields:
-    control_count :: int - the number of controls at each
-        time step
-    control_step_count :: int - the number of time steps
-    cost_multiplier :: float - the weight factor for this cost
-    max_control_norms :: ndarray (control_count) - the maximum norm for each control
-    name :: str - a unique identifier for this cost
-    nomalization_constant :: int - control_count * control_step_count
+    control_size
+    cost_multiplier
+    max_control_norms
+    name
+    requires_step_evaluation
     """
     name = "control_norm"
     requires_step_evaluation = False
 
-    def __init__(self, control_count, control_step_count,
-                 max_control_norms, cost_multiplier=1.,):
+    def __init__(self, control_count,
+                 control_eval_count,
+                 cost_multiplier=1.,
+                 max_control_norms=None,):
         """
-        See class fields for argument information.
+        See class fields for arguments not listed here.
+
+        Arguments:
+        control_count
+        control_eval_count
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.control_count = control_count
-        self.control_step_count = control_step_count
+        self.control_size = control_count * control_step_count
         self.max_control_norms = max_control_norms
-        self.normalization_constant = control_count * control_step_count
 
     
-    def cost(self, controls, states, system_step):
+    def cost(self, controls, states, system_eval_step):
         """
-        Args:
-        controls :: ndarray (control_step_count, control_count)
-            - the control parameters for all time steps
-        states :: ndarray - an array of the initial states (or densities) evolved to
-            the current time step
-        system_step :: int - the system time step
+        Compute the penalty.
+
+        Arguments:
+        controls
+        states
+        system_eval_step
 
         Returns:
-        cost :: float - the penalty
+        cost
         """
-        # Normalize the controls.
-        normalized_controls = anp.divide(controls, self.max_control_norms)
+        if self.max_control_norms is not None:
+            normalized_controls = controls / self.max_control_norms
+        else:
+            normalized_controls = controls
 
-        # Penalize the sum of the square of the absolute value of the normalized
+        # The cost is the sum of the square of the modulus of the normalized
         # controls.
-        cost = anp.sum(anp.square(anp.abs(normalized_controls)))
-        cost_normalized = anp.divide(cost, self.normalization_constant)
+        cost = anp.sum(anp.real(normalized_controls * anp.conjugate(normalized_controls)))
+        cost_normalized = cost / self.control_size
         
-        return self.cost_multiplier * cost_normalized
-
-
-def _test():
-    """
-    Run test on the module.
-    """
-    controls = np.array(((1+2j, 3-4j), (5-6j, 7+8j), (9+10j, 11+12j),))
-    control_count = controls.shape[1]
-    control_step_count = controls.shape[0]
-    max_control_norms = np.array((np.sqrt(181), np.sqrt(265),))
-    cn = ControlNorm(control_count, control_step_count,
-                      max_control_norms,)
-    cost = cn.cost(controls, None, None)
-    expected_cost = 0.48089926682650547
-    
-    assert(np.allclose(cost, expected_cost))
-
-
-if __name__ == "__main__":
-    _test()
+        return cost_normalized * self.cost_multiplier

@@ -11,14 +11,14 @@ import numpy as np
 from qoc.core.common import (clip_control_norms,
                              initialize_controls,
                              slap_controls, strip_controls,)
+from qoc.core.mathmethods import (integrate_rkdp5,
+                                  interpolate_linear_set,
+                                  get_lindbladian,)
 from qoc.models import (Dummy,
                         EvolveLindbladDiscreteState,
                         EvolveLindbladResult,
-                        integrate_rkdp5,
-                        interpolate_linear_set,
                         InterpolationPolicy,
                         OperationPolicy,
-                        get_lindbladian,
                         GrapeLindbladDiscreteState,
                         GrapeLindbladResult,)
 from qoc.standard import (Adam, ans_jacobian, commutator,
@@ -213,7 +213,7 @@ def _eldj_wrap(controls, pstate, reporter, result):
     # Rescale the controls to thier maximum norm.
     clip_control_norms(controls, pstate.max_control_norms)
     # Impose user boundary conditions.
-    if pstate.impose_control_conditions:
+    if pstate.impose_control_conditions is not None:
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
@@ -375,194 +375,3 @@ def _get_rhs_lindbladian(control_eval_times=None,
     #ENDDEF
 
     return rhs
-
-
-### MODULE TESTS ###
-
-_BIG = int(1e1)
-
-def _test_evolve_lindblad_discrete():
-    """
-    Run end-to-end tests on evolve_lindblad_discrete.
-    """
-    import numpy as np
-    from qutip import mesolve, Qobj
-    
-    from qoc.standard import (conjugate_transpose,
-                              SIGMA_X, SIGMA_Y,
-                              matrix_to_column_vector_list,
-                              SIGMA_PLUS, SIGMA_MINUS,)
-
-    def _generate_complex_matrix(matrix_size):
-        return (np.random.rand(matrix_size, matrix_size)
-                + 1j * np.random.rand(matrix_size, matrix_size))
-    
-    def _generate_hermitian_matrix(matrix_size):
-        matrix = _generate_complex_matrix(matrix_size)
-        return (matrix + conjugate_transpose(matrix)) * 0.5
-
-    # Test that evolution WITH a hamiltonian and WITHOUT lindblad operators
-    # yields a known result.
-    # Use e.q. 109 from
-    # https://arxiv.org/pdf/1904.06560.pdf.
-    hilbert_size = 4
-    identity_matrix = np.eye(hilbert_size, dtype=np.complex128)
-    iswap_unitary = np.array(((1,   0,   0, 0),
-                              (0,   0, -1j, 0),
-                              (0, -1j,   0, 0),
-                              (0,   0,   0, 1)))
-    initial_states = matrix_to_column_vector_list(identity_matrix)
-    target_states = matrix_to_column_vector_list(iswap_unitary)
-    initial_densities = np.matmul(initial_states, conjugate_transpose(initial_states))
-    target_densities = np.matmul(target_states, conjugate_transpose(target_states))
-    system_hamiltonian = ((1/ 2) * (np.kron(SIGMA_X, SIGMA_X)
-                              + np.kron(SIGMA_Y, SIGMA_Y)))
-    hamiltonian = lambda controls, time: system_hamiltonian
-    system_eval_count = 2
-    evolution_time = np.pi / 2
-    result = evolve_lindblad_discrete(evolution_time,
-                                      initial_densities,
-                                      system_eval_count,
-                                      hamiltonian=hamiltonian)
-    final_densities = result.final_densities
-    assert(np.allclose(final_densities, target_densities))
-    # Note that qutip only gets this result within 1e-5 error.
-    tlist = np.array([0, evolution_time])
-    c_ops = list()
-    e_ops = list()
-    for i, initial_density in enumerate(initial_densities):
-        result = mesolve(Qobj(system_hamiltonian),
-                         Qobj(initial_density),
-                         tlist, c_ops, e_ops,)
-        final_density = result.states[-1].full()
-        target_density = target_densities[i]
-        assert(np.allclose(final_density, target_density, atol=1e-5))
-    #ENDFOR
-
-    # Test that evolution WITHOUT a hamiltonian and WITH lindblad operators
-    # yields a known result.
-    # This test ensures that dissipators are working correctly.
-    # Use e.q.14 from
-    # https://inst.eecs.berkeley.edu/~cs191/fa14/lectures/lecture15.pdf.
-    hilbert_size = 2
-    gamma = 2
-    lindblad_dissipators = np.array((gamma,))
-    sigma_plus = np.array([[0, 1], [0, 0]])
-    lindblad_operators = np.stack((sigma_plus,))
-    lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
-    evolution_time = 1.
-    system_eval_count = 2
-    inv_sqrt_2 = 1 / np.sqrt(2)
-    a0 = np.random.rand()
-    c0 = 1 - a0
-    b0 = np.random.rand()
-    b0_star = np.conj(b0)
-    initial_density_0 = np.array(((a0,        b0),
-                                  (b0_star,   c0)))
-    initial_densities = np.stack((initial_density_0,))
-    gt = gamma * evolution_time
-    expected_final_density = np.array(((1 - c0 * np.exp(- gt),    b0 * np.exp(-gt/2)),
-                                       (b0_star * np.exp(-gt/2), c0 * np.exp(-gt))))
-    result = evolve_lindblad_discrete(evolution_time,
-                                      initial_densities,
-                                      system_eval_count,
-                                      lindblad_data=lindblad_data)
-    final_density = result.final_densities[0]
-    assert(np.allclose(final_density, expected_final_density))
-
-    # Test that evolution WITH a random hamiltonian and WITH random lindblad operators
-    # yields a similar result to qutip.
-    # Note that the allclose tolerance may need to be adjusted.
-    matrix_size = 4
-    for i in range(_BIG):
-        # Evolve under lindbladian.
-        hamiltonian_matrix = _generate_hermitian_matrix(matrix_size)
-        hamiltonian = lambda controls, time: hamiltonian_matrix
-        lindblad_operator_count = np.random.randint(1, matrix_size)
-        lindblad_operators = np.stack([_generate_complex_matrix(matrix_size)
-                                      for _ in range(lindblad_operator_count)])
-        lindblad_dissipators = np.ones((lindblad_operator_count,))
-        lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
-        density_matrix = _generate_hermitian_matrix(matrix_size)
-        initial_densities = np.stack((density_matrix,))
-        evolution_time = 5
-        system_eval_count = 2
-        result = evolve_lindblad_discrete(evolution_time,
-                                          initial_densities,
-                                          system_eval_count,
-                                          hamiltonian=hamiltonian,
-                                          lindblad_data=lindblad_data)
-        final_density = result.final_densities[0]
-
-        # Evolve under lindbladian with qutip.
-        hamiltonian_qutip =  Qobj(hamiltonian_matrix)
-        initial_density_qutip = Qobj(density_matrix)
-        lindblad_operators_qutip = [Qobj(lindblad_operator)
-                                    for lindblad_operator in lindblad_operators]
-        e_ops_qutip = list()
-        tlist = np.array((0, evolution_time,))
-        result_qutip = mesolve(hamiltonian_qutip,
-                               initial_density_qutip,
-                               tlist,
-                               lindblad_operators_qutip,
-                               e_ops_qutip,)
-        final_density_qutip = result_qutip.states[-1].full()
-        assert(np.allclose(final_density, final_density_qutip))
-    #ENDFOR
-
-
-def _test_grape_lindblad_discrete():
-    """
-    Run end-to-end test on the grape_lindblad_discrete function.
-
-    NOTE: We mostly care about the tests for evolve_lindblad_discrete.
-    For grape_lindblad_discrete we care that everything is being passed
-    through functions properly, but autograd has a really solid testing
-    suite and we trust that their gradients are being computed
-    correctly.
-    """
-    import numpy as np
-    
-    from qoc.standard import (conjugate_transpose,
-                              ForbidDensities, SIGMA_X, SIGMA_Y,)
-    
-    # Test that parameters are clipped if they grow too large.
-    hilbert_size = 4
-    hamiltonian_matrix = np.divide(1, 2) * (np.kron(SIGMA_X, SIGMA_X)
-                                            + np.kron(SIGMA_Y, SIGMA_Y))
-    hamiltonian = lambda controls, t: (controls[0] * hamiltonian_matrix)
-    initial_states = np.array([[[0], [1], [0], [0]]])
-    initial_densities = np.matmul(initial_states, conjugate_transpose(initial_states))
-    forbidden_states = np.array([[[[0], [1], [0], [0]]]])
-    forbidden_densities = np.matmul(forbidden_states, conjugate_transpose(forbidden_states))
-    control_count = 1
-    evolution_time = 10
-    system_eval_count = control_eval_count = 11
-    max_norm = 1e-10
-    max_control_norms = np.repeat(max_norm, control_count)
-    costs = [ForbidDensities(forbidden_densities, system_eval_count)]
-    iteration_count = 5
-    log_iteration_step = 0
-    result = grape_lindblad_discrete(control_count, control_eval_count,
-                                     costs, evolution_time,
-                                     initial_densities,
-                                     system_eval_count,
-                                     hamiltonian=hamiltonian,
-                                     iteration_count=iteration_count,
-                                     log_iteration_step=log_iteration_step,
-                                     max_control_norms=max_control_norms)
-    for i in range(result.best_controls.shape[1]):
-        assert(np.less_equal(np.abs(result.best_controls[:,i]),
-                             max_control_norms[i]).all())
-
-
-def _test():
-    """
-    Run tests on the module.
-    """
-    _test_evolve_lindblad_discrete()
-    _test_grape_lindblad_discrete()
-
-
-if __name__ == "__main__":
-    _test()
