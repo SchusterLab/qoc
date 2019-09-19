@@ -63,22 +63,3 @@ def get_eij(i, j, size):
     eij = np.zeros((size, size))
     eij[i, j] = 1
     return eij
-
-
-### MODULE TESTS ###
-
-_BIG = 100
-
-def _tests():
-    """
-    Run tests on the module.
-    """
-    # Use the fact that (create)(annihilate) is the number operator.
-    for i in range(1, _BIG):
-        analytic_number_operator = np.diag(np.arange(i))
-        generated_number_operator = np.matmul(get_creation_operator(i), get_annihilation_operator(i))
-        assert np.allclose(generated_number_operator, analytic_number_operator)
-        
-
-if __name__ == "__main__":
-    _tests()

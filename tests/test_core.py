@@ -148,7 +148,6 @@ def test_evolve_lindblad_discrete():
 
     # Test that evolution WITH a random hamiltonian and WITH random lindblad operators
     # yields a similar result to qutip.
-    # Note that the allclose tolerance may need to be adjusted.
     matrix_size = 4
     for i in range(big):
         # Evolve under lindbladian.
@@ -277,22 +276,25 @@ def test_interpolate_linear_points():
     #ENDFOR
 
 
-# TODO(tpr0p): Rewrite this test for time dependent matrices.
 def test_magnus():
     import numpy as np
+    
     from qoc.core.mathmethods import (magnus_m2, magnus_m4, magnus_m6,)
     
-    # These tests ensure the above methods were copied to code correclty.
+    # These tests ensure the magnus methods were copied to code correclty.
     # They are hand checked. There may be a better way to test the methods.
     dt = 1.
     identity = np.eye(2)
-    # assert(np.allclose(magnus_m2(identity, dt), identity))
-    # assert(np.allclose(magnus_m4(identity, identity, dt), identity))
-    # assert(np.allclose(magnus_m6(identity, identity, identity, dt), identity))
-    dt = 2.
-    a1 = np.array([[2., 3.], [4., 5.]])
-    a2 = np.array([[9., 6.], [8., 7.]])
-    a3 = np.array([[12., 13.], [11., 10.]])
+    iden = lambda time: identity
+    assert(np.allclose(magnus_m2(iden, dt, 0), identity))
+    assert(np.allclose(magnus_m4(iden, dt, 0), identity))
+    assert(np.allclose(magnus_m6(iden, dt, 0), identity))
+    
+    # TODO: Rewrite this test for time dependent matrices.
+    # dt = 2.
+    # a1 = np.array([[2., 3.], [4., 5.]])
+    # a2 = np.array([[9., 6.], [8., 7.]])
+    # a3 = np.array([[12., 13.], [11., 10.]])
     # assert(np.allclose(magnus_m2(a1, dt),
     #                   np.array([[4., 6.],
     #                             [8., 10.]])))
@@ -511,7 +513,8 @@ def random_hermitian_matrix(matrix_size):
     return (matrix + conjugate_transpose(matrix)) / 2
 
 
-if __name__ == "__main__":
+### all ###
+def _test_all():
     test_clip_control_norms()
     test_strip_slap()
     test_evolve_lindblad_discrete()
@@ -522,3 +525,7 @@ if __name__ == "__main__":
     test_rkdp5()
     test_evolve_schroedinger_discrete()
     test_grape_schroedinger_discrete()
+
+
+if __name__ == "__main__":
+    _test_all()

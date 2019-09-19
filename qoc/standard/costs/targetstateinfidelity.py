@@ -55,34 +55,3 @@ class TargetStateInfidelity(Cost):
         infidelity = 1 - fidelity_normalized
         
         return infidelity * self.cost_multiplier
-
-
-def _tests():
-    """
-    Run test on the module.
-    """
-    state0 = np.array([[0], [1]])
-    target0 = np.array([[1], [0]])
-    states = np.stack((state0,), axis=0)
-    targets = np.stack((target0,), axis=0)
-    ti = TargetStateInfidelity(targets)
-    cost = ti.cost(None, states, None)
-    assert(np.allclose(cost, 1))
-
-    ti = TargetStateInfidelity(states)
-    cost = ti.cost(None, states, None)
-    assert(np.allclose(cost, 0))
-
-    state0 = np.array([[1], [0]])
-    state1 = (np.array([[1j], [1]]) / np.sqrt(2))
-    target0 = np.array([[1j], [0]])
-    target1 = np.array([[1], [0]])
-    states = np.stack((state0, state1,), axis=0)
-    targets = np.stack((target0, target1,), axis=0)
-    ti = TargetStateInfidelity(targets)
-    cost = ti.cost(None, states, None)
-    assert(np.allclose(cost, .25))
-
-
-if __name__ == "__main__":
-    _tests()

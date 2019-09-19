@@ -79,29 +79,3 @@ class ForbidStates(Cost):
         cost_normalized = cost / self.cost_normalization_constant
         
         return cost_normalized * self.cost_multiplier
-
-
-def _test():
-    """
-    Run tests on the module.
-    """
-    system_step_count = 10
-    state0 = np.array([[1], [0]])
-    forbid0_0 = np.array([[1], [0]])
-    forbid0_1 = np.divide(np.array([[1], [1]]), np.sqrt(2))
-    state1 = np.array([[0], [1]])
-    forbid1_0 = np.divide(np.array([[1], [1]]), np.sqrt(2))
-    forbid1_1 = np.divide(np.array([[1j], [1j]]), np.sqrt(2))
-    states = np.stack((state0, state1,))
-    forbidden_states0 = np.stack((forbid0_0, forbid0_1,))
-    forbidden_states1 = np.stack((forbid1_0, forbid1_1,))
-    forbidden_states = np.stack((forbidden_states0, forbidden_states1,))
-    fs = ForbidStates(forbidden_states, system_step_count)
-    
-    cost = fs.cost(None, states, None)
-    expected_cost = np.divide(5, 80)
-    assert(np.allclose(cost, expected_cost,))
-
-
-if __name__ == "__main__":
-    _test()

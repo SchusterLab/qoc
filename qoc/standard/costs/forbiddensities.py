@@ -83,35 +83,3 @@ class ForbidDensities(Cost):
         cost_normalized = cost / self.cost_normalization_constant
         
         return cost_normalized * self.cost_multiplier
-
-
-def _test():
-    """
-    Run tests on the module.
-    """
-    system_step_count = 10
-    state0 = np.array([[1], [0]])
-    density0 = np.matmul(state0, conjugate_transpose(state0))
-    forbid0_0 = np.array([[1], [0]])
-    density0_0 = np.matmul(forbid0_0, conjugate_transpose(forbid0_0))
-    forbid0_1 = np.divide(np.array([[1], [1]]), np.sqrt(2))
-    density0_1 = np.matmul(forbid0_1, conjugate_transpose(forbid0_1))
-    state1 = np.array([[0], [1]])
-    density1 = np.matmul(state1, conjugate_transpose(state1))
-    forbid1_0 = np.divide(np.array([[1], [1]]), np.sqrt(2))
-    density1_0 = np.matmul(forbid1_0, conjugate_transpose(forbid1_0))
-    forbid1_1 = np.divide(np.array([[1j], [1j]]), np.sqrt(2))
-    density1_1 = np.matmul(forbid1_1, conjugate_transpose(forbid1_1))
-    densities = np.stack((density0, density1,))
-    forbidden_densities0 = np.stack((density0_0, density0_1,))
-    forbidden_densities1 = np.stack((density1_0, density1_1,))
-    forbidden_densities = np.stack((forbidden_densities0, forbidden_densities1,))
-    fd = ForbidDensities(forbidden_densities, system_step_count)
-    
-    cost = fd.cost(None, densities, None)
-    expected_cost = 7 / 640
-    assert(np.allclose(cost, expected_cost,))
-
-
-if __name__ == "__main__":
-    _test()

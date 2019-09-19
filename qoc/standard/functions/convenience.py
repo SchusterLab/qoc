@@ -102,18 +102,3 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
-
-
-### MODULE TESTS ###
-
-_BIG = 100
-
-def _tests():
-    """
-    Run tests on the module.
-    """
-    pass
-
-
-if __name__ == "__main__":
-    _tests()

@@ -150,14 +150,3 @@ def plot_best_trial(file_path, save_path=None,
     # #ENDFOR
     
     plt.savefig(save_path, dpi=dpi)
-    
-
-def _tests():
-    """
-    Run tests on the module.
-    """
-    pass
-
-
-if __name__ == "__main__":
-   _tests()
