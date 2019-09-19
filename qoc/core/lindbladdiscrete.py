@@ -29,7 +29,6 @@ from qoc.standard import (Adam, ans_jacobian, commutator,
 
 def evolve_lindblad_discrete(evolution_time, initial_densities,
                              system_eval_count,
-                             control_eval_count=0,
                              controls=None,
                              cost_eval_step=1,
                              costs=list(),
@@ -47,7 +46,6 @@ def evolve_lindblad_discrete(evolution_time, initial_densities,
     initial_densities
     system_eval_count
 
-    control_eval_count
     controls
     cost_eval_step
     costs
@@ -60,6 +58,11 @@ def evolve_lindblad_discrete(evolution_time, initial_densities,
     Returns:
     result
     """
+    if controls is not None:
+        control_eval_count = controls.shape[0]
+    else:
+        control_eval_count = 0
+    
     pstate = EvolveLindbladDiscreteState(control_eval_count,
                                          cost_eval_step, costs,
                                          evolution_time, hamiltonian,

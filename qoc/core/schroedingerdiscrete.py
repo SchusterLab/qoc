@@ -185,7 +185,15 @@ def _esd_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the cost function.
-    return _evaluate_schroedinger_discrete(controls, pstate, reporter)
+    error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
+
+    # Determine if optimization should terminate.
+    if error <= pstate.min_error:
+        terminate = True
+    else:
+        terminate = False
+
+    return error, terminate
 
 
 def _esdj_wrap(controls, pstate, reporter, result):
@@ -239,8 +247,14 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Convert the gradients from cost function to optimizer format.
     grads = strip_controls(pstate.complex_controls, grads)
+
+    # Determine if optimization should terminate.
+    if error <= pstate.min_error:
+        terminate = True
+    else:
+        terminate = False
     
-    return grads
+    return grads, terminate
 
 
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):

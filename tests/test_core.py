@@ -73,7 +73,9 @@ def test_evolve_lindblad_discrete():
     from qoc.standard import (conjugate_transpose,
                               SIGMA_X, SIGMA_Y,
                               matrix_to_column_vector_list,
-                              SIGMA_PLUS, SIGMA_MINUS,)
+                              SIGMA_PLUS, SIGMA_MINUS,
+                              get_creation_operator,
+                              get_annihilation_operator,)
 
     big = 4
     
@@ -112,7 +114,6 @@ def test_evolve_lindblad_discrete():
                          tlist, c_ops, e_ops,)
         final_density = result.states[-1].full()
         target_density = target_densities[i]
-        assert(np.allclose(final_density, target_density, atol=1e-5))
     #ENDFOR
 
     # Test that evolution WITHOUT a hamiltonian and WITH lindblad operators
@@ -149,6 +150,10 @@ def test_evolve_lindblad_discrete():
     # Test that evolution WITH a random hamiltonian and WITH random lindblad operators
     # yields a similar result to qutip.
     matrix_size = 4
+    evolution_time = 5
+    system_eval_count = 2
+    e_ops_qutip = list()
+    tlist = np.array((0, evolution_time,))
     for i in range(big):
         # Evolve under lindbladian.
         hamiltonian_matrix = random_hermitian_matrix(matrix_size)
@@ -160,22 +165,17 @@ def test_evolve_lindblad_discrete():
         lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
         density_matrix = random_hermitian_matrix(matrix_size)
         initial_densities = np.stack((density_matrix,))
-        evolution_time = 5
-        system_eval_count = 2
         result = evolve_lindblad_discrete(evolution_time,
                                           initial_densities,
                                           system_eval_count,
                                           hamiltonian=hamiltonian,
                                           lindblad_data=lindblad_data)
         final_density = result.final_densities[0]
-
         # Evolve under lindbladian with qutip.
         hamiltonian_qutip =  Qobj(hamiltonian_matrix)
         initial_density_qutip = Qobj(density_matrix)
         lindblad_operators_qutip = [Qobj(lindblad_operator)
                                     for lindblad_operator in lindblad_operators]
-        e_ops_qutip = list()
-        tlist = np.array((0, evolution_time,))
         result_qutip = mesolve(hamiltonian_qutip,
                                initial_density_qutip,
                                tlist,
@@ -183,6 +183,64 @@ def test_evolve_lindblad_discrete():
                                e_ops_qutip,)
         final_density_qutip = result_qutip.states[-1].full()
         assert(np.allclose(final_density, final_density_qutip))
+    #ENDFOR
+
+    # Test that evolvution with a random hamiltonain,
+    # random control amplitudes, and random lindblad operators yields
+    # a similar result to qutip.
+    # qoc constatns
+    matrix_size = 4
+    evolution_time = 5
+    system_eval_count = 2
+    control_eval_count = 100
+    control_count = 1
+    controls_shape = (control_eval_count, control_count)
+    create = get_creation_operator(matrix_size)
+    annihilate = get_annihilation_operator(matrix_size)
+    # qutip constants
+    e_ops_qutip = list()
+    tlist = np.linspace(0, evolution_time, control_eval_count)
+    hc0_qutip = Qobj(annihilate + create)
+    hc1_qutip = Qobj(1j * (annihilate - create))
+    lindblad_operator_count = 1
+    for i in range(big):
+        hamiltonian_matrix = random_hermitian_matrix(matrix_size)
+        hamiltonian = lambda controls, time: (hamiltonian_matrix
+                                              + controls[0] * annihilate
+                                              + np.conjugate(controls[0]) * create)
+        lindblad_operators = np.stack([random_complex_matrix(matrix_size)
+                                       for _ in range(lindblad_operator_count)])
+        lindblad_dissipators = np.ones((lindblad_operator_count,))
+        lindblad_data = lambda time: (lindblad_dissipators, lindblad_operators)
+        density_matrix = random_hermitian_matrix(matrix_size)
+        initial_densities = np.stack((density_matrix,))
+        controls = np.random.rand(*controls_shape) + 1j * np.random.rand(*controls_shape)
+        result = evolve_lindblad_discrete(evolution_time,
+                                          initial_densities,
+                                          system_eval_count,
+                                          controls=controls,
+                                          hamiltonian=hamiltonian,
+                                          lindblad_data=lindblad_data)
+        final_density = result.final_densities[0]
+        hamiltonian_qutip =  Qobj(hamiltonian_matrix)
+        c0_qutip = np.real(controls)[:, 0]
+        c1_qutip = np.imag(controls)[:, 0]
+        h0_ones = np.ones_like(controls[:, 0])
+        h_list = [[hamiltonian_qutip, h0_ones], [hc0_qutip, c0_qutip], [hc1_qutip, c1_qutip]]
+        initial_density_qutip = Qobj(density_matrix)
+        lindblad_operators_qutip = [Qobj(lindblad_operator)
+                                    for lindblad_operator in lindblad_operators]
+        result_qutip = mesolve(h_list,
+                               initial_density_qutip,
+                               tlist,
+                               lindblad_operators_qutip,
+                               e_ops_qutip,)
+        final_density_qutip = result_qutip.states[-1].full()
+        # Qutip does a cubic fit, by default, on their controls and we do a linear fit,
+        # by default.
+        # 1e-2 is reasonable, taking interpolation method differences
+        # into consideration.
+        assert(np.allclose(final_density, final_density_qutip, atol=1e-2))
     #ENDFOR
 
 
@@ -374,16 +432,19 @@ def test_evolve_schroedinger_discrete():
     """
     import numpy as np
     from qutip import mesolve, Qobj, Options
+    from scipy.linalg import norm
 
     from qoc.core import evolve_schroedinger_discrete
     from qoc.models import (MagnusPolicy,)
     from qoc.standard import (matrix_to_column_vector_list,
-                              SIGMA_X, SIGMA_Y,)
+                              SIGMA_X, SIGMA_Y,
+                              get_creation_operator,
+                              get_annihilation_operator,)
 
     big = 10
     magnus_policies = (MagnusPolicy.M2, MagnusPolicy.M4, MagnusPolicy.M6,)
 
-    # Test that evolving states under a hamiltonian yields
+    # Test that evolving states under a known hamiltonian yields
     # a known result. Use e.q. 109 of 
     # https://arxiv.org/abs/1904.06560.
     hilbert_size = 4
@@ -406,46 +467,95 @@ def test_evolve_schroedinger_discrete():
         final_states = result.final_states
         assert(np.allclose(final_states, target_states))
     #ENDFOR
-    # Note that qutip only gets the same result within 1e-6 error.
-    tlist = np.array([0, evolution_time])
-    c_ops = list()
-    e_ops = list()
-    hamiltonian_qutip = Qobj(hamiltonian_matrix)
-    for i, initial_state in enumerate(initial_states):
-        initial_state_qutip = Qobj(initial_state)
-        result = mesolve(hamiltonian_qutip,
-                         initial_state_qutip,
-                         tlist, c_ops, e_ops,)
-        final_state = result.states[-1].full()
-        target_state = target_states[i]
-        assert(np.allclose(final_state, target_state, atol=1e-6))
-    #ENDFOR
 
-    # Test that evolving states under a random hamiltonian yields
+    # Test that evolving random states under a random hamiltonian yields
     # a result similar to qutip.
+    # qoc constants
     hilbert_size = 4
-    initial_state = np.divide(np.ones((hilbert_size, 1)),
-                              np.sqrt(hilbert_size))
-    initial_states = np.stack((initial_state,))
-    initial_state_qutip = Qobj(initial_state)
     system_eval_count = int(1e3)
     evolution_time = 1
+    initial_state_shape = (hilbert_size, 1)
+    # qutip constants
     tlist = np.array([0, evolution_time])
     c_ops = e_ops = list()
     for _ in range(big):
+        # qoc setup
         hamiltonian_matrix = random_hermitian_matrix(hilbert_size)
         hamiltonian = lambda controls, time: hamiltonian_matrix
+        initial_state = (np.random.rand(*initial_state_shape)
+                         + 1j * np.random.rand(*initial_state_shape))
+        initial_state = initial_state / norm(initial_state)
+        initial_states = np.stack((initial_state,))
+        # qutip setup
         hamiltonian_qutip = Qobj(hamiltonian_matrix)
+        initial_state_qutip = Qobj(initial_state)
+        # run qutip
         result = mesolve(hamiltonian_qutip,
                          initial_state_qutip,
                          tlist, c_ops, e_ops,)
         final_state_qutip = result.states[-1].full()
+        # run qoc
         for magnus_policy in magnus_policies:
             result = evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                                   initial_states, system_eval_count,
                                                   magnus_policy=magnus_policy)
             final_state = result.final_states[0]
             assert(np.allclose(final_state, final_state_qutip, atol=1e-4))
+        #ENDFOR
+    #ENDFOR
+
+    # Test that evolving under a random hamiltonian and random controls yields
+    # a result similar to qutip.
+    # qoc constants
+    hilbert_size = 4
+    control_eval_count = 100
+    control_count = 1
+    controls_shape = (control_eval_count, control_count)
+    system_eval_count = int(1e3)
+    evolution_time = 1
+    initial_state_shape = (hilbert_size, 1)
+    create = get_creation_operator(hilbert_size)
+    annihilate = get_annihilation_operator(hilbert_size)
+    # qutip constants
+    c_ops = e_ops = list()
+    hc0_qutip = Qobj(annihilate + create)
+    hc1_qutip = Qobj(1j * (annihilate - create))
+    tlist = np.linspace(0, evolution_time, control_eval_count)
+    for _ in range(big):
+        # setup qoc
+        controls = (np.random.rand(*controls_shape)
+                    + 1j * np.random.rand(*controls_shape))
+        hamiltonian_matrix = random_hermitian_matrix(hilbert_size)
+        hamiltonian = lambda controls, time: (hamiltonian_matrix
+                                              + controls[0] * annihilate
+                                              + np.conjugate(controls[0]) * create)
+        initial_state = (np.random.rand(*initial_state_shape)
+                         + 1j * np.random.rand(*initial_state_shape))
+        initial_state = initial_state / norm(initial_state)
+        initial_states = np.stack((initial_state,))
+        # setup qutip
+        hamiltonian_qutip = Qobj(hamiltonian_matrix)
+        initial_state_qutip = Qobj(initial_state)
+        h0_ones = np.ones(controls.shape[0])
+        c0_qutip = np.real(controls)[:, 0]
+        c1_qutip = np.imag(controls)[:, 0]
+        h_list = [[hamiltonian_qutip, h0_ones], [hc0_qutip, c0_qutip], [hc1_qutip, c1_qutip]]
+        # run qutip
+        result = mesolve(h_list,
+                         initial_state_qutip,
+                         tlist, c_ops, e_ops,)
+        final_state_qutip = result.states[-1].full()
+        # run QOC
+        for magnus_policy in magnus_policies:
+            result = evolve_schroedinger_discrete(evolution_time, hamiltonian,
+                                                  initial_states, system_eval_count,
+                                                  controls=controls,
+                                                  magnus_policy=magnus_policy)
+            final_state = result.final_states[0]
+            # Again, we see 1e-2 tolerance.
+            # Note that we interpolate controls linearly whereas
+            # qutip interpolates controls cubically.
+            assert(np.allclose(final_state, final_state_qutip, atol=1e-2))
         #ENDFOR
     #ENDFOR
         
@@ -517,12 +627,15 @@ def random_hermitian_matrix(matrix_size):
 def _test_all():
     test_clip_control_norms()
     test_strip_slap()
+    
     test_evolve_lindblad_discrete()
     test_grape_lindblad_discrete()
+    
     test_get_lindbladian()
     test_interpolate_linear_points()
     test_magnus()
     test_rkdp5()
+    
     test_evolve_schroedinger_discrete()
     test_grape_schroedinger_discrete()
 

@@ -101,7 +101,9 @@ class Adam(object):
 
         params = initial_params
         for i in range(iteration_count):
-            grads = jacobian(params, *args)
+            grads, terminate = jacobian(params, *args)
+            if terminate:
+                break
             params = self.update(grads, params)
 
 

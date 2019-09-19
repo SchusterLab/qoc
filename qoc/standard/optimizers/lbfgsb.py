@@ -36,9 +36,14 @@ class LBFGSB(object):
         Returns:
         result :: scipy.optimize.OptimizeResult
         """
+        # Disregard termination conditions.
+        function_ = lambda *args, **kwargs: function(*args, **kwargs)[0]
+        jacobian_ = lambda *args, **kwargs: jacobian(*args, **kwargs)[0]
+        # NOTE: min_error termination not implemented
         options = {
             "maxiter": iteration_count,
         }
-        return minimize(function, initial_params, args=args,
-                        method="L-BFGS-B", jac=jacobian,
+
+        return minimize(function_, initial_params, args=args,
+                        method="L-BFGS-B", jac=jacobian_,
                         options=options)
