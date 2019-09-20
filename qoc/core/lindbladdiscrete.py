@@ -193,7 +193,15 @@ def _eld_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the cost function.
-    return _evaluate_lindblad_discrete(controls, pstate, reporter)
+    error =  _evaluate_lindblad_discrete(controls, pstate, reporter)
+
+    # Determine if optimization should terminate.
+    if error <= pstate.min_error:
+        terminate = True
+    else:
+        terminate = False
+
+    return error, terminate
 
 
 def _eldj_wrap(controls, pstate, reporter, result):
@@ -246,8 +254,14 @@ def _eldj_wrap(controls, pstate, reporter, result):
 
     # Convert the gradients from cost function to optimizer format.
     grads = strip_controls(pstate.complex_controls, grads)
-    
-    return grads
+
+    # Determine if optimization should terminate.
+    if error <= pstate.min_error:
+        terminate = True
+    else:
+        terminate = False
+
+    return grads, terminate
 
 
 def _evaluate_lindblad_discrete(controls, pstate, reporter):

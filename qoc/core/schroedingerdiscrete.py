@@ -66,7 +66,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              magnus_policy, save_file_path,
                                              save_intermediate_states,
                                              system_eval_count,)
-    pstate.save_initial()
+    pstate.save_initial(controls)
     result = EvolveSchroedingerResult()
     _ = _evaluate_schroedinger_discrete(controls, pstate, result)
 

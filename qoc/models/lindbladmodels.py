@@ -246,8 +246,7 @@ class GrapeLindbladDiscreteState(GrapeState):
                 save_file["cost_eval_step"] = self.cost_eval_step
                 save_file["cost_names"] = np.array([np.string_("{}".format(cost))
                                                     for cost in self.costs])
-                save_file["error"] = np.zeros((save_count),
-                                              dtype=np.float64)
+                save_file["error"] = np.repeat(np.finfo(np.float64).max, save_count)
                 save_file["evolution_time"]= self.evolution_time
                 save_file["final_densities"] = np.zeros((save_count, density_count,
                                                          self.hilbert_size, self.hilbert_size),

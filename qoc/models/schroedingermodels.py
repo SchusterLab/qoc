@@ -47,7 +47,8 @@ class EvolveSchroedingerDiscreteState(ProgramState):
         """
         See class definition for arguments not listed here.
         """
-        super().__init__(control_eval_count, cost_eval_step, costs,
+        super().__init__(control_eval_count,
+                         cost_eval_step, costs,
                          evolution_time, hamiltonian, interpolation_policy,
                          save_file_path, system_eval_count,)
         self.initial_states = initial_states
@@ -56,7 +57,7 @@ class EvolveSchroedingerDiscreteState(ProgramState):
                                           and save_file_path is not None)
 
 
-    def save_initial(self):
+    def save_initial(self, controls):
         """
         Perform the initial save.
         """
@@ -65,14 +66,14 @@ class EvolveSchroedingerDiscreteState(ProgramState):
                   "".format(self.save_file_path))
 
             with h5py.File(self.save_file_path, "w") as save_file:
-                save_file["controls"] = self.controls
+                save_file["controls"] = controls
                 save_file["cost_eval_step"] = self.cost_eval_step
                 save_file["costs"] = np.array(["{}".format(cost)
                                                for cost in self.costs])
                 save_file["evolution_time"] = self.evolution_time
                 save_file["initial_states"] = self.initial_states
                 save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
-                if self.save_intermediate_states:
+                if self.save_intermediate_states_:
                     save_file["intermediate_states"] = np.zeros((self.system_eval_count,
                                                                  *self.initial_states.shape),
                                                                 dtype=np.complex128)
@@ -86,7 +87,7 @@ class EvolveSchroedingerDiscreteState(ProgramState):
         Save intermediate states to the save file.
         """
         with h5py.File(self.save_file_path, "a") as save_file:
-            save_file["intermediate_states"][system_eval_step] = states
+            save_file["intermediate_states"][system_eval_step] = states.astype(np.complex128)
 
 
 class EvolveSchroedingerResult(object):
@@ -249,8 +250,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                 save_file["cost_eval_step"] = self.cost_eval_step
                 save_file["cost_names"] = np.array([np.string_("{}".format(cost))
                                                     for cost in self.costs])
-                save_file["error"] = np.zeros((save_count),
-                                              dtype=np.float64)
+                save_file["error"] = np.repeat(np.finfo(np.float64).max, save_count)
                 save_file["evolution_time"]= self.evolution_time
                 save_file["final_states"] = np.zeros((save_count, state_count,
                                                       self.hilbert_size, 1),

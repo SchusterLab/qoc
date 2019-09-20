@@ -51,10 +51,19 @@ class TargetDensityInfidelity(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
-        inner_products = (anp.trace(anp.matmul(self.target_densities_dagger, densities),
-                                    axis1=-1, axis2=-2) / self.hilbert_size)
-        fidelities = anp.real(inner_products * anp.conjugate(inner_products))
-        fidelity_normalized = anp.sum(fidelities) / self.density_count
+        # NOTE: Autograd doesn't support vjps of anp.trace with axis arguments.
+        # Nor does it support the vjp of anp.einsum(...ii->..., a).
+        # Therefore, we must use a for loop to index the traces.
+        # The following computations are equivalent to:
+        # inner_products = (anp.trace(anp.matmul(self.target_densities_dagger, densities),
+        #                             axis1=-1, axis2=-2) / self.hilbert_size)
+        prods = anp.matmul(self.target_densities_dagger, densities)
+        fidelity_sum = 0
+        for i, prod in enumerate(prods):
+            inner_prod = anp.trace(prod)
+            fidelity = anp.real(inner_prod * anp.conjugate(inner_prod))
+            fidelity_sum = fidelity_sum + fidelity
+        fidelity_normalized = fidelity_sum / (self.density_count * self.hilbert_size)
         infidelity = 1 - fidelity_normalized
 
         return infidelity * self.cost_multiplier
