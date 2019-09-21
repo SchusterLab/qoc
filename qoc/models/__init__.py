@@ -12,6 +12,7 @@ from .lindbladmodels import (EvolveLindbladDiscreteState,
 from .magnuspolicy import MagnusPolicy
 from .operationpolicy import OperationPolicy
 from .performancepolicy import PerformancePolicy
+from .programtype import ProgramType
 from .programstate import ProgramState
 from .schroedingermodels import (EvolveSchroedingerDiscreteState,
                                  EvolveSchroedingerResult,
@@ -26,7 +27,8 @@ __all__ = [
     "GrapeLindbladResult",
     "MagnusPolicy",
     "OperationPolicy",
-    "PerformancePolicy", "ProgramState",
+    "PerformancePolicy",
+    "ProgramType", "ProgramState",
     "EvolveSchroedingerDiscreteState",
     "EvolveSchroedingerResult",
     "GrapeSchroedingerDiscreteState",

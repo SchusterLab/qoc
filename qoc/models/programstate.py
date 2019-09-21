@@ -3,7 +3,10 @@ programstate.py - This module defines classes to encapsulate data fields
 necessary to execute qoc programs.
 """
 
+from filelock import FileLock
 import numpy as np
+
+from qoc.models.programtype import ProgramType
 
 class ProgramState(object):
     """
@@ -20,6 +23,8 @@ class ProgramState(object):
     final_system_eval_step
     hamiltonian
     interpolation_policy
+    program_type
+    save_file_lock
     save_file_path
     step_cost_indices
     step_costs
@@ -27,6 +32,7 @@ class ProgramState(object):
     """
     def __init__(self, control_eval_count, cost_eval_step, costs,
                  evolution_time, hamiltonian, interpolation_policy,
+                 program_type,
                  save_file_path, system_eval_count):
         """
         See class fields for arguments not listed here.
@@ -40,6 +46,12 @@ class ProgramState(object):
         self.final_system_eval_step = system_eval_count - 1
         self.hamiltonian = hamiltonian
         self.interpolation_policy = interpolation_policy
+        self.program_type = program_type
+        if save_file_path is not None:
+            save_file_lock_path = "{}.lock".format(save_file_path)
+            self.save_file_lock = FileLock(save_file_lock_path)
+        else:
+            self.save_file_lock = None
         self.save_file_path = save_file_path
         step_cost_indices = list()
         step_costs = list()
@@ -79,6 +91,8 @@ class GrapeState(ProgramState):
     max_control_norms
     min_error
     optimizer
+    program_type
+    save_file_lock
     save_file_path
     save_iteration_step
     should_log
@@ -104,6 +118,7 @@ class GrapeState(ProgramState):
         """
         super().__init__(control_eval_count, cost_eval_step, costs,
                          evolution_time, hamiltonian, interpolation_policy,
+                         ProgramType.GRAPE,
                          save_file_path, system_eval_count,)
         self.complex_controls = complex_controls
         self.control_count = control_count

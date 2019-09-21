@@ -5,6 +5,7 @@ plot.py - convenient visualization tools
 import ntpath
 import os
 
+from filelock import FileLock, Timeout
 import h5py
 import matplotlib
 if not "DISPLAY" in os.environ:
@@ -14,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg as la
 
+from qoc.models import ProgramType
 from qoc.standard.functions.convenience import conjugate_transpose
 
 ### CONSTANTS ###
@@ -27,12 +29,13 @@ COLOR_PALETTE_LEN = len(COLOR_PALETTE)
 
 ### MAIN METHODS ###
 
-def plot_best_controls(file_path, amplitude_unit="GHz", 
-                       dpi=1000, marker_style="o", save_file_path=None,
-                       show=False, time_unit="ns",):
+def plot_controls(file_path, amplitude_unit="GHz", 
+                  dpi=1000,
+                  marker_style="o", save_file_path=None,
+                  save_index=None,
+                  show=False, time_unit="ns",):
     """
-    Plot the controls,  and their discrete fast fourier transform, 
-    that achieved the lowest error.
+    Plot the controls,  and their discrete fast fourier transform.
 
     Arguments:
     file_path
@@ -41,24 +44,34 @@ def plot_best_controls(file_path, amplitude_unit="GHz",
     dpi
     marker_style
     save_file_path
+    save_index
     show
     time_unit
 
     Returns: None
     """
-    # Open the file and extract data.
-    file_name = os.path.splitext(ntpath.basename(file_path))[0]
-    _file = h5py.File(file_path, "r")
-    errors = _file["error"]
-    best_index = np.argmin(errors)
-    complex_controls = _file["complex_controls"][()]
-    controls = _file["controls"][best_index][()]
-    controls_real = np.real(controls)
-    controls_imag = np.imag(controls)
+    # Open the file; extract data.
+    file_lock_path = "{}.lock".format(file_path)
+    try:
+        with FileLock(file_lock_path):
+            with h5py.File(file_path, "r") as file_:
+                # If no save_index was specified, choose the save_index that achieved the lowest
+                # error.
+                if save_index is None:
+                    save_index = np.argmin(file_["error"])
+                complex_controls = file_["complex_controls"][()]
+                controls = file_["controls"][save_index][()]
+                evolution_time = file_["evolution_time"][()]
+    except Timeout:
+        print("Could not access specified file.")
+        return
+    #ENDWITH
     control_count = controls.shape[1]
     control_eval_count = controls.shape[0]
-    evolution_time = _file["evolution_time"][()]
     control_eval_times = np.linspace(0, evolution_time, control_eval_count)
+    controls_real = np.real(controls)
+    controls_imag = np.imag(controls)
+    file_name = os.path.splitext(ntpath.basename(file_path))[0]
 
     # Create labels and extra content.
     patches = list()
@@ -135,12 +148,14 @@ def plot_best_controls(file_path, amplitude_unit="GHz",
         plt.show()
 
 
-def plot_population_states(file_path, 
-                           dpi=1000,
-                           marker_style="o",
-                           save_file_path=None, show=False,
-                           state_index=0,
-                           time_unit="ns",):
+def plot_state_population(file_path, 
+                          dpi=1000,
+                          marker_style="o",
+                          save_file_path=None,
+                          save_index=None,
+                          show=False,
+                          state_index=0,
+                          time_unit="ns",):
     """
     Plot the evolution of the population levels for a state.
 
@@ -156,20 +171,36 @@ def plot_population_states(file_path,
 
     Returns: None
     """
-    # Open file and extract data.
+    # Open file; extract data.
+    file_lock_path = "{}.lock".format(file_path)
+    try:
+        with FileLock(file_lock_path):
+            with h5py.File(file_path, "r") as file_:
+                evolution_time = file_["evolution_time"][()]
+                program_type = file_["program_type"][()]
+                system_eval_count = file_["system_eval_count"][()]
+                if program_type == ProgramType.EVOLVE.value:
+                    intermediate_states = file_["intermediate_states"][:, state_index, :, :]
+                else:
+                    # If no save index was specified, choose the index that achieved
+                    # the lowest error.
+                    if save_index is None:
+                        save_index = np.argmin(file_["error"])
+                        intermediate_states = file_["intermediate_states"][save_index, :, state_index, :, :]
+            #ENDWITH
+        #ENDWITH
+    except Timeout:
+        print("Could not access the specified file.")
+        return
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
-    file_ = h5py.File(file_path, "r")
-    evolution_time = file_["evolution_time"][()]
-    system_eval_count = file_["system_eval_count"][()]
-    states = file_["intermediate_states"][()]
-    hilbert_size = states.shape[2]
+    hilbert_size = intermediate_states.shape[-2]
     system_eval_times = np.linspace(0, evolution_time, system_eval_count)
 
     # Compile data.
-    densities = np.matmul(states, conjugate_transpose(states))
+    intermediate_densities = np.matmul(intermediate_states, conjugate_transpose(intermediate_states))
     population_data = list()
     for i in range(hilbert_size):
-        population_data_ = np.real(densities[:, state_index, i, i])
+        population_data_ = np.real(intermediate_densities[:, i, i])
         population_data.append(population_data_)
 
     # Create labels and extra content.

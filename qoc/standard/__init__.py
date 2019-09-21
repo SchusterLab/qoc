@@ -25,7 +25,7 @@ from .functions import (commutator, conjugate_transpose,
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 
-from .plot import (plot_best_controls, plot_population_states,)
+from .plot import (plot_controls, plot_state_population,)
 
 from .utils import (ans_jacobian, generate_save_file_path, CustomJSONEncoder,)
 

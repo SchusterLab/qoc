@@ -18,7 +18,8 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerResult,
                         InterpolationPolicy,
-                        MagnusPolicy)
+                        MagnusPolicy,
+                        ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
                           expm, matmuls)
 
@@ -63,7 +64,8 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              costs, evolution_time,
                                              hamiltonian, initial_states,
                                              interpolation_policy,
-                                             magnus_policy, save_file_path,
+                                             magnus_policy,
+                                             save_file_path,
                                              save_intermediate_states,
                                              system_eval_count,)
     pstate.save_initial(controls)
@@ -87,7 +89,9 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 max_control_norms=None,
                                 min_error=0,
                                 optimizer=Adam(),
-                                save_file_path=None, save_iteration_step=0,):
+                                save_file_path=None,
+                                save_intermediate_states=False,
+                                save_iteration_step=0,):
     """
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
@@ -112,6 +116,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
     min_error
     optimizer
     save_file_path
+    save_intermediate_states
     save_iteration_step
     system_eval_count
 
@@ -136,7 +141,9 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             log_iteration_step,
                                             max_control_norms, magnus_policy,
                                             min_error, optimizer,
-                                            save_file_path, save_iteration_step,
+                                            save_file_path,
+                                            save_intermediate_states,
+                                            save_iteration_step,
                                             system_eval_count,)
     pstate.log_and_save_initial()
 
@@ -281,6 +288,11 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     hamiltonian = pstate.hamiltonian
     interpolation_policy = pstate.interpolation_policy
     magnus_policy = pstate.magnus_policy
+    program_type = pstate.program_type
+    if program_type == ProgramType.GRAPE:
+        iteration = reporter.iteration
+    else:
+        iteration = 0
     save_intermediate_states = pstate.save_intermediate_states_
     states = pstate.initial_states
     step_costs = pstate.step_costs
@@ -290,9 +302,15 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
     for system_eval_step in range(system_eval_count):
-        # Save the current states.
+        # If applicable, save the current states.
         if save_intermediate_states:
-            pstate.save_intermediate_states(states, system_eval_step)
+            if isinstance(states, Box):
+                intermediate_states = states._value
+            else:
+                intermediate_states = states
+            pstate.save_intermediate_states(iteration,
+                                            intermediate_states,
+                                            system_eval_step,)
         
         # Determine where we are in the mesh.
         cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)

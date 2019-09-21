@@ -178,13 +178,14 @@ if PRINT:
 from qoc.standard import (generate_save_file_path,
                           Adam, LBFGSB,)
 LOG_ITERATION_STEP = 1
+SAVE_INTERMEDIATE_STATES = True
+SAVE_ITERATION_STEP = 1
 EXPERIMENT_NAME = "tutorial_cavity_fock1"
 SAVE_PATH = "./out"
 if not DEBUG:
     OPT_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
 else:
-    OPT_FILE_PATH = "./out/00031_tutorial_cavity_fock1.h5"
-SAVE_ITERATION_STEP = 1
+    OPT_FILE_PATH = "./out/00055_tutorial_cavity_fock1.h5"
 
 # For this problem, the LBFGSB optimizer reaches a reasonable
 # answer very quickly.
@@ -209,56 +210,24 @@ if EXECUTE:
                                              log_iteration_step=LOG_ITERATION_STEP,
                                              optimizer=OPTIMIZER,
                                              save_file_path=OPT_FILE_PATH,
+                                             save_intermediate_states=SAVE_INTERMEDIATE_STATES,
                                              save_iteration_step=SAVE_ITERATION_STEP,)
     
 # Next, we want to do some analysis of our results.
 import os
 CONTROLS_PLOT_FILE = "{}_controls.png".format(EXPERIMENT_NAME)
 CONTROLS_PLOT_FILE_PATH = os.path.join(SAVE_PATH, CONTROLS_PLOT_FILE)
-# This function will plot the controls, and their fourier transform,
-# that achieved the lowest error.
+POPULATION_PLOT_FILE = "{}_population.png".format(EXPERIMENT_NAME)
+POPULATION_PLOT_FILE_PATH = os.path.join(SAVE_PATH, POPULATION_PLOT_FILE)
 if EXECUTE:
-    from qoc.standard import plot_best_controls
-    plot_best_controls(OPT_FILE_PATH,
+    from qoc.standard import (plot_controls,
+                              plot_state_population,)
+    # This function will plot the controls, and their fourier transform,
+    # that achieved the lowest error.
+    plot_controls(OPT_FILE_PATH,
                        save_file_path=CONTROLS_PLOT_FILE_PATH)
-
-# In order to see the population of our state evolve over time,
-# we can save the states to the save file every system_eval_step.
-# This is not done by default in the grape methods because
-# it is expensive.
-SAVE_INTERMEDIATE_STATES = True
-if not DEBUG:
-    EVOL_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
-else:
-    EVOL_FILE_PATH = "./out/00032_tutorial_cavity_fock1.h5"
-if EXECUTE:
-    import h5py
-    from qoc import evolve_schroedinger_discrete
-    
-    f = h5py.File(OPT_FILE_PATH)
-    best_controls_index = anp.argmin(f["error"])
-    best_controls = f["controls"][best_controls_index]
-    if not DEBUG:
-        result = evolve_schroedinger_discrete(EVOLUTION_TIME,
-                                              hamiltonian,
-                                              INITIAL_STATES, SYSTEM_EVAL_COUNT,
-                                              controls=best_controls,
-                                              save_file_path=EVOL_FILE_PATH,
-                                              save_intermediate_states=SAVE_INTERMEDIATE_STATES)
-
-    # The plot_population method plots the value of the density matrix
-    POPULATION_PLOT_FILE = "{}_population.png".format(EXPERIMENT_NAME)
-    POPULATION_PLOT_FILE_PATH = os.path.join(SAVE_PATH, POPULATION_PLOT_FILE)
-    from qoc.standard import plot_population_states
-    plot_population_states(EVOL_FILE_PATH,
+    # This function will plot the values of the diagonal elements of the
+    # density matrix that is formed by taking the outer product of the state
+    # with itself.
+    plot_state_population(OPT_FILE_PATH,
                            save_file_path=POPULATION_PLOT_FILE_PATH)
-
-
-
-
-
-
-
-
-
-
