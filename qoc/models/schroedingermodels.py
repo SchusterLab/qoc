@@ -200,7 +200,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         self.hilbert_size = initial_states[0].shape[0]
         self.initial_states = initial_states
         self.magnus_policy = magnus_policy
-        self.save_intermediate_states_ = (self.should_save and save_intermediate_states_)
+        self.save_intermediate_states_ = (self.should_save
+                                          and save_intermediate_states_)
 
 
     def log_and_save(self, controls, error, final_states, grads, iteration,):
@@ -329,8 +330,9 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                     with h5py.File(self.save_file_path, "a") as save_file:
                         save_file["intermediate_states"][iteration, system_eval_step, :, :, :] = states.astype(np.complex128)
             except Timeout:
-                print("Could not save intermediate states on iteration {}"
-                      "".format(iteration))
+                print("Could not save intermediate states on iteration {} and "
+                      "system_eval_step {}."
+                      "".format(iteration, system_eval_step))
         #ENDIF
 
 

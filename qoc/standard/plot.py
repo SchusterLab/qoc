@@ -148,6 +148,91 @@ def plot_controls(file_path, amplitude_unit="GHz",
         plt.show()
 
 
+def plot_density_population(file_path,
+                          density_index=0,
+                          dpi=1000,
+                          marker_style="o",
+                          save_file_path=None,
+                          save_index=None,
+                          show=False,
+                          time_unit="ns",):
+    """
+    Plot the evolution of the population levels for a density matrix.
+
+    Arguments:
+    file_path :: str - the full path to the H5 file
+    
+    density_index
+    dpi
+    marker_style
+    save_file_path
+    show
+    state_index
+    time_unit
+
+    Returns: None
+    """
+    # Open file; extract data.
+    file_lock_path = "{}.lock".format(file_path)
+    try:
+        with FileLock(file_lock_path):
+            with h5py.File(file_path, "r") as file_:
+                evolution_time = file_["evolution_time"][()]
+                program_type = file_["program_type"][()]
+                system_eval_count = file_["system_eval_count"][()]
+                if program_type == ProgramType.EVOLVE.value:
+                    intermediate_densities = file_["intermediate_densities"][:, density_index, :, :]
+                else:
+                    # If no save index was specified, choose the index that achieved
+                    # the lowest error.
+                    if save_index is None:
+                        save_index = np.argmin(file_["error"])
+                        intermediate_densities = file_["intermediate_densities"][save_index, :, density_index, :, :]
+            #ENDWITH
+        #ENDWITH
+    except Timeout:
+        print("Could not access the specified file.")
+        return
+    file_name = os.path.splitext(ntpath.basename(file_path))[0]
+    hilbert_size = intermediate_states.shape[-2]
+    system_eval_times = np.linspace(0, evolution_time, system_eval_count)
+
+    # Compile data.
+    population_data = list()
+    for i in range(hilbert_size):
+        population_data_ = np.real(intermediate_densities[:, i, i])
+        population_data.append(population_data_)
+
+    # Create labels and extra content.
+    patches = list()
+    labels = list()
+    for i in range(hilbert_size):
+        label = "{}".format(i)
+        labels.append(label)
+        color = get_color(i)
+        patches.append(mpatches.Patch(label=label, color=color))
+    #ENDFOR
+
+    # Plot the data.
+    plt.figure()
+    plt.suptitle(file_name)
+    plt.figlegend(handles=patches, labels=labels, loc="upper right",
+                  framealpha=0.5)
+    plt.xlabel("Time ({})".format(time_unit))
+    plt.ylabel("Population")
+    for i in range(hilbert_size):
+        color = get_color(i)
+        plt.plot(system_eval_times, population_data[i], marker_style,
+                 color=color, ms=2, alpha=0.9)
+
+    # Export.
+    if save_file_path is not None:
+        plt.savefig(save_file_path, dpi=dpi)
+
+    if show:
+        plt.show()
+
+
 def plot_state_population(file_path, 
                           dpi=1000,
                           marker_style="o",

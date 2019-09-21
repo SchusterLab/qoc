@@ -20,7 +20,8 @@ from qoc.models import (Dummy,
                         InterpolationPolicy,
                         OperationPolicy,
                         GrapeLindbladDiscreteState,
-                        GrapeLindbladResult,)
+                        GrapeLindbladResult,
+                        ProgramType,)
 from qoc.standard import (Adam, ans_jacobian, commutator,
                           conjugate_transpose,
                           matmuls,)
@@ -92,7 +93,9 @@ def grape_lindblad_discrete(control_count, control_eval_count,
                             max_control_norms=None,
                             min_error=0,
                             optimizer=Adam(),
-                            save_file_path=None, save_iteration_step=0,):
+                            save_file_path=None,
+                            save_intermediate_densities=False,
+                            save_iteration_step=0,):
     """
     This method optimizes the evolution of a set of states under the lindblad
     equation for time-discrete control parameters.
@@ -118,6 +121,7 @@ def grape_lindblad_discrete(control_count, control_eval_count,
     min_error
     optimizer
     save_file_path
+    save_intermediate_densities
     save_iteration_step
 
     Returns:
@@ -142,7 +146,8 @@ def grape_lindblad_discrete(control_count, control_eval_count,
                                         lindblad_data,
                                         log_iteration_step, max_control_norms,
                                         min_error, optimizer,
-                                        save_file_path, save_iteration_step,
+                                        save_file_path, save_intermediate_densities,
+                                        save_iteration_step,
                                         system_eval_count,)
     pstate.log_and_save_initial()
 
@@ -290,6 +295,11 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
     hamiltonian = pstate.hamiltonian
     interpolation_policy = pstate.interpolation_policy
     lindblad_data = pstate.lindblad_data
+    program_type = pstate.program_type
+    if program_type == ProgramType.GRAPE:
+        iteration = reporter.iteration
+    else:
+        iteration = 0
     save_intermediate_densities = pstate.save_intermediate_densities_
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
@@ -306,7 +316,13 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
     for system_eval_step in range(system_eval_count):
         # Save the current densities.
         if save_intermediate_densities:
-            pstate.save_intermediate_densities(densities, system_eval_step)
+            if isinstance(densities, Box):
+                intermediate_densities = densities._value
+            else:
+                intermediate_densities = densities
+            pstate.save_intermediate_densities(iteration,
+                                               intermediate_densities,
+                                               system_eval_step)
 
         # Determine where we are in the mesh.
         cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)

@@ -1,6 +1,12 @@
 # binary
 *.h5
 *.png
+*.lock
+
+# docs
+docs/_build
+docs/_templates
+docs/_static
 
 # editor files
 *~
@@ -14,6 +20,9 @@ _test/*
 *.pyc
 *.egg-info
 **/.ipynb_checkpoints/*
+
+# report
+!report/data/*.png
 
 
 

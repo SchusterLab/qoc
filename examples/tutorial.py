@@ -8,7 +8,7 @@ References:
 [1] https://arxiv.org/abs/1608.02430
 """
 
-DEBUG = False
+DEBUG = True
 EXECUTE = True
 PRINT = False
 
@@ -55,7 +55,7 @@ CAVITY_ONE = anp.copy(CAVITY_VACUUM)
 CAVITY_ONE[1, 0] = 1
 B = get_annihilation_operator(TRANSMON_STATE_COUNT)
 B_DAGGER = get_creation_operator(TRANSMON_STATE_COUNT)
-B_ID = anp.eye(CAVITY_STATE_COUNT)
+B_ID = anp.eye(TRANSMON_STATE_COUNT)
 TRANSMON_VACUUM = anp.zeros((TRANSMON_STATE_COUNT, 1))
 TRANSMON_ZERO = anp.copy(TRANSMON_VACUUM)
 TRANSMON_ZERO[0, 0] = 1
@@ -183,9 +183,9 @@ SAVE_ITERATION_STEP = 1
 EXPERIMENT_NAME = "tutorial_cavity_fock1"
 SAVE_PATH = "./out"
 if not DEBUG:
-    OPT_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+    SCHROED_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
 else:
-    OPT_FILE_PATH = "./out/00055_tutorial_cavity_fock1.h5"
+    SCHROED_FILE_PATH = "./out/00011_tutorial_cavity_fock1.h5"
 
 # For this problem, the LBFGSB optimizer reaches a reasonable
 # answer very quickly.
@@ -209,7 +209,7 @@ if EXECUTE:
                                              complex_controls=COMPLEX_CONTROLS,
                                              log_iteration_step=LOG_ITERATION_STEP,
                                              optimizer=OPTIMIZER,
-                                             save_file_path=OPT_FILE_PATH,
+                                             save_file_path=SCHROED_FILE_PATH,
                                              save_intermediate_states=SAVE_INTERMEDIATE_STATES,
                                              save_iteration_step=SAVE_ITERATION_STEP,)
     
@@ -224,10 +224,100 @@ if EXECUTE:
                               plot_state_population,)
     # This function will plot the controls, and their fourier transform,
     # that achieved the lowest error.
-    plot_controls(OPT_FILE_PATH,
-                       save_file_path=CONTROLS_PLOT_FILE_PATH)
+    if not DEBUG:
+        plot_controls(SCHROED_FILE_PATH,
+                           save_file_path=CONTROLS_PLOT_FILE_PATH)
     # This function will plot the values of the diagonal elements of the
     # density matrix that is formed by taking the outer product of the state
     # with itself.
-    plot_state_population(OPT_FILE_PATH,
-                           save_file_path=POPULATION_PLOT_FILE_PATH)
+    if not DEBUG:
+        plot_state_population(SCHROED_FILE_PATH,
+                               save_file_path=POPULATION_PLOT_FILE_PATH)
+
+# Great, so we have now obtained a control pulse that will achieve a desired
+# state transfer in a closed quantum system. If we want to model an open quantum system,
+# qoc also gives us the power to do that. In particular, qoc chooses to model
+# dissipative systems using the lindblad master equation.
+# https://en.wikipedia.org/wiki/Lindbladian
+# Similar to the way we defined our hamiltonian, we define our lindblad operators
+# and dissipation constants as a joint function of time.
+# lindblad_data :: (time :: float)
+# -> (dissipators :: ndarray (lindblad_operator_count),
+#     operators :: ndarray (lindblad_operator_count x hilbert_size x hilbert_size))
+# The operators defined here follow from e.q. 9 of [1].
+L_OP_0 = krons(A, B_ID)
+L_OP_1 = krons(A_ID, B)
+L_OP_2 = krons(A_ID, matmuls(B_DAGGER, B))
+G_0 = 1 / T1_C
+G_1 = 1 / T1_T
+G_2 = 1 / TP_T
+LINDBLAD_DISSIPATORS = anp.array((G_0, G_1, G_2,))
+LINDBLAD_OPERATORS = anp.stack((L_OP_0, L_OP_1, L_OP_2,))
+lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
+# Notice that the lindblad equation operates on density matrices; it does not operate on state vectors
+# like the schroedinger equation.
+# Therefore, we need to redefine the initial state of our system, and our cost functions,
+# using density matrices.
+from qoc.standard import TargetDensityInfidelity
+INITIAL_DENSITIES = matmuls(INITIAL_STATES, conjugate_transpose(INITIAL_STATES))
+TARGET_DENSITIES = matmuls(TARGET_STATES, conjugate_transpose(TARGET_STATES))
+COSTS = [TargetDensityInfidelity(TARGET_DENSITIES)]
+
+# Note that evolving under the lindblad equation is substantially more expensive,
+# in both time and memory, than evolving under the schroedinger equation.
+# qoc saves memory by writing the intermediate states and densities to a file,
+# as opposed to keeping them in memory. However, writing to a file is expensive
+# in time. Here we show how to disable the intermediate saving option and
+# still produce population plots. This method is recommended for most use cases.
+SAVE_INTERMEDIATE_DENSITIES = False
+
+# As mentioned earlier, the `system_eval_count` argument has no bearing on
+# how the accuracy of the lindblad integrator. Therefore, if you do not have any cost
+# functions that require evaluation at intermediary time steps in the evolution,
+# it is recommended that you set `system_eval_count` = 2.
+# This means that the lindblad integrator will only evaluate the density matrices
+# at time=0 and time=EVOLUTION_TIME.
+SYSTEM_EVAL_COUNT = 2
+OPTIMIZER = Adam()
+
+DEBUG = False
+if not DEBUG:
+    LINDBLAD_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+else:
+    pass
+
+if EXECUTE:
+    from qoc import grape_lindblad_discrete
+    if not DEBUG:
+        CORE_COUNT = 8
+        os.environ["OMP_NUM_THREADS"] = "{}".format(CORE_COUNT)
+        os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
+        os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
+        os.environ["VECLIB_MAXIMUM_THREADS"] = "{}".format(CORE_COUNT)
+        os.environ["NUMEXPR_NUM_THREADS"] = "{}".format(CORE_COUNT)
+        result = grape_lindblad_discrete(CONTROL_COUNT,
+                                         CONTROL_EVAL_COUNT,
+                                         COSTS, EVOLUTION_TIME,
+                                         INITIAL_DENSITIES,
+                                         SYSTEM_EVAL_COUNT,
+                                         complex_controls=COMPLEX_CONTROLS,
+                                         hamiltonian=hamiltonian,
+                                         lindblad_data=lindblad_data,
+                                         log_iteration_step=LOG_ITERATION_STEP,
+                                         optimizer=OPTIMIZER,
+                                         save_file_path=LINDBLAD_FILE_PATH,
+                                         save_intermediate_densities=SAVE_INTERMEDIATE_DENSITIES,
+                                         save_iteration_step=SAVE_ITERATION_STEP,)
+        
+# Again, we want to analyze our results.
+L_CONTROLS_PLOT_FILE = "{}_controls.png".format(EXPERIMENT_NAME)
+L_CONTROLS_PLOT_FILE_PATH = os.path.join(SAVE_PATH, L_CONTROLS_PLOT_FILE)
+L_POPULATION_PLOT_FILE = "{}_population_lindblad.png".format(EXPERIMENT_NAME)
+L_POPULATION_PLOT_FILE_PATH = os.path.join(SAVE_PATH, L_POPULATION_PLOT_FILE)
+
+if EXECUTE:
+    from qoc.standard import plot_density_population
+    plot_controls(LINDBLAD_FILE_PATH,
+                  save_file_path=L_CONTROLS_PLOT_FILE_PATH)
+    plot_density_population(LINDBLAD_FILE_PATH,
+                            save_file_path=L_POPULATION_PLOT_FILE_PATH)

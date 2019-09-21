@@ -4,6 +4,7 @@ encapsulate the necessary information to execute
 programs involving lindblad evolution
 """
 
+from filelock import FileLock, Timeout
 import h5py
 import numpy as np
 
@@ -27,6 +28,7 @@ class EvolveLindbladDiscreteState(ProgramState):
     interpolation_policy
     lindblad_data
     method
+    program_type
     save_file_path
     save_intermediate_densities_
     step_cost_indices
@@ -45,11 +47,13 @@ class EvolveLindbladDiscreteState(ProgramState):
         """
         super().__init__(control_eval_count, cost_eval_step, costs,
                          evolution_time, hamiltonian, interpolation_policy,
+                         ProgramType.EVOLVE,
                          save_file_path, system_eval_count)
         self.initial_densities = initial_densities
         self.lindblad_data = lindblad_data
         self.save_intermediate_densities_ = (save_intermediate_densities_
                                              and save_file_path is not None)
+
 
     def save_initial(self):
         """
@@ -58,29 +62,41 @@ class EvolveLindbladDiscreteState(ProgramState):
         if self.save_file_path is not None:
             print("QOC is saving this evolution to {}."
                   "".format(self.save_file_path))
-
-            with h5py.File(self.save_file_path, "w") as save_file:
-                save_file["controls"] = self.controls
-                save_file["cost_eval_step"] = self.cost_eval_step
-                save_file["costs"] = np.array(["{}".format(cost)
-                                               for cost in self.costs])
-                save_file["evolution_time"] = self.evolution_time
-                save_file["initial_densities"] = self.initial_densities
-                save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
-                if self.save_intermediate_densities:
-                    save_file["intermediate_densities"] = np.zeros((self.system_eval_count,
-                                                                    *self.initial_densities.shape),
-                                                                   dtype=np.complex128)
-                save_file["method"] = self.method
-                save_file["system_eval_count"] = self.system_eval_count
+            try:
+                with self.save_file_lock:
+                    with h5py.File(self.save_file_path, "w") as save_file:
+                        save_file["controls"] = self.controls
+                        save_file["cost_eval_step"] = self.cost_eval_step
+                        save_file["costs"] = np.array(["{}".format(cost)
+                                                       for cost in self.costs])
+                        save_file["evolution_time"] = self.evolution_time
+                        save_file["initial_densities"] = self.initial_densities
+                        save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
+                        if self.save_intermediate_densities_:
+                            save_file["intermediate_densities"] = np.zeros((self.system_eval_count,
+                                                                            *self.initial_densities.shape),
+                                                                           dtype=np.complex128)
+                        save_file["method"] = self.method
+                        save_file["program_type"] = self.program_type.value
+                        save_file["system_eval_count"] = self.system_eval_count
+                    #ENDWITH
+                #ENDWITH
+            except:
+                print("Could not perform initial save.")
+        #ENDIF
 
     
     def save_intermediate_densities(self, densities, system_eval_step):
         """
         Save intermediate densities to the save file.
         """
-        with h5py.File(self.save_file_path, "a") as save_file:
-            save_file["intermediate_densities"][system_eval_step] = densities
+        try:
+            with self.save_file_lock:
+                with h5py.File(self.save_file_path, "a") as save_file:
+                    save_file["intermediate_densities"][system_eval_step] = densities
+        except Timeout:
+            print("Could not save intermediate densities on system_eval_step {}."
+                  "".format(system_eval_step))
 
 
 class EvolveLindbladResult(object):
@@ -133,6 +149,7 @@ class GrapeLindbladDiscreteState(GrapeState):
     method
     min_error
     optimizer
+    program_type
     save_file_path
     save_intermediate_densities_
     save_iteration_step
@@ -157,7 +174,8 @@ class GrapeLindbladDiscreteState(GrapeState):
                  lindblad_data,
                  log_iteration_step, max_control_norms,
                  min_error, optimizer,
-                 save_file_path, save_iteration_step,
+                 save_file_path, save_intermediate_densities_,
+                 save_iteration_step,
                  system_eval_count,):
         """
         See class fields for arguments not listed here.
@@ -176,6 +194,8 @@ class GrapeLindbladDiscreteState(GrapeState):
         self.hilbert_size = initial_densities[0].shape[0]
         self.initial_densities = initial_densities
         self.lindblad_data = lindblad_data
+        self.save_intermediate_densities_ = (self.should_save and
+                                             save_intermediate_densities_)
     
 
     def log_and_save(self, controls, error, final_densities, grads, iteration):
@@ -213,11 +233,18 @@ class GrapeLindbladDiscreteState(GrapeState):
             and ((np.mod(iteration, self.save_iteration_step) == 0)
                  or is_final_iteration)):
             save_step, _ = np.divmod(iteration, self.save_iteration_step)
-            with h5py.File(self.save_file_path, "a") as save_file:
-                save_file["controls"][save_step,] = controls
-                save_file["error"][save_step,] = error
-                save_file["final_densities"][save_step,] = final_densities
-                save_file["grads"][save_step,] = grads
+            try:
+                with self.save_file_lock:
+                    with h5py.File(self.save_file_path, "a") as save_file:
+                        save_file["controls"][save_step,] = controls
+                        save_file["error"][save_step,] = error
+                        save_file["final_densities"][save_step,] = final_densities
+                        save_file["grads"][save_step,] = grads
+                    #ENDWITH
+                #ENDWITH
+            except Timeout:
+                print("Could not perform save after iteration {}."
+                      "".format(iteration))
 
 
     def log_and_save_initial(self):
@@ -236,37 +263,71 @@ class GrapeLindbladDiscreteState(GrapeState):
             if save_count_remainder != 0:
                 save_count += 1
 
-            with h5py.File(self.save_file_path, "w") as save_file:
-                save_file["complex_controls"] = self.complex_controls
-                save_file["control_count"] = self.control_count
-                save_file["control_eval_count"] = self.control_eval_count
-                save_file["controls"] = np.zeros((save_count, self.control_eval_count,
-                                                  self.control_count,),
-                                                 dtype=self.initial_controls.dtype)
-                save_file["cost_eval_step"] = self.cost_eval_step
-                save_file["cost_names"] = np.array([np.string_("{}".format(cost))
-                                                    for cost in self.costs])
-                save_file["error"] = np.repeat(np.finfo(np.float64).max, save_count)
-                save_file["evolution_time"]= self.evolution_time
-                save_file["final_densities"] = np.zeros((save_count, density_count,
-                                                         self.hilbert_size, self.hilbert_size),
-                                                        dtype=np.complex128)
-                save_file["grads"] = np.zeros((save_count, self.control_eval_count,
-                                               self.control_count), dtype=self.initial_controls.dtype)
-                save_file["initial_controls"] = self.initial_controls
-                save_file["initial_densities"] = self.initial_densities
-                save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
-                save_file["iteration_count"] = self.iteration_count
-                save_file["max_control_norms"] = self.max_control_norms
-                save_file["method"] = self.method
-                save_file["optimizer"] = "{}".format(self.optimizer)
-                save_file["system_eval_count"] = self.system_eval_count
-            #ENDWITH
+            try:
+                with self.save_file_lock:
+                    with h5py.File(self.save_file_path, "w") as save_file:
+                        save_file["complex_controls"] = self.complex_controls
+                        save_file["control_count"] = self.control_count
+                        save_file["control_eval_count"] = self.control_eval_count
+                        save_file["controls"] = np.zeros((save_count, self.control_eval_count,
+                                                          self.control_count,),
+                                                         dtype=self.initial_controls.dtype)
+                        save_file["cost_eval_step"] = self.cost_eval_step
+                        save_file["cost_names"] = np.array([np.string_("{}".format(cost))
+                                                            for cost in self.costs])
+                        save_file["error"] = np.repeat(np.finfo(np.float64).max, save_count)
+                        save_file["evolution_time"]= self.evolution_time
+                        save_file["final_densities"] = np.zeros((save_count, density_count,
+                                                                 self.hilbert_size, self.hilbert_size),
+                                                                dtype=np.complex128)
+                        save_file["grads"] = np.zeros((save_count, self.control_eval_count,
+                                                       self.control_count), dtype=self.initial_controls.dtype)
+                        save_file["initial_controls"] = self.initial_controls
+                        save_file["initial_densities"] = self.initial_densities
+                        if self.save_intermediate_densities_:
+                            save_file["intermediate_densities"] = np.zeros((save_count,
+                                                                            self.system_eval_count,
+                                                                            *self.initial_densities.shape),
+                                                                           dtype=np.complex128)
+                        save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
+                        save_file["iteration_count"] = self.iteration_count
+                        save_file["max_control_norms"] = self.max_control_norms
+                        save_file["method"] = self.method
+                        save_file["optimizer"] = "{}".format(self.optimizer)
+                        save_file["program_type"] = self.program_type.value
+                        save_file["system_eval_count"] = self.system_eval_count
+                    #ENDWITH
+                #ENDWITH
+            except Timeout:
+                print("Could not perform initial save.")
         #ENDIF
 
         if self.should_log:
             print("iter   |   total error  |    grads_l2   \n"
                   "=========================================")
+
+
+    def save_intermediate_densities(self, densities, iteration,
+                                    system_eval_step,):
+        """
+        Save intermediate densities to the save file.
+        """
+        # Determine decision parameters.
+        is_final_iteration = iteration == self.final_iteration
+
+        if (self.should_save
+            and ((np.mod(iteration, self.save_iteration_step) ==0)
+                 or is_final_iteration)):
+            save_step, _ = np.divmod(iteration, self.save_iteration_step)
+            try:
+                with self.save_file_lock:
+                    with h5py.File(self.save_file_path, "a") as save_file:
+                        save_file["intermediate_densities"][iteration, system_eval_step, :, :, :] = densities.astype(np.complex128)
+            except Timeout:
+                print("Could not save intermediate densities on iteration {} and "
+                      "system_eval_step {}."
+                      "".format(iteration, system_eval_step))
+        #ENDIF
 
 
 class GrapeLindbladResult(object):

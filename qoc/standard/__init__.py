@@ -25,7 +25,8 @@ from .functions import (commutator, conjugate_transpose,
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 
-from .plot import (plot_controls, plot_state_population,)
+from .plot import (plot_controls, plot_density_population,
+                   plot_state_population,)
 
 from .utils import (ans_jacobian, generate_save_file_path, CustomJSONEncoder,)
 
@@ -42,6 +43,6 @@ __all__ = [
     "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "Adam", "LBFGSB", "SGD",
-    "plot_best_controls", "plot_population_states",
+    "plot_controls", "plot_density_population", "plot_state_population",
     "ans_jacobian", "generate_save_file_path", "CustomJSONEncoder",
 ]
