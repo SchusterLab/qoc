@@ -43,18 +43,46 @@ def evolve_lindblad_discrete(evolution_time, initial_densities,
     and compute the optimization error.
 
     Arguments:
-    evolution_time
-    initial_densities
-    system_eval_count
+    evolution_time :: float - This value specifies the duration of the
+        system's evolution.
+    initial_densities :: ndarray (density_count x hilbert_size x hilbert_size)
+        - This array specifies the densities that should be evolved under
+        the specified system. These are the densities at the beginning of
+        evolution.
+    system_eval_count :: int >= 2 - This value determines how many times
+        during the evolution the system is evaluated, including the
+        initial value of the system. For lindblad evolution, this value does not
+        determine the time step of integration.
+        This value is used as:
+        `system_eval_times` = numpy.linspace(0, `evolution_time`, `system_eval_count`).
 
-    controls
-    cost_eval_step
-    costs
-    hamiltonian
-    interpolation_policy
-    lindblad_data
-    save_file_path
-    save_intermediate_densities
+    controls :: ndarray (control_step_count x control_count)
+        - This array specifies the control parameter values at each
+          control step. These values will be used to determine the `controls`
+          argument passed to the `hamiltonian` function.
+    cost_eval_step :: int >= 1- This value determines how often step-costs are evaluated.
+         The units of this value are in system_eval steps. E.g. if this value is 2,
+         step-costs will be computed every 2 system_eval steps.
+    costs :: iterable(qoc.models.cost.Cost) - This list specifies all
+        the cost functions that the optimizer should evaluate. This list
+        defines the criteria for an "optimal" control set.
+    hamiltonian :: (controls :: ndarray (control_count), time :: float)
+                   -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
+        - This function provides the system's hamiltonian given a set
+        of control parameters and a time value.
+    interpolation_policy :: qoc.models.interpolationpolicy.InterpolationPolicy
+        - This value specifies how control parameters should be
+        interpreted at points where they are not defined.
+    lindblad_data :: (time :: float)
+                     -> (dissipators :: ndarray (operator_count),
+                         operators :: ndarray (operator_count x hilbert_size x hilbert_size))
+        - This function encodes the lindblad dissipators and operators for all time.
+    save_file_path :: str - This is the full path to the file where
+        information about program execution will be stored.
+        E.g. "./out/foo.h5"
+    save_intermediate_densities :: bool - If this value is set to True,
+        qoc will write the densities to the save file after every
+        system_eval step.
 
     Returns:
     result
@@ -101,28 +129,84 @@ def grape_lindblad_discrete(control_count, control_eval_count,
     equation for time-discrete control parameters.
 
     Arguments:
-    control_count
-    control_eval_count
-    costs
-    evolution_time
-    initial_densities
-    system_eval_count
+    control_count :: int - This is the number of control parameters that qoc should
+        optimize over. I.e. it is the length of the `controls` array passed
+        to the hamiltonian.
+    control_eval_count :: int >= 2 - This value determines where definite values
+        of the control parameters are evaluated. This value is used as:
+        `control_eval_times`= numpy.linspace(0, `evolution_time`, `control_eval_count`).
+    costs :: iterable(qoc.models.cost.Cost) - This list specifies all
+        the cost functions that the optimizer should evaluate. This list
+        defines the criteria for an "optimal" control set.
+    evolution_time :: float - This value specifies the duration of the
+        system's evolution.
+    initial_densities :: ndarray (density_count x hilbert_size x hilbert_size)
+        - This array specifies the densities that should be evolved under
+        the specified system. These are the densities at the beginning of
+        evolution.
+    system_eval_count :: int >= 2 - This value determines how many times
+        during the evolution the system is evaluated, including the
+        initial value of the system.
+        For lindblad evolution, this value does not determine the time step of integration.
+        This value is used as:
+        `system_eval_times` = numpy.linspace(0, `evolution_time`, `system_eval_count`).
 
-    complex_controls
-    cost_eval_step
-    hamiltonian
-    impose_control_conditions
-    initial_controls
-    interpolation_policy
-    iteration_count
-    lindblad_data
-    log_iteration_step
-    max_control_norms
-    min_error
-    optimizer
-    save_file_path
-    save_intermediate_densities
-    save_iteration_step
+    complex_controls :: bool - This value determines if the control parameters
+        are complex-valued. If some controls are real only or imaginary only
+        while others are complex, real only and imaginary only controls
+        can be simulated by taking the real or imaginary part of a complex control.
+    cost_eval_step :: int >= 1- This value determines how often step-costs are evaluated.
+         The units of this value are in system_eval steps. E.g. if this value is 2,
+         step-costs will be computed every 2 system_eval steps.
+    hamiltonian :: (controls :: ndarray (control_count), time :: float)
+                   -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
+        - This function provides the system's hamiltonian given a set
+        of control parameters and a time value.
+    impose_control_conditions :: (controls :: (control_eval_count x control_count))
+                                 -> (controls :: (control_eval_count x control_count))
+        - This function is called after every optimization update. Example uses
+        include setting boundary conditions on the control parameters.
+    initial_controls :: ndarray (control_step_count x control_count)
+        - This array specifies the control parameters at each
+        control_eval step. These values will be used to determine the `controls`
+        argument passed to the `hamiltonian` function at each time step for
+        the first iteration of optimization.
+    interpolation_policy :: qoc.models.interpolationpolicy.InterpolationPolicy
+        - This value specifies how control parameters should be
+        interpreted at points where they are not defined.
+    iteration_count :: int - This value determines how many total system
+        evolutions the optimizer will perform to determine the
+        optimal control set.
+    lindblad_data :: (time :: float)
+                     -> (dissipators :: ndarray (operator_count),
+                         operators :: ndarray (operator_count x hilbert_size x hilbert_size))
+        - This function encodes the lindblad dissipators and operators for all time.
+    log_iteration_step :: int - This value determines how often qoc logs
+        progress to stdout. This value is specified in units of system steps,
+        of which there are `control_step_count` * `system_step_multiplier`.
+        Set this value to 0 to disable logging.
+    max_control_norms :: ndarray (control_count) - This array
+        specifies the element-wise maximum norm that each control is
+        allowed to achieve. If, in optimization, the value of a control
+        exceeds its maximum norm, the control will be rescaled to
+        its maximum norm. Note that for non-complex values, this
+        feature acts exactly as absolute value clipping.
+    min_error :: float - This value is the threshold below which
+        optimization will terminate.
+    optimizer :: class instance - This optimizer object defines the
+        gradient-based procedure for minimizing the total contribution
+        of all cost functions with respect to the control parameters.
+    save_file_path :: str - This is the full path to the file where
+        information about program execution will be stored.
+        E.g. "./out/foo.h5"
+    save_intermediate_densities :: bool - If this value is set to True,
+        qoc will write the densities to the save file after every
+        system_eval step.
+    save_iteration_step :: int - This value determines how often qoc
+        saves progress to the save file specified by `save_file_path`.
+        This value is specified in units of system steps, of which
+        there are `control_step_count` * `system_step_multiplier`.
+        Set this value to 0 to disable saving (default).
 
     Returns:
     result
