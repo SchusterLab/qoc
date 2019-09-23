@@ -64,15 +64,13 @@ class TargetDensityInfidelityTime(Cost):
         # inner_products = (anp.trace(anp.matmul(self.target_densities_dagger, densities),
         #                             axis1=-1, axis2=-2) / self.hilbert_size)
         prods = anp.matmul(self.target_densities_dagger, densities)
-        inner_products = list()
+        fidelity_sum = 0
         for i, prod in enumerate(prods):
             inner_prod = anp.trace(prod)
-            inner_products.append(inner_prod)
-        inner_products = np.stack(inner_products) / self.hilbert_size
-        fidelities = anp.real(inner_products * anp.conjugate(inner_products))
-        fidelity_normalized = anp.sum(fidelities) / self.density_count
+            fidelity = anp.abs(inner_prod)
+            fidelity_sum = fidelity_sum + fidelity
+        fidelity_normalized = fidelity_sum / (self.density_count * self.hilbert_size)
         infidelity = 1 - fidelity_normalized
-        # Normalize the cost for the number of times the cost is evaluated.
         cost_normalized = infidelity / self.cost_eval_count
 
         return cost_normalized * self.cost_multiplier

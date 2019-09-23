@@ -61,7 +61,7 @@ class TargetDensityInfidelity(Cost):
         fidelity_sum = 0
         for i, prod in enumerate(prods):
             inner_prod = anp.trace(prod)
-            fidelity = anp.real(inner_prod * anp.conjugate(inner_prod))
+            fidelity = anp.abs(inner_prod)
             fidelity_sum = fidelity_sum + fidelity
         fidelity_normalized = fidelity_sum / (self.density_count * self.hilbert_size)
         infidelity = 1 - fidelity_normalized

@@ -108,7 +108,7 @@ def test_targetdensityinfidelity():
 
     ti = TargetDensityInfidelity(densities)
     cost = ti.cost(None, densities, None)
-    assert(np.allclose(cost, 0.75))
+    assert(np.allclose(cost, 0.5))
 
     state0 = np.array([[1], [0]])
     state1 = (np.array([[1j], [1]]) / np.sqrt(2))
@@ -122,7 +122,7 @@ def test_targetdensityinfidelity():
     targets = np.stack((target_density0, target_density1,), axis=0)
     ti = TargetDensityInfidelity(targets)
     cost = ti.cost(None, densities, None)
-    expected_cost = 1 - np.divide(5, 32)
+    expected_cost = 0.625
     assert(np.allclose(cost, expected_cost))
 
     
@@ -145,7 +145,7 @@ def test_targetdensityinfidelitytime():
 
     ti = TargetDensityInfidelityTime(system_eval_count, densities)
     cost = ti.cost(None, densities, None)
-    assert(np.allclose(cost, 0.075))
+    assert(np.allclose(cost, 0.05))
 
     state0 = np.array([[1], [0]])
     state1 = (np.array([[1j], [1]]) / np.sqrt(2))
@@ -159,7 +159,7 @@ def test_targetdensityinfidelitytime():
     targets = np.stack((target_density0, target_density1,), axis=0)
     ti = TargetDensityInfidelityTime(system_eval_count, targets)
     cost = ti.cost(None, densities, None)
-    expected_cost = (1 - np.divide(5, 32)) / 10
+    expected_cost = 0.0625
     assert(np.allclose(cost, expected_cost))
 
     
