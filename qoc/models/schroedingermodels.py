@@ -268,6 +268,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             # If the final iteration doesn't fall on a save step, add a save step.
             if save_count_remainder != 0:
                 save_count += 1
+
             try:
                 with self.save_file_lock:
                     with h5py.File(self.save_file_path, "w") as save_file:
@@ -318,6 +319,10 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         """
         Save intermediate states to the save file.
         """
+        # Don't log if the iteration number is invalid.
+        if iteration > self.final_iteration:
+            return
+
         # Determine decision parameters.
         is_final_iteration = iteration == self.final_iteration
         

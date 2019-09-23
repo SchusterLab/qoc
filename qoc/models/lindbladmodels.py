@@ -86,7 +86,7 @@ class EvolveLindbladDiscreteState(ProgramState):
         #ENDIF
 
     
-    def save_intermediate_densities(self, densities, system_eval_step):
+    def save_intermediate_densities(self, densities, iteration, system_eval_step):
         """
         Save intermediate densities to the save file.
         """
@@ -312,11 +312,15 @@ class GrapeLindbladDiscreteState(GrapeState):
         """
         Save intermediate densities to the save file.
         """
+        # Don't log if the iteration number is invalid.
+        if iteration > self.final_iteration:
+            return
+
         # Determine decision parameters.
         is_final_iteration = iteration == self.final_iteration
 
         if (self.should_save
-            and ((np.mod(iteration, self.save_iteration_step) ==0)
+            and ((np.mod(iteration, self.save_iteration_step) == 0)
                  or is_final_iteration)):
             save_step, _ = np.divmod(iteration, self.save_iteration_step)
             try:

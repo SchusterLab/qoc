@@ -2,24 +2,43 @@
 tutorial.py - This module is a walkthrough for some of QOC's functionality.
 
 This tutorial will follow the experimental setup of [1].
-All amplitudes are in GHz. All time scales are in ns.
+All frequencies are in gigahertz. All time scales are in nanoseconds.
 
 References:
+[0] https://qoc.readthedocs.io/en/latest/ (coming soon)
 [1] https://arxiv.org/abs/1608.02430
+[2] https://github.com/HIPS/autograd
+[3] https://en.wikipedia.org/wiki/Automatic_differentiation
+[4] https://en.wikipedia.org/wiki/Lindbladian
+[5] http://docs.h5py.org/en/stable/
+[6] https://filelock.readthedocs.io/en/latest/
 """
 
-DEBUG = True
-EXECUTE = True
-PRINT = False
+import os
 
 # Every computation that qoc performs has to be differentiable.
-# We use autograd (https://github.com/HIPS/autograd)
-# to do automatic differentiation (https://en.wikipedia.org/wiki/Automatic_differentiation).
+# qoc uses autograd [2] to do automatic differentiation [3].
 # All operations that you perform on your operands should use autograd's
 # numpy wrapper. autograd.numpy wraps the entire numpy namespace, but not all functions
 # have derivatives implemented for them. You may view which functionality is supported
-# on autograd's github, linked above.
+# on autograd's github [2].
 import autograd.numpy as anp
+
+# All of the core functionality that qoc offers can be imported from the top level.
+# Core functionality not shown here includes `evolve_schroedinger_discrete`
+# and `evolve_lindblad_discrete`.
+from qoc import (grape_schroedinger_discrete, grape_lindblad_discrete)
+
+# qoc.standard is a module that has optimization cost functions, optimizers,
+# convenience functions, and other goodies. All of the operations
+# (e.g. `conjugate_transpose`) that you import
+# from qoc.standard use autograd.numpy, so they are OK to use in your operations.
+from qoc.standard import (Adam,
+    conjugate_transpose, generate_save_file_path,
+    get_creation_operator, get_annihilation_operator,
+    krons, LBFGSB, matmuls, plot_controls, plot_density_population,
+    plot_state_population, TargetDensityInfidelity,
+    TargetStateInfidelity,)
 
 # First, we define our experimental constants as in [1] pp.7.
 PI_2 = 2 * anp.pi
@@ -34,13 +53,6 @@ TP_T = 4.3e4
 T1_C = 2.7e6
 
 # Second, we define the system.
-# qoc.standard is a module that has optimization cost functions, optimizers,
-# convenience functions, and other goodies. All of the functions you import
-# from qoc.standard use autograd.numpy, so they are OK to use in your operations.
-from qoc.standard import (conjugate_transpose,
-                          get_creation_operator,
-                          get_annihilation_operator,
-                          krons, matmuls,)
 CAVITY_STATE_COUNT = 2
 TRANSMON_STATE_COUNT = 2
 HILBERT_SIZE = CAVITY_STATE_COUNT * TRANSMON_STATE_COUNT
@@ -64,10 +76,10 @@ TRANSMON_ONE[1, 0] = 1
 
 # Next, we define the system hamiltonian.
 # qoc requires you to specify your hamiltonian as a function of control parameters
-# and time
-# I.e. hamiltonian_function :: (controls :: ndarray (control_count),
-#                               time :: float)
-#                              -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
+# and time, i.e.
+# hamiltonian_function :: (controls :: ndarray (control_count),
+#                          time :: float)
+#                          -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
 # You will see this notation in the qoc documentation. The symbol `::` is read "as".
 # It specifies the object type of the argument. E.g. 1 :: int, True :: bool, 'hello' :: str.
 # The parens that follow the `ndarray` type specifies the shape of the array.
@@ -101,12 +113,12 @@ CONTROL_COUNT = 2
 # what domain our controls are in
 COMPLEX_CONTROLS = True
 # where our controls are positioned in time
-# where our system is evaluated in time
 CONTROL_EVAL_COUNT = int(1e2)
+# and where our system is evaluated in time
 SYSTEM_EVAL_COUNT = int(1e2)
 # Note that `CONTROL_COUNT` is the length of the `controls` array that is passed
 # to our `hamiltonian` function.
-# CONTROL_EVAL_COUNT is used to determine how many points in time the `controls` are
+# `CONTROL_EVAL_COUNT` is used to determine how many points in time the `controls` are
 # evaluated. It is likely this value should be consistent with a physical apparatus,
 # such as the sampling rate of an AWG. The points in time where controls are evaluated
 # is given by control_eval_times = anp.linspace(0, evolution_time, control_eval_count).
@@ -131,7 +143,7 @@ SYSTEM_EVAL_COUNT = int(1e2)
 
 # Now, we are ready to give qoc a problem.
 # Let's try to put a photon in the cavity.
-# That is, we desire the fock state transition |0> -> |1>.
+# That is, we desire the fock state transition |0, g> -> |1, g>.
 INITIAL_STATE_0 = krons(CAVITY_ZERO, TRANSMON_ZERO)
 # Notice that when we specify states (or probability density matrices!)
 # to qoc, we always give qoc an array of states that we would like it to track,
@@ -145,100 +157,95 @@ TARGET_STATES = anp.stack((TARGET_STATE_0,))
 # In this example, we want to minimize the infidelity (maximize the fidelity) of
 # the initial state and the target state.
 # Note that `COSTS` is a list of cost function objects.
-from qoc.standard import TargetStateInfidelity
 COSTS = [TargetStateInfidelity(TARGET_STATES)]
-
-# Before we move on, it is a good idea to check that everything looks how you would expect it to.
-if PRINT:
-    print("HILBERT_SIZE:\n{}"
-          "".format(HILBERT_SIZE))
-    print("SYSTEM_HAMILTONIAN:\n{}"
-          "".format(SYSTEM_HAMILTONIAN))
-    print("CAVITY_ZERO:\n{}"
-          "".format(CAVITY_ZERO))
-    print("CAVITY_ONE:\n{}"
-          "".format(CAVITY_ONE))
-    print("TRANSMON_ZERO:\n{}"
-          "".format(TRANSMON_ZERO))
-    print("TRANSMON_ONE:\n{}"
-          "".format(TRANSMON_ONE))
-    print("INITIAL_STATE_0:\n{}"
-          "".format(INITIAL_STATE_0))
-    print("TARGET_STATE_0:\n{}"
-          "".format(TARGET_STATE_0))
-    print("CONTROL_EVAL_TIMES:\n{}"
-          "".format(anp.linspace(0, EVOLUTION_TIME, CONTROL_EVAL_COUNT)))
-    print("SYSTEM_EVAL_TIMES:\n{}"
-          "".format(anp.linspace(0, EVOLUTION_TIME, SYSTEM_EVAL_COUNT)))
-
 
 # We want to tell qoc how often to store information about the optimization
 # and how often to log output. Both `log_iteration_step` and `save_iteration_step`
 # are specified in units of optimization iterations.
-from qoc.standard import (generate_save_file_path,
-                          Adam, LBFGSB,)
 LOG_ITERATION_STEP = 1
 SAVE_INTERMEDIATE_STATES = True
 SAVE_ITERATION_STEP = 1
-EXPERIMENT_NAME = "tutorial_cavity_fock1"
-SAVE_PATH = "./out"
-if not DEBUG:
-    SCHROED_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
-else:
-    SCHROED_FILE_PATH = "./out/00011_tutorial_cavity_fock1.h5"
 
 # For this problem, the LBFGSB optimizer reaches a reasonable
 # answer very quickly.
 OPTIMIZER = LBFGSB()
-# In practice, we find that using a second order optimizer, such as LBFGSB,
-# gives a good initial answer. Then, this answer may be used with a first
+ITERATION_COUNT = 30
+# In practice, we find that using a second-order optimizer, such as LBFGSB,
+# gives a good initial answer. Then, this answer may be used with a first-
 # order optimizer, such as Adam, to achieve the desired error.
 # You can seed optimizations with a set of controls using the
 # `initial_controls` argument.
 
-if EXECUTE:
-    # Lastly, we use the GRAPE algorithm to find a set of time-dependent
-    # controls that accomplishes the state transfer that we desire.
-    from qoc import grape_schroedinger_discrete
-    if not DEBUG:
-        result = grape_schroedinger_discrete(CONTROL_COUNT,
-                                             CONTROL_EVAL_COUNT,
-                                             COSTS, EVOLUTION_TIME,
-                                             hamiltonian, INITIAL_STATES,
-                                             SYSTEM_EVAL_COUNT,
-                                             complex_controls=COMPLEX_CONTROLS,
-                                             log_iteration_step=LOG_ITERATION_STEP,
-                                             optimizer=OPTIMIZER,
-                                             save_file_path=SCHROED_FILE_PATH,
-                                             save_intermediate_states=SAVE_INTERMEDIATE_STATES,
-                                             save_iteration_step=SAVE_ITERATION_STEP,)
-    
+# Before we move on, it is a good idea to check that everything looks how you would expect it to.
+print("HILBERT_SIZE:\n{}"
+      "".format(HILBERT_SIZE))
+print("SYSTEM_HAMILTONIAN:\n{}"
+      "".format(SYSTEM_HAMILTONIAN))
+print("CAVITY_ZERO:\n{}"
+      "".format(CAVITY_ZERO))
+print("CAVITY_ONE:\n{}"
+      "".format(CAVITY_ONE))
+print("TRANSMON_ZERO:\n{}"
+      "".format(TRANSMON_ZERO))
+print("TRANSMON_ONE:\n{}"
+      "".format(TRANSMON_ONE))
+print("INITIAL_STATE_0:\n{}"
+      "".format(INITIAL_STATE_0))
+print("TARGET_STATE_0:\n{}"
+      "".format(TARGET_STATE_0))
+print("CONTROL_EVAL_TIMES:\n{}"
+      "".format(anp.linspace(0, EVOLUTION_TIME, CONTROL_EVAL_COUNT)))
+print("SYSTEM_EVAL_TIMES:\n{}"
+      "".format(anp.linspace(0, EVOLUTION_TIME, SYSTEM_EVAL_COUNT)))
+
+# qoc saves data in h5 format. You can parse h5 files using the `h5py` package [5].
+EXPERIMENT_NAME = "tutorial_schroed_cavity01"
+SAVE_PATH = "./out"
+SCHROED_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+
+# Next, we use the GRAPE algorithm to find a set of time-dependent
+# controls that accomplishes the state transfer that we desire.
+result = grape_schroedinger_discrete(CONTROL_COUNT,
+                                     CONTROL_EVAL_COUNT,
+                                     COSTS, EVOLUTION_TIME,
+                                     hamiltonian, INITIAL_STATES,
+                                     SYSTEM_EVAL_COUNT,
+                                     complex_controls=COMPLEX_CONTROLS,
+                                     iteration_count=ITERATION_COUNT,
+                                     log_iteration_step=LOG_ITERATION_STEP,
+                                     optimizer=OPTIMIZER,
+                                     save_file_path=SCHROED_FILE_PATH,
+                                     save_intermediate_states=SAVE_INTERMEDIATE_STATES,
+                                     save_iteration_step=SAVE_ITERATION_STEP,)
+
 # Next, we want to do some analysis of our results.
-import os
 CONTROLS_PLOT_FILE = "{}_controls.png".format(EXPERIMENT_NAME)
 CONTROLS_PLOT_FILE_PATH = os.path.join(SAVE_PATH, CONTROLS_PLOT_FILE)
 POPULATION_PLOT_FILE = "{}_population.png".format(EXPERIMENT_NAME)
 POPULATION_PLOT_FILE_PATH = os.path.join(SAVE_PATH, POPULATION_PLOT_FILE)
-if EXECUTE:
-    from qoc.standard import (plot_controls,
-                              plot_state_population,)
-    # This function will plot the controls, and their fourier transform,
-    # that achieved the lowest error.
-    if not DEBUG:
-        plot_controls(SCHROED_FILE_PATH,
-                           save_file_path=CONTROLS_PLOT_FILE_PATH)
-    # This function will plot the values of the diagonal elements of the
-    # density matrix that is formed by taking the outer product of the state
-    # with itself.
-    if not DEBUG:
-        plot_state_population(SCHROED_FILE_PATH,
-                               save_file_path=POPULATION_PLOT_FILE_PATH)
+SHOW = True
+# This function will plot the controls, and their fourier transform.
+plot_controls(SCHROED_FILE_PATH,
+              save_file_path=CONTROLS_PLOT_FILE_PATH,
+              show=SHOW,)
+# This function will plot the values of the diagonal elements of the
+# density matrix that is formed by taking the outer product of the state
+# with itself.
+plot_state_population(SCHROED_FILE_PATH,
+                      save_file_path=POPULATION_PLOT_FILE_PATH,
+                      show=SHOW,)
+# Both of the above functions plot the iteration that achieved the lowest error
+# by default. However, you check out their documentation in the source or
+# on qoc's documentation [0] to plot arbitrary iterations.
+# QOC locks [6] every h5 file before it writes to it or reads from it.
+# Therefore, you can call these plotting functions from a seperate process
+# while your optimization is running to see the current controls
+# or the current population diagrams.
 
-# Great, so we have now obtained a control pulse that will achieve a desired
-# state transfer in a closed quantum system. If we want to model an open quantum system,
+# Great, we have now obtained a control pulse that will achieve a desired
+# state transfer for a closed quantum system. If we want to model an open quantum system,
 # qoc also gives us the power to do that. In particular, qoc chooses to model
-# dissipative systems using the lindblad master equation.
-# https://en.wikipedia.org/wiki/Lindbladian
+# dissipative systems using the lindblad master equation [4].
 # Similar to the way we defined our hamiltonian, we define our lindblad operators
 # and dissipation constants as a joint function of time.
 # lindblad_data :: (time :: float)
@@ -254,70 +261,53 @@ G_2 = 1 / TP_T
 LINDBLAD_DISSIPATORS = anp.array((G_0, G_1, G_2,))
 LINDBLAD_OPERATORS = anp.stack((L_OP_0, L_OP_1, L_OP_2,))
 lindblad_data = lambda time: (LINDBLAD_DISSIPATORS, LINDBLAD_OPERATORS)
+
 # Notice that the lindblad equation operates on density matrices; it does not operate on state vectors
 # like the schroedinger equation.
 # Therefore, we need to redefine the initial state of our system, and our cost functions,
 # using density matrices.
-from qoc.standard import TargetDensityInfidelity
 INITIAL_DENSITIES = matmuls(INITIAL_STATES, conjugate_transpose(INITIAL_STATES))
 TARGET_DENSITIES = matmuls(TARGET_STATES, conjugate_transpose(TARGET_STATES))
 COSTS = [TargetDensityInfidelity(TARGET_DENSITIES)]
 
-# Note that evolving under the lindblad equation is substantially more expensive,
-# in both time and memory, than evolving under the schroedinger equation.
-# qoc saves memory by writing the intermediate states and densities to a file,
-# as opposed to keeping them in memory. However, writing to a file is expensive
-# in time. Here we show how to disable the intermediate saving option and
-# still produce population plots. This method is recommended for most use cases.
-SAVE_INTERMEDIATE_DENSITIES = False
-
 # As mentioned earlier, the `system_eval_count` argument has no bearing on
-# how the accuracy of the lindblad integrator. Therefore, if you do not have any cost
+# the accuracy of the lindblad integrator. Therefore, if you do not have any cost
 # functions that require evaluation at intermediary time steps in the evolution,
 # it is recommended that you set `system_eval_count` = 2.
 # This means that the lindblad integrator will only evaluate the density matrices
 # at time=0 and time=EVOLUTION_TIME.
 SYSTEM_EVAL_COUNT = 2
-OPTIMIZER = Adam()
+SAVE_INTERMEDIATE_DENSITIES = True
 
-DEBUG = False
-if not DEBUG:
-    LINDBLAD_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
-else:
-    pass
+# TODO: This optimization does not converge, and it is slow.
+# Either tweak the parameters to get the optimization to converge,
+# or consider demonstrating a different example.
+# For a working lindblad example, check out `examples/1_transmon_pi_decoherence.py`
+EXPERIMENT_NAME = "tutorial_lindblad_cavity01"
+LINDBLAD_FILE_PATH = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+result = grape_lindblad_discrete(CONTROL_COUNT,
+                                 CONTROL_EVAL_COUNT,
+                                 COSTS, EVOLUTION_TIME,
+                                 INITIAL_DENSITIES,
+                                 SYSTEM_EVAL_COUNT,
+                                 complex_controls=COMPLEX_CONTROLS,
+                                 hamiltonian=hamiltonian,
+                                 lindblad_data=lindblad_data,
+                                 log_iteration_step=LOG_ITERATION_STEP,
+                                 optimizer=OPTIMIZER,
+                                 save_file_path=LINDBLAD_FILE_PATH,
+                                 save_intermediate_densities=SAVE_INTERMEDIATE_DENSITIES,
+                                 save_iteration_step=SAVE_ITERATION_STEP,)
 
-if EXECUTE:
-    from qoc import grape_lindblad_discrete
-    if not DEBUG:
-        CORE_COUNT = 8
-        os.environ["OMP_NUM_THREADS"] = "{}".format(CORE_COUNT)
-        os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
-        os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
-        os.environ["VECLIB_MAXIMUM_THREADS"] = "{}".format(CORE_COUNT)
-        os.environ["NUMEXPR_NUM_THREADS"] = "{}".format(CORE_COUNT)
-        result = grape_lindblad_discrete(CONTROL_COUNT,
-                                         CONTROL_EVAL_COUNT,
-                                         COSTS, EVOLUTION_TIME,
-                                         INITIAL_DENSITIES,
-                                         SYSTEM_EVAL_COUNT,
-                                         complex_controls=COMPLEX_CONTROLS,
-                                         hamiltonian=hamiltonian,
-                                         lindblad_data=lindblad_data,
-                                         log_iteration_step=LOG_ITERATION_STEP,
-                                         optimizer=OPTIMIZER,
-                                         save_file_path=LINDBLAD_FILE_PATH,
-                                         save_intermediate_densities=SAVE_INTERMEDIATE_DENSITIES,
-                                         save_iteration_step=SAVE_ITERATION_STEP,)
-        
 # Again, we want to analyze our results.
 L_CONTROLS_PLOT_FILE = "{}_controls.png".format(EXPERIMENT_NAME)
 L_CONTROLS_PLOT_FILE_PATH = os.path.join(SAVE_PATH, L_CONTROLS_PLOT_FILE)
-L_POPULATION_PLOT_FILE = "{}_population_lindblad.png".format(EXPERIMENT_NAME)
+L_POPULATION_PLOT_FILE = "{}_population.png".format(EXPERIMENT_NAME)
 L_POPULATION_PLOT_FILE_PATH = os.path.join(SAVE_PATH, L_POPULATION_PLOT_FILE)
-
-if EXECUTE:
-    from qoc.standard import plot_density_population
-    plot_controls(LINDBLAD_FILE_PATH,
-                  save_file_path=L_CONTROLS_PLOT_FILE_PATH)
-    plot_density_population(LINDBLAD_FILE_PATH,
-                            save_file_path=L_POPULATION_PLOT_FILE_PATH)
+SHOW = True
+plot_controls(LINDBLAD_FILE_PATH,
+              save_file_path=L_CONTROLS_PLOT_FILE_PATH,
+              show=SHOW,)
+plot_density_population(LINDBLAD_FILE_PATH,
+                        save_file_path=L_POPULATION_PLOT_FILE_PATH,
+                        show=SHOW,)

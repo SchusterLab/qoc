@@ -320,8 +320,8 @@ def _evaluate_lindblad_discrete(controls, pstate, reporter):
                 intermediate_densities = densities._value
             else:
                 intermediate_densities = densities
-            pstate.save_intermediate_densities(iteration,
-                                               intermediate_densities,
+            pstate.save_intermediate_densities(intermediate_densities,
+                                               iteration,
                                                system_eval_step)
 
         # Determine where we are in the mesh.

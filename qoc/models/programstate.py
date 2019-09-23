@@ -120,6 +120,8 @@ class GrapeState(ProgramState):
                          evolution_time, hamiltonian, interpolation_policy,
                          ProgramType.GRAPE,
                          save_file_path, system_eval_count,)
+        print("iteration_count: {}"
+              "".format(iteration_count))
         self.complex_controls = complex_controls
         self.control_count = control_count
         self.controls_shape = (control_eval_count, control_count)
