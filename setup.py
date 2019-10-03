@@ -11,6 +11,7 @@ DEPENDENCIES = [
     "autograd",
     "filelock",
     "h5py",
+    "matplotlib",
     "numpy",
     "scipy",
 ]
