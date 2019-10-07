@@ -73,6 +73,39 @@ def gen_controls_cos(complex_controls, control_count, control_eval_count,
 
     return controls
 
+def gen_controls_white(complex_controls, control_count, control_eval_count,
+                      evolution_time, max_control_norms, periods=10.):
+    """
+    Create a discrete control set of random white noise.
+
+    Arguments:
+    complex_controls
+    control_count
+    control_eval_count
+    evolution_time
+    max_control_norms
+    
+    periods
+    
+    Returns:
+    controls
+    """
+    controls = np.zeros((control_eval_count, control_count))
+
+    # Make each control a random distribution of white noise.
+    for i in range(control_count):
+        max_norm = max_control_norms[i]
+        stddev = max_norm/5.0
+        control = np.random.normal(0, stddev, control_eval_count)
+        controls[:, i] = control
+    #ENDFOR
+
+    # Mimic the white noise for the imaginary parts, and normalize.
+    if complex_controls:
+        controls = (controls - 1j * controls) / np.sqrt(2)
+
+    return controls
+
 
 def gen_controls_flat(complex_controls, control_count, control_eval_count,
                       evolution_time, max_control_norms, periods=10.):
@@ -134,7 +167,7 @@ def initialize_controls(complex_controls,
         max_control_norms = np.ones(control_count)
         
     if initial_controls is None:
-        controls = gen_controls_flat(complex_controls, control_count, control_eval_count,
+        controls = gen_controls_white(complex_controls, control_count, control_eval_count,
                                      evolution_time, max_control_norms)
     else:
         # Check that the user-specified controls match the specified data type.

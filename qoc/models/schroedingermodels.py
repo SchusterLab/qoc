@@ -11,6 +11,7 @@ import numpy as np
 
 from qoc.models.programtype import ProgramType
 from qoc.models.programstate import (ProgramState, GrapeState,)
+from qoc.standard.plot import plot_summary
 
 class EvolveSchroedingerDiscreteState(ProgramState):
     """
@@ -226,19 +227,11 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         
         # Determine decision parameters.
         is_final_iteration = iteration == self.final_iteration
-        
-        if (self.should_log
-            and ((np.mod(iteration, self.log_iteration_step) == 0)
-                 or is_final_iteration)):
-            grads_norm = np.linalg.norm(grads)
-            print("{:^6d} | {:^1.8e} | {:^1.8e}"
-                  "".format(iteration, error,
-                            grads_norm))
+        save_step, _ = np.divmod(iteration, self.save_iteration_step)
 
         if (self.should_save
             and ((np.mod(iteration, self.save_iteration_step) == 0)
                  or is_final_iteration)):
-            save_step, _ = np.divmod(iteration, self.save_iteration_step)
             try:
                 with self.save_file_lock:
                     with h5py.File(self.save_file_path, "a") as save_file:
@@ -251,7 +244,12 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             except Timeout:
                 print("Could not perform save after iteration {}."
                       "".format(iteration))
-
+        
+        if (self.should_log
+            and ((np.mod(iteration, self.log_iteration_step) == 0)
+                 or is_final_iteration)):
+            grads_norm = np.linalg.norm(grads)
+            plot_summary(self.save_file_path, iteration, error, grads_norm, save_index = save_step, show=True,)
 
     def log_and_save_initial(self):
         """
