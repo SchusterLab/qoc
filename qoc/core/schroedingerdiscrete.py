@@ -338,10 +338,10 @@ def _esdj_wrap(controls, pstate, reporter, result):
     pstate.log_and_save(controls, error, final_states,
                         grads, reporter.iteration)
     reporter.iteration += 1
-
+    
     # Convert the gradients from cost function to optimizer format.
     grads = strip_controls(pstate.complex_controls, grads)
-
+   
     # Determine if optimization should terminate.
     if error <= pstate.min_error:
         terminate = True

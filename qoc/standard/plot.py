@@ -12,8 +12,11 @@ if not "DISPLAY" in os.environ:
     matplotlib.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 from scipy import linalg as la
+from qutip import *
+from IPython import display
 
 from qoc.models import ProgramType
 from qoc.standard.functions.convenience import conjugate_transpose
@@ -69,6 +72,7 @@ def plot_controls(file_path, amplitude_unit="GHz",
     control_count = controls.shape[1]
     control_eval_count = controls.shape[0]
     control_eval_times = np.linspace(0, evolution_time, control_eval_count)
+    dt = evolution_time / control_eval_count
     controls_real = np.real(controls)
     controls_imag = np.imag(controls)
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
@@ -90,7 +94,7 @@ def plot_controls(file_path, amplitude_unit="GHz",
     #ENDFOR
 
     # Set up the plots.
-    plt.figure()
+    plt.figure(figsize=(10,10))
     plt.suptitle(file_name)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
@@ -123,18 +127,14 @@ def plot_controls(file_path, amplitude_unit="GHz",
     # Plot the fft.
     plt.subplot(2, 1, 2)
     freq_axis = np.where(control_eval_times, control_eval_times, 1) ** -1
+    flist = np.fft.fftfreq(control_eval_times.shape[-1],d=dt)
+    
     for i in range(control_count):
         i2 = i * 2
-        color_fft_real = get_color(i2)
-        color_fft_imag = get_color(i2 + 1)
-        control_fft = np.fft.fft(controls[:, i])
-        control_fft_real = control_fft.real
-        control_fft_imag = control_fft.imag
-        plt.plot(freq_axis,
-                 control_fft_real, marker_style, color=color_fft_real,
-                 ms=2,alpha=0.9)
-        plt.plot(freq_axis,
-                 control_fft_imag, marker_style, color=color_fft_imag,
+        color_fft = get_color(i2)
+        control_fft = abs(np.fft.fft(controls[:, i]))
+        plt.plot(flist,
+                 control_fft, ls = '-', color=color_fft,
                  ms=2,alpha=0.9)
     #ENDFOR
     plt.xlabel("Frequency ({})".format(amplitude_unit))
@@ -214,7 +214,7 @@ def plot_density_population(file_path,
     #ENDFOR
 
     # Plot the data.
-    plt.figure()
+    plt.figure(figsize=(10,10))
     plt.suptitle(file_name)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
@@ -271,7 +271,7 @@ def plot_state_population(file_path,
                     # the lowest error.
                     if save_index is None:
                         save_index = np.argmin(file_["error"])
-                        intermediate_states = file_["intermediate_states"][save_index, :, state_index, :, :]
+                    intermediate_states = file_["intermediate_states"][save_index, :, state_index, :, :]
             #ENDWITH
         #ENDWITH
     except Timeout:
@@ -299,7 +299,7 @@ def plot_state_population(file_path,
     #ENDFOR
 
     # Plot the data.
-    plt.figure()
+    plt.figure(figsize=(10,10))
     plt.suptitle(file_name)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
@@ -317,7 +317,177 @@ def plot_state_population(file_path,
     if show:
         plt.show()
 
+def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz", 
+                  dpi=1000,
+                  marker_style="o", save_file_path=None,
+                  save_index=None,
+                  show=False, state_index=0, time_unit="ns",):
+    """
+    Plots both the controls and the population evolutions as a function of
+    time. This function is essentially plot_controls and plot_state_population
+    copy and pasted, but is useful for emulating the output of GRAPE 1.0,
+    whereby the controls and the state evolutions were plotted for each 
+    timestep, erasing the old output. 
 
+    Arguments:
+    file_path :: str - the full path to the H5 file
+
+    iteration
+    error
+    grads_norm
+    amplitude_unit
+    dpi
+    marker_style
+    save_file_path
+    save_index
+    show
+    state_index
+    time_unit
+
+    Returns: None
+    """
+    # Open the file; extract data.
+    file_lock_path = "{}.lock".format(file_path)
+    try:
+        with FileLock(file_lock_path):
+            with h5py.File(file_path, "r") as file_:
+                # If no save_index was specified, choose the save_index that achieved the lowest
+                # error.
+                if save_index is None:
+                    save_index = np.argmin(file_["error"])
+                complex_controls = file_["complex_controls"][()]
+                controls = file_["controls"][save_index][()]
+                evolution_time = file_["evolution_time"][()]
+                program_type = file_["program_type"][()]
+                system_eval_count = file_["system_eval_count"][()]
+                if program_type == ProgramType.EVOLVE.value:
+                    intermediate_states = file_["intermediate_states"][:, state_index, :, :]
+                else:
+                    # If no save index was specified, choose the index that achieved
+                    # the lowest error.
+                    if save_index is None:
+                        save_index = np.argmin(file_["error"])
+                    intermediate_states = file_["intermediate_states"][save_index, :, state_index, :, :]
+    except Timeout:
+        print("Could not access specified file.")
+        return
+    #ENDWITH
+    control_count = controls.shape[1]
+    control_eval_count = controls.shape[0]
+    control_eval_times = np.linspace(0, evolution_time, control_eval_count)
+    system_eval_times = np.linspace(0, evolution_time, system_eval_count)
+    dt = evolution_time / control_eval_count
+    hilbert_size = intermediate_states.shape[-2]
+    controls_real = np.real(controls)
+    controls_imag = np.imag(controls)
+    file_name = os.path.splitext(ntpath.basename(file_path))[0]
+
+    # Create labels and extra content.
+    patches = list()
+    labels = list()
+    for i in range(control_count):
+        i2 = i * 2
+        label_real = "control_{}_real".format(i)
+        labels.append(label_real)
+        color_real = get_color(i2)
+        patches.append(mpatches.Patch(label=label_real, color=color_real))
+
+        label_imag = "control_{}_imag".format(i)
+        color_imag = get_color(i2 + 1)
+        labels.append(label_imag)
+        patches.append(mpatches.Patch(label=label_imag, color=color_imag))
+    #ENDFOR
+
+    # Set up the plots.
+    gs = gridspec.GridSpec(4, 2)
+    gs_index = 0
+    plt.subplot(gs[gs_index, :],title="{:^6d} | {:^1.8e} | {:^1.8e}"
+                  "".format(iteration, error,
+                            grads_norm))
+    gs_index += 1
+    plt.figlegend(handles=patches, labels=labels, loc="upper right",
+                  framealpha=0.5)
+#    plt.subplots_adjust(hspace=0.8)
+
+    # Plot the controls.
+#    plt.subplot(2, 1, 1)
+    plt.xlabel("Time ({})".format(time_unit))
+    plt.ylabel("Amplitude ({})".format(amplitude_unit))
+    if complex_controls:
+        for i in range(control_count):
+            i2 = i * 2
+            color_real = get_color(i2)
+            color_imag = get_color(i2 + 1)
+            control_real = controls_real[:, i]
+            control_imag = controls_imag[:, i]
+            plt.plot(control_eval_times, control_real, ls='-',
+                     color=color_real, alpha=0.9)
+            plt.plot(control_eval_times, control_imag, ls='-',
+                     color=color_imag, alpha=0.9)
+    else:
+        for i in range(control_count):
+            i2 = i * 2
+            color= get_color(i2)
+            control = controls[:, i]
+            plt.plot(control_eval_times, control, ls='-',
+                     color=color, alpha=0.9)
+    #ENDIF
+
+    # Plot the fft.
+    plt.subplot(gs[gs_index,:])
+    gs_index += 1
+#    freq_axis = np.where(control_eval_times, control_eval_times, 1) ** -1
+    flist = np.fft.fftfreq(control_eval_times.shape[-1],d=dt)
+    
+    plt.xlabel("Frequency ({})".format(amplitude_unit))
+    plt.ylabel("FFT")
+    for i in range(control_count):
+        i2 = i * 2
+        color_fft = get_color(i2)
+        control_fft = abs(np.fft.fft(controls[:, i]))
+        plt.plot(flist,
+                 control_fft, ls = '-', color=color_fft,
+                 ms=2,alpha=0.9)
+    #ENDFOR
+  
+    # Compile data.
+    intermediate_densities = np.matmul(intermediate_states, conjugate_transpose(intermediate_states))
+    population_data = list()
+    for i in range(hilbert_size):
+        population_data_ = np.real(intermediate_densities[:, i, i])
+        population_data.append(population_data_)
+
+    # Create labels and extra content.
+    patches = list()
+    labels = list()
+    for i in range(hilbert_size):
+        label = "{}".format(i)
+        labels.append(label)
+        color = get_color(i)
+        patches.append(mpatches.Patch(label=label, color=color))
+    #ENDFOR
+
+    # Plot the data.
+    plt.subplot(gs[gs_index,:],title="Evolution")
+    plt.figlegend(handles=patches, labels=labels, loc="upper right",
+                  framealpha=0.5)
+    plt.xlabel("Time ({})".format(time_unit))
+    plt.ylabel("Population")
+    for i in range(hilbert_size):
+        color = get_color(i)
+        plt.plot(system_eval_times, population_data[i], marker_style,
+                 color=color, ms=2, alpha=0.9)
+
+    # Export.
+    if save_file_path is not None:
+        plt.savefig(save_file_path, dpi=dpi)
+ 
+    if show:
+        fig = plt.gcf()
+        fig.set_size_inches(15, 20)
+        display.display(plt.gcf())
+        display.clear_output(wait=True)
+        
 ### HELPER FUNCTIONS ###
 
 def get_color(index):
