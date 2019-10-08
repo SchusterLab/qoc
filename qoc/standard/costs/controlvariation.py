@@ -16,6 +16,7 @@ class ControlVariation(Cost):
     Fields:
     control_size
     cost_multiplier
+    cost_normalization_constant
     max_control_norms
     name
     order
@@ -40,6 +41,7 @@ class ControlVariation(Cost):
         self.max_control_norms = max_control_norms
         self.diffs_size = control_count * (control_eval_count - order)
         self.order = order
+        self.cost_normalization_constant = self.diffs_size * (2 ** self.order)
 
 
     def cost(self, controls, states, system_eval_step):
@@ -62,12 +64,12 @@ class ControlVariation(Cost):
         # Penalize the square of the absolute value of the difference
         # in value of the control parameters from one step to the next.
         diffs = anp.diff(normalized_controls, axis=0, n=self.order)
-        cost = anp.sum(anp.real(diffs_normalized * anp.conjugate(diffs_normalized)))
+        cost = anp.sum(anp.real(diffs * anp.conjugate(diffs)))
         # You can prove that the square of the complex modulus of the difference
         # between two complex values is l.t.e. 2 if the complex modulus
         # of the two complex values is l.t.e. 1 respectively using the
         # triangle inequality. This fact generalizes for higher order differences.
         # Therefore, a factor of 2 should be used to normalize the diffs.
-        cost_normalized = cost / (self.diffs_size * (2 ** self.order))
+        cost_normalized = cost / self.cost_normalization_constant
 
         return cost_normalized * self.cost_multiplier
