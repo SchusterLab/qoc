@@ -36,7 +36,7 @@ class ControlArea(Cost):
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.control_count = control_count
-        self.control_size = control_count * control_step_count
+        self.control_size = control_count * control_eval_count
         self.max_control_norms = max_control_norms
 
 
