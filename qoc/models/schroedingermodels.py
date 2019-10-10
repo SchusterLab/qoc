@@ -225,6 +225,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         if iteration > self.final_iteration:
             return
         
+        self.cost_recorder[iteration] = error
+        
         # Determine decision parameters.
         is_final_iteration = iteration == self.final_iteration
         save_step, _ = np.divmod(iteration, self.save_iteration_step)
@@ -249,7 +251,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             and ((np.mod(iteration, self.log_iteration_step) == 0)
                  or is_final_iteration)):
             grads_norm = np.linalg.norm(grads)
-            plot_summary(self.save_file_path, iteration, error, grads_norm, save_index = save_step, show=True,)
+            plot_summary(self.save_file_path, self.cost_recorder, iteration, error, 
+                         grads_norm, save_index = save_step, show=True,)
 
     def log_and_save_initial(self):
         """
@@ -306,6 +309,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             except Timeout:
                 print("Could not perform initial save.")
         #ENDIF
+        
+        self.cost_recorder = np.zeros(self.control_eval_count)
 
         if self.should_log:
             print("iter   |   total error  |    grads_l2   \n"

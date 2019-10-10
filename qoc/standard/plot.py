@@ -17,6 +17,7 @@ import numpy as np
 from scipy import linalg as la
 from qutip import *
 from IPython import display
+import pandas as pd
 
 from qoc.models import ProgramType
 from qoc.standard.functions.convenience import conjugate_transpose
@@ -317,11 +318,11 @@ def plot_state_population(file_path,
     if show:
         plt.show()
 
-def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz", 
-                  dpi=1000,
-                  marker_style="o", save_file_path=None,
-                  save_index=None,
-                  show=False, state_index=0, time_unit="ns",):
+def plot_summary(file_path, cost_recorder, iteration, error, 
+                 grads_norm, amplitude_unit="GHz", dpi=1000,
+                 marker_style="o", save_file_path=None,
+                 save_index=None,
+                 show=False, state_index=0, time_unit="ns",):
     """
     Plots both the controls and the population evolutions as a function of
     time. This function is essentially plot_controls and plot_state_population
@@ -363,10 +364,6 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
                 if program_type == ProgramType.EVOLVE.value:
                     intermediate_states = file_["intermediate_states"][:, state_index, :, :]
                 else:
-                    # If no save index was specified, choose the index that achieved
-                    # the lowest error.
-                    if save_index is None:
-                        save_index = np.argmin(file_["error"])
                     intermediate_states = file_["intermediate_states"][save_index, :, state_index, :, :]
     except Timeout:
         print("Could not access specified file.")
@@ -401,16 +398,20 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
     # Set up the plots.
     gs = gridspec.GridSpec(4, 2)
     gs_index = 0
-    plt.subplot(gs[gs_index, :],title="{:^6d} | {:^1.8e} | {:^1.8e}"
-                  "".format(iteration, error,
-                            grads_norm))
-    gs_index += 1
-    plt.figlegend(handles=patches, labels=labels, loc="upper right",
-                  framealpha=0.5)
-#    plt.subplots_adjust(hspace=0.8)
+    plt.subplot(gs[gs_index, :], 
+                title="Iteration = {:^6d} | Error = {:^1.8e} | Grad = {:^1.8e}".format(iteration, error,grads_norm))
+    plt.xlabel("Iteration")
+    plt.ylabel("Error")
+    cost_recorder_temp = cost_recorder[:iteration]
+    plt.plot(np.arange(iteration), cost_recorder_temp, marker_style, 
+             ls = '-', alpha=0.9)
+    plt.yscale('log')
+#    plt.figlegend(handles=patches, labels=labels, loc="upper right",
+#                  framealpha=0.5)
 
     # Plot the controls.
-#    plt.subplot(2, 1, 1)
+    gs_index += 1
+    plt.subplot(gs[gs_index, :])
     plt.xlabel("Time ({})".format(time_unit))
     plt.ylabel("Amplitude ({})".format(amplitude_unit))
     if complex_controls:
@@ -434,9 +435,8 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
     #ENDIF
 
     # Plot the fft.
-    plt.subplot(gs[gs_index,:])
     gs_index += 1
-#    freq_axis = np.where(control_eval_times, control_eval_times, 1) ** -1
+    plt.subplot(gs[gs_index,:])
     flist = np.fft.fftfreq(control_eval_times.shape[-1],d=dt)
     
     plt.xlabel("Frequency ({})".format(amplitude_unit))
@@ -445,9 +445,8 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
         i2 = i * 2
         color_fft = get_color(i2)
         control_fft = abs(np.fft.fft(controls[:, i]))
-        plt.plot(flist,
-                 control_fft, ls = '-', color=color_fft,
-                 ms=2,alpha=0.9)
+        plt.plot(flist, control_fft, ls = '-', color=color_fft,
+                 alpha=0.9)
     #ENDFOR
   
     # Compile data.
@@ -456,6 +455,7 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
     for i in range(hilbert_size):
         population_data_ = np.real(intermediate_densities[:, i, i])
         population_data.append(population_data_)
+    #ENDFOR
 
     # Create labels and extra content.
     patches = list()
@@ -468,6 +468,7 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
     #ENDFOR
 
     # Plot the data.
+    gs_index += 1
     plt.subplot(gs[gs_index,:],title="Evolution")
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
@@ -475,8 +476,9 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
     plt.ylabel("Population")
     for i in range(hilbert_size):
         color = get_color(i)
-        plt.plot(system_eval_times, population_data[i], marker_style,
-                 color=color, ms=2, alpha=0.9)
+        plt.plot(system_eval_times, population_data[i], marker_style, ls='-',
+                 color=color, alpha=0.9)
+    #ENDFOR 
 
     # Export.
     if save_file_path is not None:
@@ -487,6 +489,7 @@ def plot_summary(file_path, iteration, error, grads_norm, amplitude_unit="GHz",
         fig.set_size_inches(15, 20)
         display.display(plt.gcf())
         display.clear_output(wait=True)
+    #ENDIF
         
 ### HELPER FUNCTIONS ###
 

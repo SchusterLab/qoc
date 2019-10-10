@@ -385,6 +385,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
     error = 0
+    speedup_error = 0
 
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
@@ -409,8 +410,15 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         # Compute step costs every `cost_step`.
         if is_cost_step and not is_first_system_eval_step:
             for i, step_cost in enumerate(step_costs):
-                cost_error = step_cost.cost(controls, states, system_eval_step)
-                error = error + cost_error
+                if step_cost == "speedup":
+                    if save_intermediate_states == False:
+                        raise RuntimeError("To use the speedup cost function, save_intermediate_states "
+                                           "must be set to True")
+                    speedup_cost_error = step_cost.cost(controls, states, system_eval_step, intermediate_states)
+                    speedup_error = speedup_error + speedup_cost_error
+                else:
+                    cost_error = step_cost.cost(controls, states, system_eval_step)
+                    error = error + cost_error
             #ENDFOR
 
         # Evolve the states to the next time step.
@@ -428,6 +436,9 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         if not cost.requires_step_evaluation:
             cost_error = cost.cost(controls, states, final_system_eval_step)
             error = error + cost_error
+            
+    if "speedup" is in step_costs:
+        error = error + (1 - speedup_error)
 
     # Report reults.
     reporter.error = error
