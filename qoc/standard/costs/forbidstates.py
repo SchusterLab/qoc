@@ -50,29 +50,26 @@ class ForbidStates(Cost):
     def cost(self, controls, states, system_eval_step):
         """
         Compute the penalty.
-
         Arguments:
         controls
         states
         system_eval_step
-
         Returns:
         cost
         """
         # The cost is the overlap (fidelity) of the evolved state and each
         # forbidden state.
         cost = 0
-        for initial_state in states:
-            for i, forbidden_states_dagger_ in enumerate(self.forbidden_states_dagger):
-                state_cost = 0
-                for forbidden_state_dagger in forbidden_states_dagger_:
-                    inner_product = anp.matmul(forbidden_state_dagger, initial_state)[0, 0]
-                    fidelity = anp.real(inner_product * anp.conjugate(inner_product))
-                    state_cost = state_cost + fidelity
-                #ENDFOR
-                state_cost_normalized = state_cost / self.forbidden_states_count[i]
-                cost = cost + state_cost_normalized
+        for i, forbidden_states_dagger_ in enumerate(self.forbidden_states_dagger):
+            state = states[i]
+            state_cost = 0
+            for forbidden_state_dagger in forbidden_states_dagger_:
+                inner_product = anp.matmul(forbidden_state_dagger, state)[0, 0]
+                fidelity = anp.real(inner_product * anp.conjugate(inner_product))
+                state_cost = state_cost + fidelity
             #ENDFOR
+            state_cost_normalized = state_cost / self.forbidden_states_count[i]
+            cost = cost + state_cost_normalized
         #ENDFOR
         
         # Normalize the cost for the number of evolving states
