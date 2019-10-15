@@ -55,12 +55,16 @@ class ProgramState(object):
         self.save_file_path = save_file_path
         step_cost_indices = list()
         step_costs = list()
+        non_step_cost_indices = list()
         for i, cost in enumerate(costs):
             if cost.requires_step_evaluation:
                 step_costs.append(cost)
                 step_cost_indices.append(i)
+            else:
+                non_step_cost_indices.append(i)
         #ENDFOR
         self.step_cost_indices = step_cost_indices
+        self.non_step_cost_indices = non_step_cost_indices
         self.step_costs = step_costs
         self.system_eval_count = system_eval_count
 

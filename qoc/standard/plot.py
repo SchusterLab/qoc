@@ -318,8 +318,8 @@ def plot_state_population(file_path,
     if show:
         plt.show()
 
-def plot_summary(file_path, cost_recorder, iteration, error, 
-                 grads_norm, amplitude_unit="GHz", dpi=1000,
+def plot_summary(file_path, cost_recorder, individual_cost_recorder, costs, iteration, error, 
+                 grads_norm, save_iteration_step, amplitude_unit="GHz", dpi=1000,
                  marker_style="o", save_file_path=None,
                  save_index=None,
                  show=False, state_index=0, time_unit="ns",):
@@ -332,10 +332,15 @@ def plot_summary(file_path, cost_recorder, iteration, error,
 
     Arguments:
     file_path :: str - the full path to the H5 file
+    cost_recorder :: ndarray - tracks the overall error as a function of iteration
+    individual_cost_recorder :: ndarray - tracks the error of individual cost functions 
+        as a function of iteration
+    costs :: iterable(qoc.models.cost.Cost) - necessary for labeling costs
 
     iteration
     error
     grads_norm
+    save_iteration_step
     amplitude_unit
     dpi
     marker_style
@@ -379,6 +384,48 @@ def plot_summary(file_path, cost_recorder, iteration, error,
     controls_imag = np.imag(controls)
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
 
+    cost_recorder_temp = cost_recorder[:save_index]
+    individual_cost_recorder_temp = individual_cost_recorder[:,:save_index]
+    num_costs = individual_cost_recorder.shape[0]
+    for i, individual_costs in enumerate(costs):
+        individual_costs = str(individual_costs)
+        if ((individual_costs == "target_state_infidelity")
+            or (individual_costs == "target_density_infidelity")):
+            infidelity = individual_cost_recorder[i,save_index]
+            break
+    #ENDFOR
+    
+    # Set up the plots.
+    gs = gridspec.GridSpec(4, 2)
+    gs_index = 0
+    plt.subplot(gs[gs_index, :], title="Iteration = {:^6d} | "
+                "Error = {:^1.8e} | Infidelity = {:^1.8e} | "
+                "Grad = {:^1.8e}".format(iteration, error, infidelity, grads_norm))
+    plt.xlabel("Iteration")
+    plt.ylabel("Error")
+    
+    # Create labels and extra content.
+    patches = list()
+    labels = list()
+    for i, cost_names in enumerate(costs):
+        label = "{}".format(cost_names)
+        labels.append(label)
+        color = get_color(i)
+        patches.append(mpatches.Patch(label=label, color=color))
+    #ENDFOR
+    labels.append("total_cost")
+    patches.append(mpatches.Patch(label="total_cost", color=get_color(num_costs)))
+    plt.figlegend(handles=patches, labels=labels, loc="upper right",
+                  framealpha=0.5)
+    x = np.arange(0,save_index*save_iteration_step,save_iteration_step)
+    for i in range(num_costs):
+        color=get_color(i)
+        plt.plot(x, individual_cost_recorder_temp[i,:], 
+                 marker_style, ls = '-', color=color, alpha=0.9)
+    #ENDFOR
+    plt.plot(x, cost_recorder_temp, marker_style, ls = '-', color=get_color(num_costs),alpha=0.9)
+    plt.yscale('log')
+    
     # Create labels and extra content.
     patches = list()
     labels = list()
@@ -394,21 +441,9 @@ def plot_summary(file_path, cost_recorder, iteration, error,
         labels.append(label_imag)
         patches.append(mpatches.Patch(label=label_imag, color=color_imag))
     #ENDFOR
-
-    # Set up the plots.
-    gs = gridspec.GridSpec(4, 2)
-    gs_index = 0
-    plt.subplot(gs[gs_index, :], 
-                title="Iteration = {:^6d} | Error = {:^1.8e} | Grad = {:^1.8e}".format(iteration, error,grads_norm))
-    plt.xlabel("Iteration")
-    plt.ylabel("Error")
-    cost_recorder_temp = cost_recorder[:iteration]
-    plt.plot(np.arange(iteration), cost_recorder_temp, marker_style, 
-             ls = '-', alpha=0.9)
-    plt.yscale('log')
-#    plt.figlegend(handles=patches, labels=labels, loc="upper right",
-#                  framealpha=0.5)
-
+    plt.figlegend(handles=patches, labels=labels, loc="center right",
+                  framealpha=0.5)
+    
     # Plot the controls.
     gs_index += 1
     plt.subplot(gs[gs_index, :])
@@ -425,6 +460,7 @@ def plot_summary(file_path, cost_recorder, iteration, error,
                      color=color_real, alpha=0.9)
             plt.plot(control_eval_times, control_imag, ls='-',
                      color=color_imag, alpha=0.9)
+        #ENDFOR
     else:
         for i in range(control_count):
             i2 = i * 2
@@ -432,6 +468,7 @@ def plot_summary(file_path, cost_recorder, iteration, error,
             control = controls[:, i]
             plt.plot(control_eval_times, control, ls='-',
                      color=color, alpha=0.9)
+        #ENDFOR
     #ENDIF
 
     # Plot the fft.
@@ -470,7 +507,7 @@ def plot_summary(file_path, cost_recorder, iteration, error,
     # Plot the data.
     gs_index += 1
     plt.subplot(gs[gs_index,:],title="Evolution")
-    plt.figlegend(handles=patches, labels=labels, loc="upper right",
+    plt.figlegend(handles=patches, labels=labels, loc="lower right",
                   framealpha=0.5)
     plt.xlabel("Time ({})".format(time_unit))
     plt.ylabel("Population")

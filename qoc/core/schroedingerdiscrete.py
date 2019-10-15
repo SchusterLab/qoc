@@ -336,7 +336,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
     
     # Save and log optimization progress.
     pstate.log_and_save(controls, error, final_states,
-                        grads, reporter.iteration)
+                        grads, reporter)
     reporter.iteration += 1
     
     # Convert the gradients from cost function to optimizer format.
@@ -383,7 +383,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     save_intermediate_states = pstate.save_intermediate_states_
     states = pstate.initial_states
     step_costs = pstate.step_costs
+    step_cost_indices = pstate.step_cost_indices
+    non_step_cost_indices = pstate.non_step_cost_indices
     system_eval_count = pstate.system_eval_count
+    cost_holder = np.zeros(len(costs))
     error = 0
     speedup_error = 0
 
@@ -410,15 +413,9 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         # Compute step costs every `cost_step`.
         if is_cost_step and not is_first_system_eval_step:
             for i, step_cost in enumerate(step_costs):
-                if step_cost == "speedup":
-                    if save_intermediate_states == False:
-                        raise RuntimeError("To use the speedup cost function, save_intermediate_states "
-                                           "must be set to True")
-                    speedup_cost_error = step_cost.cost(controls, states, system_eval_step, intermediate_states)
-                    speedup_error = speedup_error + speedup_cost_error
-                else:
-                    cost_error = step_cost.cost(controls, states, system_eval_step)
-                    error = error + cost_error
+                cost_error = step_cost.cost(controls, states, system_eval_step)
+                cost_holder[step_cost_indices[i]] += cost_error._value
+                error = error + cost_error
             #ENDFOR
 
         # Evolve the states to the next time step.
@@ -435,14 +432,14 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     for i, cost in enumerate(costs):
         if not cost.requires_step_evaluation:
             cost_error = cost.cost(controls, states, final_system_eval_step)
+            cost_holder[non_step_cost_indices[i]] = cost_error._value
             error = error + cost_error
-            
-    if "speedup" is in step_costs:
-        error = error + (1 - speedup_error)
-
+    #ENDFOR
+    
     # Report reults.
     reporter.error = error
     reporter.final_states = states
+    reporter.cost_holder = cost_holder
     
     return error
 

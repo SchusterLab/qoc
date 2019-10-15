@@ -205,7 +205,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                           and save_intermediate_states_)
 
 
-    def log_and_save(self, controls, error, final_states, grads, iteration,):
+    def log_and_save(self, controls, error, final_states, grads, reporter,):
         """
         If necessary, log to stdout and save to the save file.
 
@@ -217,15 +217,15 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             of evolution
         grads :: ndarray - the current gradients of the cost function
             with resepct to controls
-        iteration :: int - the optimization iteration
+        reporter :: Dummy() - class for keeping track of iteration, cost_holder, etc.
 
         Returns: none
         """
         # Don't log if the iteration number is invalid.
+        iteration = reporter.iteration
+        cost_holder = reporter.cost_holder
         if iteration > self.final_iteration:
             return
-        
-        self.cost_recorder[iteration] = error
         
         # Determine decision parameters.
         is_final_iteration = iteration == self.final_iteration
@@ -234,6 +234,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         if (self.should_save
             and ((np.mod(iteration, self.save_iteration_step) == 0)
                  or is_final_iteration)):
+            self.cost_recorder[save_step] = error
+            self.individual_cost_recorder[:,save_step] = cost_holder
             try:
                 with self.save_file_lock:
                     with h5py.File(self.save_file_path, "a") as save_file:
@@ -251,8 +253,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             and ((np.mod(iteration, self.log_iteration_step) == 0)
                  or is_final_iteration)):
             grads_norm = np.linalg.norm(grads)
-            plot_summary(self.save_file_path, self.cost_recorder, iteration, error, 
-                         grads_norm, save_index = save_step, show=True,)
+            plot_summary(self.save_file_path, self.cost_recorder, self.individual_cost_recorder, self.costs, 
+                         iteration, error, grads_norm, self.save_iteration_step, save_index = save_step, show=True,)
 
     def log_and_save_initial(self):
         """
@@ -310,7 +312,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                 print("Could not perform initial save.")
         #ENDIF
         
-        self.cost_recorder = np.zeros(self.control_eval_count)
+        self.cost_recorder = np.zeros(save_count)
+        self.individual_cost_recorder = np.zeros((len(self.costs), save_count))
 
         if self.should_log:
             print("iter   |   total error  |    grads_l2   \n"
