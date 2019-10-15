@@ -333,7 +333,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             try:
                 with self.save_file_lock:
                     with h5py.File(self.save_file_path, "a") as save_file:
-                        save_file["intermediate_states"][iteration, system_eval_step, :, :, :] = states.astype(np.complex128)
+                        save_file["intermediate_states"][save_step, system_eval_step, :, :, :] = states.astype(np.complex128)
             except Timeout:
                 print("Could not save intermediate states on iteration {} and "
                       "system_eval_step {}."
