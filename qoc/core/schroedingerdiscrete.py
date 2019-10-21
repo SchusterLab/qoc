@@ -383,6 +383,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     save_intermediate_states = pstate.save_intermediate_states_
     states = pstate.initial_states
     step_costs = pstate.step_costs
+    non_step_costs = pstate.non_step_costs
     step_cost_indices = pstate.step_cost_indices
     non_step_cost_indices = pstate.non_step_cost_indices
     system_eval_count = pstate.system_eval_count
@@ -429,11 +430,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     #ENDFOR
 
     # Compute non-step-costs.
-    for i, cost in enumerate(costs):
-        if not cost.requires_step_evaluation:
-            cost_error = cost.cost(controls, states, final_system_eval_step)
-            cost_holder[non_step_cost_indices[i]] = cost_error._value
-            error = error + cost_error
+    for i, cost in enumerate(non_step_costs):
+        cost_error = cost.cost(controls, states, final_system_eval_step)
+        cost_holder[non_step_cost_indices[i]] = cost_error._value
+        error = error + cost_error
     #ENDFOR
     
     # Report reults.
