@@ -18,6 +18,16 @@ class BandpassFilter(Cost):
         that should be penalized
     name
     requires_step_evaluation
+    
+    Example Usage:
+    CONTROL_COUNT = 1
+    EVOLUTION_TIME = 10 #ns
+    CONTROL_EVAL_COUNT = 1000
+    BAND_RANGE = anp.array([[0.0,0.40],[10.,40.]])
+    BAND_RANGE_LIST = anp.stack((BAND_RANGE,))
+    
+    COSTS = [BandpassFilter(BAND_RANGE_LIST, CONTROL_COUNT, CONTROL_EVAL_COUNT,
+                 EVOLUTION_TIME, cost_multiplier=0.01,)]
     """
     name = "bandpass_filter"
     requires_step_evaluation = False
