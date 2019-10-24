@@ -12,6 +12,7 @@ DEPENDENCIES = [
     "filelock",
     "h5py",
     "matplotlib",
+    "numba",
     "numpy",
     "scipy",
 ]
