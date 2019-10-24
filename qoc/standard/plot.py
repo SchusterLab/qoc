@@ -33,7 +33,8 @@ def plot_controls(file_path, amplitude_unit="GHz",
                   dpi=1000,
                   marker_style="o", save_file_path=None,
                   save_index=None,
-                  show=False, time_unit="ns",):
+                  show=False, time_unit="ns",
+                  title=None):
     """
     Plot the controls,  and their discrete fast fourier transform.
 
@@ -69,9 +70,12 @@ def plot_controls(file_path, amplitude_unit="GHz",
     control_count = controls.shape[1]
     control_eval_count = controls.shape[0]
     control_eval_times = np.linspace(0, evolution_time, control_eval_count)
+    control_dt = control_eval_times[1] - control_eval_times[0]
     controls_real = np.real(controls)
     controls_imag = np.imag(controls)
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
+    if title is None:
+        title = file_name
 
     # Create labels and extra content.
     patches = list()
@@ -91,7 +95,7 @@ def plot_controls(file_path, amplitude_unit="GHz",
 
     # Set up the plots.
     plt.figure()
-    plt.suptitle(file_name)
+    plt.suptitle(title)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
     plt.subplots_adjust(hspace=0.8)
@@ -122,19 +126,13 @@ def plot_controls(file_path, amplitude_unit="GHz",
 
     # Plot the fft.
     plt.subplot(2, 1, 2)
-    freq_axis = np.where(control_eval_times, control_eval_times, 1) ** -1
+    freq_axis = np.fft.fftfreq(control_eval_count, d=control_dt)
     for i in range(control_count):
-        i2 = i * 2
-        color_fft_real = get_color(i2)
-        color_fft_imag = get_color(i2 + 1)
+        color_fft = get_color(i)
         control_fft = np.fft.fft(controls[:, i])
-        control_fft_real = control_fft.real
-        control_fft_imag = control_fft.imag
+        control_fft_squared = np.real(control_fft * np.conj(control_fft))
         plt.plot(freq_axis,
-                 control_fft_real, marker_style, color=color_fft_real,
-                 ms=2,alpha=0.9)
-        plt.plot(freq_axis,
-                 control_fft_imag, marker_style, color=color_fft_imag,
+                 control_fft_squared, marker_style, color=color_fft,
                  ms=2,alpha=0.9)
     #ENDFOR
     plt.xlabel("Frequency ({})".format(amplitude_unit))
@@ -149,13 +147,14 @@ def plot_controls(file_path, amplitude_unit="GHz",
 
 
 def plot_density_population(file_path,
-                          density_index=0,
-                          dpi=1000,
-                          marker_style="o",
-                          save_file_path=None,
-                          save_index=None,
-                          show=False,
-                          time_unit="ns",):
+                            density_index=0,
+                            dpi=1000,
+                            marker_style="o",
+                            save_file_path=None,
+                            save_index=None,
+                            show=False,
+                            time_unit="ns",
+                            titile=None):
     """
     Plot the evolution of the population levels for a density matrix.
 
@@ -194,6 +193,8 @@ def plot_density_population(file_path,
         print("Could not access the specified file.")
         return
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
+    if title is None:
+        title = file_name
     hilbert_size = intermediate_states.shape[-2]
     system_eval_times = np.linspace(0, evolution_time, system_eval_count)
 
@@ -215,7 +216,7 @@ def plot_density_population(file_path,
 
     # Plot the data.
     plt.figure()
-    plt.suptitle(file_name)
+    plt.suptitle(title)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
     plt.xlabel("Time ({})".format(time_unit))
@@ -240,7 +241,8 @@ def plot_state_population(file_path,
                           save_index=None,
                           show=False,
                           state_index=0,
-                          time_unit="ns",):
+                          time_unit="ns",
+                          title=None):
     """
     Plot the evolution of the population levels for a state.
 
@@ -278,6 +280,8 @@ def plot_state_population(file_path,
         print("Could not access the specified file.")
         return
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
+    if title is None:
+        title = file_name
     hilbert_size = intermediate_states.shape[-2]
     system_eval_times = np.linspace(0, evolution_time, system_eval_count)
 
@@ -300,7 +304,7 @@ def plot_state_population(file_path,
 
     # Plot the data.
     plt.figure()
-    plt.suptitle(file_name)
+    plt.suptitle(title)
     plt.figlegend(handles=patches, labels=labels, loc="upper right",
                   framealpha=0.5)
     plt.xlabel("Time ({})".format(time_unit))

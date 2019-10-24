@@ -4,8 +4,10 @@ expm.py - a module for all things e^M
 
 from autograd.extend import (defvjp as autograd_defvjp,
                              primitive as autograd_primitive)
+import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
+from numba import jit
 
 @autograd_primitive
 def expm(matrix):
@@ -21,6 +23,21 @@ def expm(matrix):
     exp_matrix = la.expm(matrix)
 
     return exp_matrix
+
+
+@jit(nopython=True, parallel=True)
+def _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
+    dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
+
+    # Compute a first order approximation of the frechet derivative of the matrix
+    # exponential in every unit direction Eij.
+    for i in range(matrix_size):
+        for j in range(matrix_size):
+            dexpm_dmij_rowi = exp_matrix[j,:]
+            dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
+        #ENDFOR
+    #ENDFOR
+    return dfinal_dmatrix
 
 
 def _expm_vjp(exp_matrix, matrix):
@@ -54,23 +71,7 @@ def _expm_vjp(exp_matrix, matrix):
         to the jacobian of the final function with respect to `matrix`
     """
     matrix_size = matrix.shape[0]
-        
-    def _expm_vjp_(dfinal_dexpm):
-        dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
-
-        # Compute a first order approximation of the frechet derivative of the matrix
-        # exponential in every unit direction Eij.
-        for i in range(matrix_size):
-            for j in range(matrix_size):
-                dexpm_dmij_rowi = exp_matrix[j,:]
-                dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
-            #ENDFOR
-        #ENDFOR
-
-        return dfinal_dmatrix
-    #ENDDEF
-
-    return _expm_vjp_
+    return lambda dfinal_dexpm: _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size)
 
 
 autograd_defvjp(expm, _expm_vjp)
