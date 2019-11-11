@@ -100,6 +100,7 @@ def evolve_lindblad_discrete(evolution_time, initial_densities,
                                          lindblad_data, save_file_path,
                                          save_intermediate_densities,
                                          system_eval_count)
+    pstate.save_initial(controls)
     result = EvolveLindbladResult()
     _ = _evaluate_lindblad_discrete(controls, pstate, result)
 
