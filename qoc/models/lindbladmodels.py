@@ -56,7 +56,7 @@ class EvolveLindbladDiscreteState(ProgramState):
                                              and save_file_path is not None)
 
 
-    def save_initial(self):
+    def save_initial(self, controls):
         """
         Perform the initial save.
         """
@@ -66,7 +66,7 @@ class EvolveLindbladDiscreteState(ProgramState):
             try:
                 with self.save_file_lock:
                     with h5py.File(self.save_file_path, "w") as save_file:
-                        save_file["controls"] = self.controls
+                        save_file["controls"] = controls
                         save_file["cost_eval_step"] = self.cost_eval_step
                         save_file["costs"] = np.array(["{}".format(cost)
                                                        for cost in self.costs])
