@@ -11,6 +11,7 @@ from .targetdensityinfidelity import TargetDensityInfidelity
 from .targetdensityinfidelitytime import TargetDensityInfidelityTime
 from .targetstateinfidelity import TargetStateInfidelity
 from .targetstateinfidelitytime import TargetStateInfidelityTime
+from .bandpassfilter import BandpassFilter
 
 __all__ = [
     "ControlArea",
@@ -18,4 +19,5 @@ __all__ = [
     "ForbidDensities", "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
+    "BandpassFilter",
 ]
