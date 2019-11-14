@@ -34,7 +34,10 @@ def plot_controls(file_path, amplitude_unit="GHz",
                   marker_style="o", save_file_path=None,
                   save_index=None,
                   show=False, time_unit="ns",
-                  title=None):
+                  title=None,
+                  fft_freq_lo=None,
+                  fft_freq_hi=None,
+                  fft_tick_count=None):
     """
     Plot the controls,  and their discrete fast fourier transform.
 
@@ -48,6 +51,9 @@ def plot_controls(file_path, amplitude_unit="GHz",
     save_index
     show
     time_unit
+    fft_freq_lo
+    fft_freq_hi
+    fft_tick_count
 
     Returns: None
     """
@@ -125,18 +131,29 @@ def plot_controls(file_path, amplitude_unit="GHz",
     #ENDIF
 
     # Plot the fft.
-    plt.subplot(2, 1, 2)
+    ax = plt.subplot(2, 1, 2)
     freq_axis = np.fft.fftfreq(control_eval_count, d=control_dt)
     for i in range(control_count):
         color_fft = get_color(i)
         control_fft = np.fft.fft(controls[:, i])
         control_fft_squared = np.real(control_fft * np.conj(control_fft))
-        plt.plot(freq_axis,
-                 control_fft_squared, marker_style, color=color_fft,
-                 ms=2,alpha=0.9)
+        ax.plot(freq_axis,
+                control_fft_squared, marker_style, color=color_fft,
+                ms=2,alpha=0.9)
     #ENDFOR
-    plt.xlabel("Frequency ({})".format(amplitude_unit))
-    plt.ylabel("FFT")
+    ax.set_xlabel("Frequency ({})".format(amplitude_unit))
+    ax.set_ylabel("FFT")
+    
+    freq_index_max = np.argmax(freq_axis)
+    if fft_freq_lo is None:
+        fft_freq_lo = 0
+    if fft_freq_hi is None:
+        fft_freq_hi = freq_axis[freq_index_max]
+    ax.set_xbound(lower=fft_freq_lo, upper=fft_freq_hi)
+    
+    if fft_tick_count is not None:
+        ticks = np.linspace(fft_freq_lo, fft_freq_hi, fft_tick_count)
+        ax.set_xticks(ticks)
 
     # Export.
     if save_file_path is not None:
