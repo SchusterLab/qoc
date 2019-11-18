@@ -95,7 +95,7 @@ def gen_controls_white(complex_controls, control_count, control_eval_count,
     # Make each control a random distribution of white noise.
     for i in range(control_count):
         max_norm = max_control_norms[i]
-        stddev = max_norm/5.0
+        stddev = max_norm/10.0
         control = np.random.normal(0, stddev, control_eval_count)
         controls[:, i] = control
     #ENDFOR

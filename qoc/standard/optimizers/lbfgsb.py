@@ -17,7 +17,6 @@ class LBFGSB(object):
         """
         super().__init__()
 
-
     def run(self, function, iteration_count, 
             initial_params, jacobian, args=()):
         """

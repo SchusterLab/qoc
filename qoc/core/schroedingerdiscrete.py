@@ -21,7 +21,7 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         MagnusPolicy,
                         ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
-                          expm, matmuls)
+                          expm, expm_fastgrad, matmuls)
 
 ### MAIN METHODS ###
 
@@ -119,7 +119,8 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 optimizer=Adam(),
                                 save_file_path=None,
                                 save_intermediate_states=False,
-                                save_iteration_step=0,):
+                                save_iteration_step=0,
+                                control_matrix_list=None):
     """
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
@@ -206,6 +207,9 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
         This value is specified in units of system steps, of which
         there are `control_step_count` * `system_step_multiplier`.
         Set this value to 0 to disable saving.
+    control_matrix_list :: ndarray - List of the control matrices, to be used in
+        computing the gradient of the propogator more efficently in the case of 
+        real controls, small step size, no interpolation, etc.
 
     Returns:
     result :: qoc.models.schroedingermodels.GrapeSchroedingerResult
@@ -231,7 +235,8 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count,)
+                                            system_eval_count,
+                                            control_matrix_list,)
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -326,6 +331,8 @@ def _esdj_wrap(controls, pstate, reporter, result):
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_states, Box):
         final_states = reporter.final_states._value
+    else:
+        final_states = reporter.final_states
 
     # Update best configuration.
     if error < result.best_error:
@@ -390,6 +397,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     cost_holder = np.zeros(len(costs))
     error = 0
     speedup_error = 0
+    control_matrix_list = pstate.control_matrix_list
 
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
@@ -415,7 +423,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         if is_cost_step and not is_first_system_eval_step:
             for i, step_cost in enumerate(step_costs):
                 cost_error = step_cost.cost(controls, states, system_eval_step)
-                cost_holder[step_cost_indices[i]] += cost_error._value
+                if isinstance(cost_error,Box):
+                    cost_holder[step_cost_indices[i]] += cost_error._value
+                else:
+                    cost_holder[step_cost_indices[i]] += cost_error
                 error = error + cost_error
             #ENDFOR
 
@@ -425,6 +436,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
                                                         states, time,
                                                         control_eval_times=control_eval_times,
                                                         controls=controls,
+                                                        control_matrix_list=control_matrix_list,
                                                         interpolation_policy=interpolation_policy,
                                                         magnus_policy=magnus_policy,)
     #ENDFOR
@@ -432,7 +444,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     # Compute non-step-costs.
     for i, cost in enumerate(non_step_costs):
         cost_error = cost.cost(controls, states, final_system_eval_step)
-        cost_holder[non_step_cost_indices[i]] = cost_error._value
+        if isinstance(cost_error,Box):
+            cost_holder[non_step_cost_indices[i]] += cost_error._value
+        else:
+            cost_holder[non_step_cost_indices[i]] += cost_error
         error = error + cost_error
     #ENDFOR
     
@@ -443,11 +458,11 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     
     return error
 
-
 def _evolve_step_schroedinger_discrete(dt, hamiltonian,
                                        states, time,
                                        control_eval_times=None,
                                        controls=None,
+                                       control_matrix_list=None,
                                        interpolation_policy=InterpolationPolicy.LINEAR,
                                        magnus_policy=MagnusPolicy.M2,):
     """
@@ -464,6 +479,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
 
     control_eval_times
     controls
+    control_matrix_list
     interpolation_policy
     magnus_policy
     
@@ -502,7 +518,14 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
                          "".format(magnus_policy))
     #ENDIF
 
-    step_unitary = expm(magnus)
-    states = matmuls(step_unitary, states)
+    testbool = False
+    if ((magnus_policy == MagnusPolicy.M2) and
+        (testbool == True)):
+        control_matrix_list = -1j * dt * np.array(control_matrix_list)
+        step_unitary = expm_fastgrad(magnus, control_matrix_list)
+        states = matmuls(step_unitary, states)
+    else:
+        step_unitary = expm(magnus)
+        states = matmuls(step_unitary, states)
 
     return states

@@ -19,7 +19,7 @@ from .costs import (ControlArea,
                     BandpassFilter,)
 
 from .functions import (commutator, conjugate_transpose,
-                        expm, krons, matmuls,
+                        expm, expm_fastgrad, krons, matmuls,
                         rms_norm,
                         column_vector_list_to_matrix,
                         matrix_to_column_vector_list,)
@@ -41,7 +41,7 @@ __all__ = [
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
     "BandpassFilter",
-    "commutator", "conjugate_transpose", "expm", "krons",
+    "commutator", "conjugate_transpose", "expm", "expm_fastgrad","krons",
     "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "Adam", "LBFGSB", "SGD",

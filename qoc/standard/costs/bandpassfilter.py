@@ -68,6 +68,7 @@ class BandpassFilter(Cost):
         for i, band_range in enumerate(self.band_range_list):
             control_fft_raw = anp.fft.fft(controls[:, i])
             control_fft_sq  = anp.real(anp.multiply(control_fft_raw, anp.conjugate(control_fft_raw)))
+            control_fft_sq_norm = control_fft_sq / anp.amax(control_fft_sq)
             #iterate over the forbidden tuples
             for j, band in enumerate(band_range):
                 lower_bound_index = np.abs(flist-band[0]).argmin()
