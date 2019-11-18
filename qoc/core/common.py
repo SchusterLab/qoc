@@ -167,7 +167,7 @@ def initialize_controls(complex_controls,
         max_control_norms = np.ones(control_count)
         
     if initial_controls is None:
-        controls = gen_controls_white(complex_controls, control_count, control_eval_count,
+        controls = gen_controls_flat(complex_controls, control_count, control_eval_count,
                                      evolution_time, max_control_norms)
     else:
         # Check that the user-specified controls match the specified data type.

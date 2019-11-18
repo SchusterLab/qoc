@@ -8,6 +8,7 @@ from .constants import (get_annihilation_operator,
                         SIGMA_MINUS, SIGMA_PLUS,)
 
 from .costs import (ControlArea,
+                    ControlBandwidthMax,
                     ControlNorm,
                     ControlVariation,
                     ForbidDensities,
@@ -15,8 +16,7 @@ from .costs import (ControlArea,
                     TargetDensityInfidelity,
                     TargetDensityInfidelityTime,
                     TargetStateInfidelity,
-                    TargetStateInfidelityTime,
-                    BandpassFilter,)
+                    TargetStateInfidelityTime,)
 
 from .functions import (commutator, conjugate_transpose,
                         expm, krons, matmuls,
@@ -35,12 +35,11 @@ __all__ = [
     "get_annihilation_operator", "get_creation_operator",
     "get_eij", "SIGMA_X", "SIGMA_Y", "SIGMA_Z", "SIGMA_MINUS",
     "SIGMA_PLUS",
-    "ControlArea",
+    "ControlArea", "ControlBandwidthMax",
     "ControlNorm", "ControlVariation", "ForbidDensities",
     "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
-    "BandpassFilter",
     "commutator", "conjugate_transpose", "expm", "krons",
     "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
