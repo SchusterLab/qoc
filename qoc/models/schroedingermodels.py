@@ -27,6 +27,7 @@ class EvolveSchroedingerDiscreteState(ProgramState):
     evolution_time
     final_system_eval_step
     hamiltonian
+    hamiltonian_args
     initial_states
     interpolation_policy
     magnus_policy
@@ -43,7 +44,8 @@ class EvolveSchroedingerDiscreteState(ProgramState):
     
     def __init__(self,control_eval_count,
                  cost_eval_step, costs,
-                 evolution_time, hamiltonian, initial_states,
+                 evolution_time, hamiltonian, hamiltonian_args,
+                 initial_states,
                  interpolation_policy,
                  magnus_policy,
                  save_file_path,
@@ -54,7 +56,8 @@ class EvolveSchroedingerDiscreteState(ProgramState):
         """
         super().__init__(control_eval_count,
                          cost_eval_step, costs,
-                         evolution_time, hamiltonian, interpolation_policy,
+                         evolution_time, hamiltonian, hamiltonian_args,
+                         interpolation_policy,
                          ProgramType.EVOLVE,
                          save_file_path, system_eval_count,)
         self.initial_states = initial_states
@@ -148,6 +151,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     final_iteration
     final_system_eval_step
     hamiltonian
+    hamiltonian_args
     hilbert_size
     impose_control_conditions
     initial_controls
@@ -175,7 +179,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
 
     def __init__(self, complex_controls, control_count,
                  control_eval_count, cost_eval_step, costs,
-                 evolution_time, hamiltonian,
+                 evolution_time, hamiltonian, hamiltonian_args,
                  impose_control_conditions,
                  initial_controls,
                  initial_states, interpolation_policy, iteration_count,
@@ -189,7 +193,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         """
         super().__init__(complex_controls, control_count,
                          control_eval_count, cost_eval_step, costs,
-                         evolution_time, hamiltonian,
+                         evolution_time, hamiltonian, hamiltonian_args,
                          impose_control_conditions,
                          initial_controls,
                          interpolation_policy, iteration_count,

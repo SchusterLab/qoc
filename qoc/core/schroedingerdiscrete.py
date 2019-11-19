@@ -3,7 +3,9 @@ schroedingerdiscrete.py - a module to expose the grape schroedinger discrete
 optimization algorithm
 """
 
+import autograd.numpy as anp
 from autograd.extend import Box
+from autograd import jacobian
 import numpy as np
 
 from qoc.core.common import (initialize_controls,
@@ -23,12 +25,15 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
 from qoc.standard import (Adam, ans_jacobian,
                           expm, matmuls)
 
+HAMILTONIAN_PARAMETER_ROBUSTNESS = 1
+
 ### MAIN METHODS ###
 
 def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                  initial_states, system_eval_count,
                                  controls=None,
-                                 cost_eval_step=1, costs=list(), 
+                                 cost_eval_step=1, costs=list(),
+                                 hamiltonian_args=None,
                                  interpolation_policy=InterpolationPolicy.LINEAR,
                                  magnus_policy=MagnusPolicy.M2,
                                  save_file_path=None,
@@ -40,10 +45,13 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
     Args:
     evolution_time :: float - This value specifies the duration of the
         system's evolution.
-    hamiltonian :: (controls :: ndarray (control_count), time :: float)
+    hamiltonian :: (controls :: ndarray (control_count), hamiltonian_args :: ndarray (hamiltonian_args_count), time :: float)
                    -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
         - This function provides the system's hamiltonian given a set
         of control parameters and a time value.
+    hamiltonian_args :: ndarray (hamiltonian_args_count)
+        - This array contains auxiliary arguments to pass to the hamiltonian function,
+          typically for the purpose of hamiltonian parameter robustness optimization.
     initial_states :: ndarray (state_count x hilbert_size x 1)
         - This array specifies the states that should be evolved under the
         specified system. These are the states at the beginning of the evolution.
@@ -90,7 +98,8 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
     pstate = EvolveSchroedingerDiscreteState(control_eval_count,
                                              cost_eval_step,
                                              costs, evolution_time,
-                                             hamiltonian, initial_states,
+                                             hamiltonian, hamiltonian_args,
+                                             initial_states,
                                              interpolation_policy,
                                              magnus_policy,
                                              save_file_path,
@@ -98,7 +107,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              system_eval_count,)
     pstate.save_initial(controls)
     result = EvolveSchroedingerResult()
-    _ = _evaluate_schroedinger_discrete(controls, pstate, result)
+    _ = _evaluate_schroedinger_discrete(controls, pstate.hamiltonian_args, pstate, result)
 
     return result
 
@@ -108,6 +117,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 initial_states, system_eval_count,
                                 complex_controls=False,
                                 cost_eval_step=1,
+                                hamiltonian_args=None,
                                 impose_control_conditions=None,
                                 initial_controls=None,
                                 interpolation_policy=InterpolationPolicy.LINEAR,
@@ -136,10 +146,13 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
         defines the criteria for an "optimal" control set.
     evolution_time :: float - This value specifies the duration of the
         system's evolution.
-    hamiltonian :: (controls :: ndarray (control_count), time :: float)
+    hamiltonian :: (controls :: ndarray (control_count), hamiltonian_args :: ndarray (hamiltonian_args_count), time :: float)
                    -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
         - This function provides the system's hamiltonian given a set
         of control parameters and a time value.
+    hamiltonian_args :: ndarray (hamiltonian_args_count)
+        - This array contains auxiliary arguments to pass to the hamiltonian function,
+          typically for the purpose of hamiltonian parameter robustness optimization.
     initial_states :: ndarray (state_count x hilbert_size x 1)
         - This array specifies the states that should be evolved under the
         specified system. These are the states at the beginning of the evolution.
@@ -221,6 +234,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
     pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
                                             control_eval_count, cost_eval_step,
                                             costs, evolution_time, hamiltonian,
+                                            hamiltonian_args,
                                             impose_control_conditions,
                                             initial_controls,
                                             initial_states, interpolation_policy,
@@ -279,7 +293,7 @@ def _esd_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the cost function.
-    error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
+    error = _evaluate_schroedinger_discrete(controls, pstate.hamiltonian_args, pstate, reporter)
 
     # Determine if optimization should terminate.
     if error <= pstate.min_error:
@@ -315,17 +329,28 @@ def _esdj_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
-    error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
-                          (controls, pstate, reporter))
+    if HAMILTONIAN_PARAMETER_ROBUSTNESS:
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_hargs, 0)
+                        (controls, pstate, reporter))
+    else:
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+                        (controls, pstate.hamiltonian_args, pstate, reporter))
+    
+    # Everything need to be unwrapped from its autograd box.
+    final_states = reporter.final_states
+    while isinstance(final_states, Box):
+        final_states = final_states._value
+    while isinstance(error, Box):
+        error = error._value
+    error = error[0]
+    while isinstance(grads, Box):
+        grads = grads._value
+    
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
     if pstate.complex_controls:
         grads = np.conjugate(grads)
-
-    # The states need to be unwrapped from their autograd box.
-    if isinstance(reporter.final_states, Box):
-        final_states = reporter.final_states._value
 
     # Update best configuration.
     if error < result.best_error:
@@ -351,13 +376,39 @@ def _esdj_wrap(controls, pstate, reporter, result):
     return grads, terminate
 
 
-def _evaluate_schroedinger_discrete(controls, pstate, reporter):
+def _evaluate_schroedinger_discrete_hargs(controls, pstate, reporter):
+    """
+    Do the hamiltonian parameter robustness thing in addition to the
+    typical cost functions.
+    
+    Arguments:
+    controls :: ndarray (control_eval_count x control_count)
+        - the control parameters
+    pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
+        - static objects
+    reporter :: any - a reporter for mutable objects
+
+    Returns:
+    error :: float - total error of the evolution
+    """
+    hamiltonian_args_grads = (jacobian(_evaluate_schroedinger_discrete, 1)
+                              (controls, pstate.hamiltonian_args, pstate, reporter))
+    hamiltonian_args_grads_norm = anp.sqrt(anp.conjugate(hamiltonian_args_grads)
+                                           * hamiltonian_args_grads / hamiltonian_args_grads.shape[0])
+    standard_costs_error = _evaluate_schroedinger_discrete(controls, pstate.hamiltonian_args, pstate, reporter)
+    error = hamiltonian_args_grads_norm + standard_costs_error
+    return error
+
+
+def _evaluate_schroedinger_discrete(controls, hamiltonian_args, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
 
     Arguments:
     controls :: ndarray (control_eval_count x control_count)
         - the control parameters
+    hamiltonian_Args :: ndarray (hamiltonian_args_count) - Auxiliary parameters to pass
+        to the hamiltonian function.
     pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
         - static objects
     reporter :: any - a reporter for mutable objects
@@ -419,6 +470,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
                                                         states, time,
                                                         control_eval_times=control_eval_times,
                                                         controls=controls,
+                                                        hamiltonian_args=hamiltonian_args,
                                                         interpolation_policy=interpolation_policy,
                                                         magnus_policy=magnus_policy,)
     #ENDFOR
@@ -440,6 +492,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
                                        states, time,
                                        control_eval_times=None,
                                        controls=None,
+                                       hamiltonian_args=None,
                                        interpolation_policy=InterpolationPolicy.LINEAR,
                                        magnus_policy=MagnusPolicy.M2,):
     """
@@ -480,7 +533,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     # for all time.
     def get_hamiltonian(time_):
         controls_ = interpolate_controls(time_, control_eval_times, controls)
-        hamiltonian_ = hamiltonian(controls_, time_)
+        hamiltonian_ = hamiltonian(controls_, hamiltonian_args, time_)
         return -1j * hamiltonian_
     
     if magnus_policy == MagnusPolicy.M2:

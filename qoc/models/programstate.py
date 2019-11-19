@@ -22,6 +22,7 @@ class ProgramState(object):
     evolution_time
     final_system_eval_step
     hamiltonian
+    hamiltonian_args
     interpolation_policy
     program_type
     save_file_lock
@@ -31,7 +32,8 @@ class ProgramState(object):
     system_eval_count
     """
     def __init__(self, control_eval_count, cost_eval_step, costs,
-                 evolution_time, hamiltonian, interpolation_policy,
+                 evolution_time, hamiltonian, hamiltonian_args,
+                 interpolation_policy,
                  program_type,
                  save_file_path, system_eval_count):
         """
@@ -45,6 +47,7 @@ class ProgramState(object):
         self.evolution_time = evolution_time
         self.final_system_eval_step = system_eval_count - 1
         self.hamiltonian = hamiltonian
+        self.hamiltonian_args = hamiltonian_args
         self.interpolation_policy = interpolation_policy
         self.program_type = program_type
         if save_file_path is not None:
@@ -83,6 +86,7 @@ class GrapeState(ProgramState):
     final_iteration
     final_system_eval_step
     hamiltonian
+    hamiltonian_args
     impose_control_conditions
     initial_controls
     interpolation_policy
@@ -106,6 +110,7 @@ class GrapeState(ProgramState):
                  control_count,
                  control_eval_count, cost_eval_step, costs,
                  evolution_time, hamiltonian,
+                 hamiltonian_args,
                  impose_control_conditions,
                  initial_controls,
                  interpolation_policy, iteration_count,
@@ -117,7 +122,8 @@ class GrapeState(ProgramState):
         See class fields for arguments not listed here.
         """
         super().__init__(control_eval_count, cost_eval_step, costs,
-                         evolution_time, hamiltonian, interpolation_policy,
+                         evolution_time, hamiltonian, hamiltonian_args,
+                         interpolation_policy,
                          ProgramType.GRAPE,
                          save_file_path, system_eval_count,)
         self.complex_controls = complex_controls

@@ -7,7 +7,6 @@ from autograd.extend import (defvjp as autograd_defvjp,
 import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
-from numba import jit
 
 @autograd_primitive
 def expm(matrix):
@@ -25,18 +24,20 @@ def expm(matrix):
     return exp_matrix
 
 
-@jit(nopython=True, parallel=True)
 def _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
-    dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
-
     # Compute a first order approximation of the frechet derivative of the matrix
     # exponential in every unit direction Eij.
+    dfinal_dmatrix = list()
     for i in range(matrix_size):
+        dfinal_dmatrix_rowi = list()
         for j in range(matrix_size):
-            dexpm_dmij_rowi = exp_matrix[j,:]
-            dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
+            dexpm_dmij_rowi = exp_matrix[j, :]
+            dfinal_dmatrix_rowi_colj = anp.sum(anp.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi)) 
+            dfinal_dmatrix_rowi.append(dfinal_dmatrix_rowi_colj)
         #ENDFOR
+        dfinal_dmatrix.append(dfinal_dmatrix_rowi)
     #ENDFOR
+    dfinal_dmatrix = anp.array(dfinal_dmatrix)
     return dfinal_dmatrix
 
 
