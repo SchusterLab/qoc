@@ -24,7 +24,7 @@ class ProgramState(object):
     hamiltonian
     interpolation_policy
     program_type
-    save_file_lock
+    save_file_lock_path
     save_file_path
     step_cost_indices
     step_costs
@@ -47,11 +47,7 @@ class ProgramState(object):
         self.hamiltonian = hamiltonian
         self.interpolation_policy = interpolation_policy
         self.program_type = program_type
-        if save_file_path is not None:
-            save_file_lock_path = "{}.lock".format(save_file_path)
-            self.save_file_lock = FileLock(save_file_lock_path)
-        else:
-            self.save_file_lock = None
+        self.save_file_lock_path = "{}.lock".format(save_file_path)
         self.save_file_path = save_file_path
         step_cost_indices = list()
         step_costs = list()
@@ -92,7 +88,7 @@ class GrapeState(ProgramState):
     min_error
     optimizer
     program_type
-    save_file_lock
+    save_file_lock_path
     save_file_path
     save_iteration_step
     should_log
