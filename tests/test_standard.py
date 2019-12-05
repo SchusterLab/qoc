@@ -229,7 +229,7 @@ def test_expm():
     from autograd import jacobian
     import numpy as np
 
-    from qoc.standard.functions.expm import expm
+    from qoc.standard.functions.expm import expm_scipy
     
     # Test that the end-to-end gradient of the matrix exponential is working.
     m = np.array([[1., 0.],
@@ -242,7 +242,7 @@ def test_expm():
     dexpm_dm_expected[1, 0, 1, 0] = exp_m[1, 1]
     dexpm_dm_expected[1, 1, 1, 1] = exp_m[1, 1]
     
-    dexpm_dm = jacobian(expm, 0)(m)
+    dexpm_dm = jacobian(expm_scipy, 0)(m)
 
     assert(np.allclose(dexpm_dm, dexpm_dm_expected))
 
