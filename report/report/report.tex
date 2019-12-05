@@ -5,12 +5,14 @@
 \begin{document}
 
 \begin{center}
-  {\huge Schuster Lab - GRAPE 2.0 Proposal} \\[0.5em]
+  {\huge Schuster Lab - QOC Report} \\[0.5em]
   {\large Thomas Propson $\vert$ \href{mailto:tcpropson@uchicago.edu}
     {tcpropson@uchicago.edu} \\[0.5em] \today}
 \end{center}
 
-\section{Motivation}
+\section{QOC a.k.a. GRAPE 2.0 Proposal}
+
+\subsection{Motivation}
 %% "Don't call it a comeback; I've been here for years" LL Cool J.
 
 There are tasks we would like to perform that GRAPE 1.0 \cite{leung2017speedup} does not support. Additionally, there are performance improvements that can be made. We list them here:
@@ -37,7 +39,7 @@ There are tasks we would like to perform that GRAPE 1.0 \cite{leung2017speedup} 
 \item There are opaque naming conventions and code formatting used in GRAPE 1.0. GRAPE 1.0 is hard to extend.
 \end{enumerate}
 
-\section{Automatic Differentiation}
+\subsection{Automatic Differentiation}
 We will use \href{https://github.com/HIPS/autograd}{Autograd} \cite{maclaurin2016modeling} for short operations in GRAPE 2.0. It supports gradients of functions that take complex inputs and return real outputs. This covers all cost functions that we care about and those we will care about: gradient-based optimization techniques require real, scalar output, cost functions. The package accepts functions performing python, numpy, and scipy operations and generates the corresponding gradient function.
 
 For computations with small computation graphs, autograd performs comparably to hand derivatives (see Table 1 and 2, Figures 5 and 6). For the main integration of the GRAPE program, we can achieve constant memory usage where autograd requires exponential memory usage (see Table 3 and 4, Figures 7 and 8). Therefore, we will use hand derivatives for the core functionality of GRAPE 2.0, but outsource tasks which require variable differentiation to autograd. For example, we can use autograd to easily differntiate user defined functions such as cost functions and the hamiltonian specification at each time step.
@@ -138,12 +140,12 @@ For computations with small computation graphs, autograd performs comparably to 
   \caption{Plots corresponding to the data in Table 4.}
 \end{figure}
 
-\section{Hamiltonian Specification}
+\subsection{Hamiltonian Specification}
 The total hamiltonian (drift hamiltonian plus control hamiltonians) at each time step will be specified by providing a function to GRAPE that returns a hamiltonian $H_{j}$given the control operators for a time step $\{u_{j}\}$ and an integer $current\_step \in \{0, ..., steps - 1\}$. This will allow the user to perform arbitrary operations between $\{u_{j}\}$ and the control hamiltonians. This will allow the user to use time-dependent drift and control hamiltonians. The user could draw hamiltonians from a list indexed by the optimization step $current\_step$. This requires storing $steps$ number of matrices in memory and is not advised. Additionally, the user could get the wall time of the optimization by computing $t = current\_step * step\_count / pulse\_time$ to use accordingly. Autograd will allow us to get the gradient of this user-specified function with respect to $\{u_{j}\}$ for each time step.
 
 All problems in GRAPE 2.0 will be framed as state (column vector) transfer problems. A set of initial states, and final states they map to, will be specified. Transferring an entire unitary is equivalent to transferring all basis states of the hilbert space.
 
-\section{Cost Functions}
+\subsection{Cost Functions}
 Cost functions will subclass a super cost function class. Each function will be instantiated with a corresponding weight and constants it requires. For example, the forbidden state cost function would be instantiated with a list of states that it is forbidding. The class will implement a method that computes a cost. The output of all cost functions should be normalized to 1. This will make it easier to choose cost function weights.
 
 The inputs to the cost functions will be parameters of the optimization. Obviously, we must compute $\{u_{k, j}\}$ and expose them to the cost functions. Whether we provide intermediate states $\{\Psi_{j}\}$, intermediate propagators $\{U_{j}\}$, and/or total propagators $\{K_{j}\}$ is a question of memory. Suppose we have an optimization running on a hilbert space of size $2^{16}$, i.e. 16 qubits, and use 1000 optimization steps. If we use 128-bit percision complex numbers, storing $\{K_{j}\}$, $\{U_{j}\}$, and $\{\Psi_{j}\}$ together would require $128 * (2 * (2 ^{16})^{2} + 2^{16}) * 1000$bits $= 137.4$ terabytes.
@@ -156,7 +158,7 @@ Dave believes that we should disregard $K_{j}$ altogether. Instead, he would hav
 
 Computing gradients at each time step and adding them to a total gradient sum means that we cannot have cost functions that compute non-linear combinations of the costs they achieve at each time step. E.g. costs computed at different time steps can only be summed. Otherwise, it would be difficult to compute the gradient of that non-linear cost contribution to the total cost function. However, we don't anticipate needing this functionality.
 
-\section{Numerical Compuatation Performance}
+\subsection{Numerical Compuatation Performance}
 GRAPE 2.0 will expose more sophisticated methods for calculating the time-dependent schroedinger equation propagator. Namely, it will implement the second, fourth, and sixth order mangus integrator methods with commutators described in \cite{auer2018magnus}. More details can be found in \cite{blanes2009magnus}. I will try implementing the mutliple-exponential magnus integrators described in \cite{auer2018magnus} and compare their run time to the commutator methods. However, I expect that the commutator methods will be faster because I expect matrix exponentiation to be more expensive than matrix multiplication (see Table 5). Note that GRAPE 1.0 uses the second order magnus integrator method $U = \textrm{exp}(-i H \delta t)$.
 
 GRAPE 2.0 could calculate the matrix exponential and the derivative of the matrix exponential using \href{https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.linalg.expm_frechet.html}{scipy.linalg.expm\_frechet}. Scipy's algorithm \href{https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.linalg.expm.html#scipy.linalg.expm}{scipy.linalg.expm} takes longer to perform than the algorithm used in GRAPE 1.0 for the $T = 10$ case (see Table 5 and Figure 9). However, Scipy's algorithm is more numerically accurate because it accounts for floating point round-off error \cite{al2009new}.
@@ -188,12 +190,12 @@ Note that if the drift and control hamiltonians are hermitian, then their linear
   \caption{Plot corresponding to the data in Table 5.}
 \end{figure}
 
-\section{Time Discretization}
+\subsection{Time Discretization}
 Sometimes we have a parameter in our system Hamiltonian that acts very quickly. Consider $H = \omega_{c}a^{\dagger}a$ where $\omega_{c} = 5$GHz. The osciallation of our system is on the order of $\frac{1}{5\textrm{GHz}} = \frac{1}{5}$nanoseconds. This suggests that we use an evolution time step of $\frac{1}{5}$ns. However, the sampling rate of our arbitrary waveform generator may only be 1 sample per ns. We typically get around this problem by performing a rotating frame transformation to our system Hamiltonian (e.g. $U=\textrm{exp}(i\omega_{c}a^{\dagger}at)$) that cancels the term $\omega_{c}a^{\dagger}a$ in our Hamiltonian. Consider a case where no such simple rotating frame transformation exists or where it makes the other terms in the Hamiltonian prohibitively hard to compute. In GRAPE 1.0 we cannot differentiate between the system rate and the sampling rate, so we must optimize the control pulse at $\frac{1}{5}$ steps per nanosecond even though we cannot realize the output pulse. In GRAPE 2.0 we could implement a scheme where control amplitudes are updated at one time step, but the system evolves at another. Let the rate at which we update the discrete pulse be known as the pulse rate. Let the rate at which we must account for changes in our system be known as the system rate. The optimization parameters will be updated at pulse steps and interpolated at system steps. The user will provide an interpolation scheme which will be differentiated with autograd. The gradient of each of the parameters will be calculated at both pulse and system steps. For simplicity, the number of system steps must be an integer multiple of the pulse steps.
 
 Another way to overcome this obstacle is to optimize an analytical pulse to fit the specified problem. The optimization problem then turns to optimizing the parameters of the anlaytical pulse. Note that these optimization parameters act on the system for all time steps, as opposed to the discrete case. Since the pulse is continuous in time, its value does not need to be interpolated numerically. Therefore, there is no need to differentiate between a system and pulse time step for this case. GRAPE 2.0 will implement both a discrete and a continuous strategy seperately.
 
-\section{Open System}
+\subsection{Open System}
 If our system can be modeled as an open markovian system, we may account for dissipative processes by evolving the probability density matrix $\rho$ under the \href{https://en.wikipedia.org/wiki/Lindbladian}{Lindbladian}
 \[
 \dot{\rho} = -i[H, \rho] + \Gamma(p) = \mathcal{L}(p)\textrm{.}
@@ -206,22 +208,74 @@ The cost functions for this evolution method will be dependent upon the probabil
 
 In this case, we evolve probability density matrices under the PDE instead of individual state vectors. Thus, for each state we wish to transform, we will need to specify a corresponding probability density matrix \cite{basilewitsch2019reservoir}. Similar to the Schroedinger equation case, the function to evolve under the Lindbladian will require a set of initial probability density matrices and corresponding final probability density matrices. The reader should see why this is more expensive than our previous task. If we want to evolve every basis state in the hilbert space, instead of requiring the evolution of $d$ vectors of length $d$, we must now evolve $d$ matrices of size $d \times d$. Note that we expect the probability denisty matrices to be sparse, so we should see reasonable speedups by employing sparse multiplication. We may also employ the technique of turning each probability density matrix to a column vector of length $d^{2}$ and the Lindbladian superoperators to matrices of size $d^{2} \times d^{2}$. I will run tests to see which of these options is most memory and time efficient. If the matrices are stored in row-major order, then the memory layout of the probability density matrix should be the same in matrix and column vector format, so I wouldn't expect better cache performance. Further, increasing the size of the Lindbladian superoperators would seem to give worse cache performance because redundant values need to be referenced from different locations in memory.
 
-\section{Further Performance Considerations}
+\subsection{Further Performance Considerations}
 Autograd implements gradients for numpy operations. Numpy operations are currently limited to running on CPUs, although it takes advantage of access to multiple CPUs for parallelism. Furthermore, Scipy's sparse matrix operations are not currently supported by autograd. To overcome this obstruction, we could implement derivates for these functions by hand or extend autograd.
 
 GRAPE 2.0 will use \href{https://scikit-cuda.readthedocs.io/en/latest/}{scikit-cuda} on top of \href{https://documen.tician.de/pycuda/}{PyCUDA} to perform GPU operations. GRAPE 2.0 will extend autograd to provide derivatives of scikit-cuda functions. Sparse matrix operations are implemented by \href{https://pyculib.readthedocs.io/en/latest/cusparse.html}{cuSPARSE}.
 
-\section{Gradient Based Optimization}
+\subsection{Gradient Based Optimization}
 The question is: Which gradient-based optimizer should we use? GRAPE 1.0 made use of Adam and L-BFGS-B. GRAPE 2.0 will allow the user to create their own optimizer classes to provide updates to learning parameters. GRAPE 2.0 will implement Adam, Adadelta, and L-BFGS-B natively. Adam and Adadelta will be implemented following their \href{https://github.com/keras-team/keras/blob/master/keras/optimizers.py}{keras implementations}. L-BFGS-B will use the \href{https://docs.scipy.org/doc/scipy/reference/optimize.minimize-lbfgsb.html}{scipy implementation}. Adam and L-BFGS-B were chosen because they yielded good results in GRAPE 1.0. Adadelta was chosen because it requires less memory than Adam. Adam needs to store information about all of the parameters it is optimizing. This memory usage scales poorly for $10,000 <$ learning parameters. If time allows, both Dave and I think it would be interesting to see if providing hessians to L-BFGS-B would be useful. I also think it would be interesting to try Newton's method if we have access to hessians. Second-order methods should be more expensive, but I think if they yield better performance they would be worth the value. We care about achieving a specific tolerance for our cost functions, e.g. time, fidelity, etc. The main constraint in constructing higher order derivatives is that we need to be able to take higher order derivatives of the matrix exponential, which likely means implementing a custom solution. I may be thinking about this the wrong way and there is an easier approach.
 
-\section{Software Design}
-GRAPE 2.0 will be python3 official and linted. It will adhere to \href{https://www.python.org/dev/peps/pep-0008/}{PEP8}. It will have unit tests on its modules.
+\subsection{Software Design}
+GRAPE 2.0 will be python3 official and linted. It will adhere to
+\href{https://www.python.org/dev/peps/pep-0008/}{PEP8}. It will have unit tests on its modules.
 
-\section{Miscellaneous Features}
+\subsection{Miscellaneous Features}
 \begin{enumerate}
 \item Examples to include: Gate Smash, HPO.
 \item Include a library of hamiltonians.
 \end{enumerate}
+
+
+\section{Post-Implementation Notes}
+
+\subsection{Derivative of the Matrix Exponential}
+It appears that the matrix exponential derivative approximation, e.g. that
+the matrix being exponentiated commutes with the exponentiated matrix or the direction matrix of the
+derivative, leads to misleading gradients over large step sizes. For example, when compiling pulses for
+the multimode blockade experiments, evolution times are on the order of $3e4$ nanoseconds so a
+$1$ nanosecond step size yields $3e4$ time steps.
+
+\begin{table}[h]
+  \begin{center}
+    \hspace*{-1in}\begin{tabular}{c | c | c | c | c | c | c | c | c}
+      Hilbert Size & matmul      & expm\_pade  & expm\_eigh  & expm\_scipy & dmatmul     & dexpm\_pade & dexpm\_eigh & dexpm\_frechet\_approx \\
+                   & (s)         & (s)         & (s)         & (s)         & (s)         & (s)         & (s)         & (s)\\
+      \hline
+      $2^{1}$      & $6.1698e-6$ & $1.3201e-4$ & $4.0547e-5$ & $4.3278e-4$ & $3.0349e-4$ & $2.4660e-3$ & $1.4168e-3$ & $1.0e-1$\\
+      $2^{2}$      & $3.6065e-6$ & $1.5067e-4$ & $6.1886e-5$ & $3.6125e-4$ & $7.5229e-4$ & $1.2043e-2$ & $2.9244e-3$ & $1.3e-3$\\
+      $2^{3}$      & $2.1484e-6$ & $1.7355e-4$ & $8.3276e-5$ & $4.9917e-4$ & $2.8633e-3$ & $6.3386e-2$ & $1.7894e-2$ & $3.4e-2$\\
+      $2^{4}$      & $3.5103e-6$ & $3.2280e-4$ & $1.8085e-4$ & $6.7427e-4$ & $1.8785e-2$ & $3.3655e-1$ & $6.1969e-2$ & $1.8e-1$\\
+      $2^{5}$      & $1.1596e-5$ & $8.2301e-4$ & $4.5589e-4$ & $1.3221e-3$ & $7.6538e-2$ & $2.4116$    & $4.3173e-1$ & $2.74$\\
+      $2^{6}$      & $4.8016e-5$ & $2.1824e-3$ & $1.3923e-3$ & $3.3298e-3$ & $5.9743e-1$ & $23.226$    & $7.5352$    & $44.12$\\
+      $2^{7}$      & $1.1593e-4$ & $6.2335e-3$ & $5.1759e-3$ & $1.2420e-2$ & $6.6442$    & $313.15$    & $213.16$    &\\
+      $2^{8}$      & $6.9656e-4$ & $2.4849e-2$ & $2.2440e-2$ & $3.9558e-2$ &             &             &             &\\ 
+      $2^{9}$      & $5.1817e-3$ & $1.2113e-1$ & $8.8163e-2$ & $1.7083e-1$ &             &             &             &\\
+      $2^{10}$     & $3.8879e-2$ & $7.5982e-1$ & $7.8604e-1$ & $1.0145$    &             &             &             &\\
+      $2^{11}$     & $3.1001e-1$ & $5.5703$    & $9.3414$    & $6.6560$    &             &             &             &\\
+    \end{tabular}\hspace*{-1in}
+  \end{center}
+  \caption{Run times for different numerical algorithms on Ferimum with 8 cores over 5 averages. Matrices
+    used are complex hermitian, each entry's norm is no greater than 1.
+    matmul squares the matrix using numpy's matrix multiplication.
+    The matrix multiplication
+    time is representative of the matrix exponential derivative time
+    with the commutation simplification used in
+    GRAPE 1.0. expm uses Higham's 2005 algorithm.
+    expm\_eigh uses the eigen-decomposition of the hermitian matrix to compute the
+    matrix exponential via diagonalization.
+    dmatmul, dexpm, and dexpm\_eigh are the times autograd takes to differentiate
+    matmul, expm, and expm\_eigh respectively.
+    dexpm\_frechet\_approx uses the approximation that the matrix being exponentiated commutes with the matrix of
+    the derivative direction--parallelized with numba's jit feature.}
+\end{table}
+
+\begin{figure}[h]
+  \begin{center}
+    %% \includegraphics[width=\linewidth]{data/dexpm_perf.png}
+    \caption{Data from Table 6.}
+  \end{center}
+\end{figure}
 
 
 \bibliography{report/refs}

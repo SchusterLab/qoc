@@ -21,6 +21,13 @@ _test/*
 *.egg-info
 **/.ipynb_checkpoints/*
 
+# latex files
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+
 # report
 !report/data/*.png
 
