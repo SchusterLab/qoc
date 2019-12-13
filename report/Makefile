@@ -1,6 +1,6 @@
 PDF=pdflatex
 BIB=bibtex
-LATEXOBJS= *.aux *.log *.out *.pdf *.bbl *.blg
+LATEXOBJS= *.aux *.log *.out *.bbl *.blg
 
 RDIR=report
 RHEADER=report
