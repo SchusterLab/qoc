@@ -9,10 +9,10 @@ import numpy as np
 import scipy.linalg as la
 from numba import jit
 
-### EXPM IMPLEMENTATION VIA SCIPY ###
+### FRECHET APPROXIMATION ###
 
 @autograd_primitive
-def expm_scipy(matrix):
+def expm_frechet_approx(matrix):
     """
     Compute the matrix exponential of a matrix.
     Args:
@@ -22,13 +22,11 @@ def expm_scipy(matrix):
     Returns:
     exp_matrix :: numpy.ndarray - the exponentiated matrix
     """
-    exp_matrix = la.expm(matrix)
-
-    return exp_matrix
+    return expm_pade(matrix)
 
 
 @jit(nopython=True, parallel=True)
-def _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
+def expm_frechet_approx_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
     dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
 
     # Compute a first order approximation of the frechet derivative of the matrix
@@ -42,7 +40,7 @@ def _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
     return dfinal_dmatrix
 
 
-def _expm_vjp(exp_matrix, matrix):
+def expm_frechet_approx_vjp(exp_matrix, matrix):
     """
     Construct the left-multiplying vector jacobian product function
     for the matrix exponential.
@@ -73,13 +71,13 @@ def _expm_vjp(exp_matrix, matrix):
         to the jacobian of the final function with respect to `matrix`
     """
     matrix_size = matrix.shape[0]
-    return lambda dfinal_dexpm: _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size)
+    return lambda dfinal_dexpm: expm_frechet_approx_vjp_(dfinal_dexpm, exp_matrix, matrix_size)
 
 
-autograd_defvjp(expm_scipy, _expm_vjp)
+autograd_defvjp(expm_frechet_approx, expm_frechet_approx_vjp)
 
 
-### EXPM IMPLEMENTATION DUE TO HIGHAM 2005 ###
+### PADE DUE TO HIGHAM 2005 ###
 
 # Pade approximants from algorithm 2.3.
 B = (
@@ -251,7 +249,7 @@ def expm_pade(a):
     return r
 
 
-### EXPM IMPLEMENTATION VIA EIGEN DECOMPOSITION AND DIAGONALIZATION ###
+### EIGEN DECOMPOSITION AND DIAGONALIZATION ###
 
 def expm_eigh(h):
     """
@@ -268,6 +266,30 @@ def expm_eigh(h):
     p_dagger = anp.conjugate(anp.swapaxes(p, -1, -2))
     d = anp.exp(-1j * eigvals)
     return anp.matmul(p *d, p_dagger)
+
+
+### FULL FRECHET DERIVATIVE ###
+
+@autograd_primitive
+def expm_frechet(matrix):
+    return expm_pade(matrix)
+
+def expm_frechet_vjp(exp_matrix, matrix):
+    matrix_size = matrix.shape[0]
+    def expm_frechet_vjp_(dfinal):
+        dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
+        for i in range(matrix_size):
+            for j in range(matrix_size):
+                eij = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
+                eij[i][j] = 1.
+                dexpm_matrix = la.expm_frechet(matrix, eij, compute_expm=False)
+                dmatrix[i][j] = np.sum(dfinal * dexpm_matrix)
+            #ENDFOR
+        #ENDFOR
+        return dmatrix
+    #ENDDEF
+    return expm_frechet_vjp_
+autograd_defvjp(expm_frechet, expm_frechet_vjp)
 
 
 ### EXPORT ###
