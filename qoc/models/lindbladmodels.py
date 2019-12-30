@@ -30,6 +30,7 @@ class EvolveLindbladDiscreteState(ProgramState):
     lindblad_data
     method
     program_type
+    save_file_lock_path
     save_file_path
     save_intermediate_densities_
     step_cost_indices
@@ -64,7 +65,7 @@ class EvolveLindbladDiscreteState(ProgramState):
             print("QOC is saving this evolution to {}."
                   "".format(self.save_file_path))
             try:
-                with self.save_file_lock:
+                with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "w") as save_file:
                         save_file["controls"] = controls
                         save_file["cost_eval_step"] = self.cost_eval_step
@@ -82,8 +83,9 @@ class EvolveLindbladDiscreteState(ProgramState):
                         save_file["system_eval_count"] = self.system_eval_count
                     #ENDWITH
                 #ENDWITH
-            except:
-                print("Could not perform initial save.")
+            except Timeout:
+                print("Timeout while locking {}."
+                      "".format(self.save_file_lock_path))
         #ENDIF
 
     
@@ -92,12 +94,12 @@ class EvolveLindbladDiscreteState(ProgramState):
         Save intermediate densities to the save file.
         """
         try:
-            with self.save_file_lock:
+            with FileLock(self.save_file_lock_path):
                 with h5py.File(self.save_file_path, "a") as save_file:
                     save_file["intermediate_densities"][system_eval_step] = densities
         except Timeout:
-            print("Could not save intermediate densities on system_eval_step {}."
-                  "".format(system_eval_step))
+            print("Timeout on {} while saving intermediate densities on system_eval_step {}."
+                  "".format(self.save_file_lock_path, system_eval_step))
 
 
 class EvolveLindbladResult(object):
@@ -151,6 +153,7 @@ class GrapeLindbladDiscreteState(GrapeState):
     min_error
     optimizer
     program_type
+    save_file_lock_path
     save_file_path
     save_intermediate_densities_
     save_iteration_step
@@ -235,7 +238,7 @@ class GrapeLindbladDiscreteState(GrapeState):
                  or is_final_iteration)):
             save_step, _ = np.divmod(iteration, self.save_iteration_step)
             try:
-                with self.save_file_lock:
+                with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "a") as save_file:
                         save_file["controls"][save_step,] = controls
                         save_file["error"][save_step,] = error
@@ -244,8 +247,8 @@ class GrapeLindbladDiscreteState(GrapeState):
                     #ENDWITH
                 #ENDWITH
             except Timeout:
-                print("Could not perform save after iteration {}."
-                      "".format(iteration))
+                print("Timeout while locking {}, could not perform save after iteration {}."
+                      "".format(self.save_file_lock_path, iteration))
 
 
     def log_and_save_initial(self):
@@ -265,7 +268,7 @@ class GrapeLindbladDiscreteState(GrapeState):
                 save_count += 1
 
             try:
-                with self.save_file_lock:
+                with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "w") as save_file:
                         save_file["complex_controls"] = self.complex_controls
                         save_file["control_count"] = self.control_count
@@ -300,7 +303,8 @@ class GrapeLindbladDiscreteState(GrapeState):
                     #ENDWITH
                 #ENDWITH
             except Timeout:
-                print("Could not perform initial save.")
+                print("Timeout while locking {}."
+                      "".format(self.save_file_lock_path))
         #ENDIF
 
         if self.should_log:
@@ -325,13 +329,13 @@ class GrapeLindbladDiscreteState(GrapeState):
                  or is_final_iteration)):
             save_step, _ = np.divmod(iteration, self.save_iteration_step)
             try:
-                with self.save_file_lock:
+                with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "a") as save_file:
                         save_file["intermediate_densities"][iteration, system_eval_step, :, :, :] = densities.astype(np.complex128)
             except Timeout:
-                print("Could not save intermediate densities on iteration {} and "
+                print("Timeout while locking {} while saving intermediate densities on iteration {} and "
                       "system_eval_step {}."
-                      "".format(iteration, system_eval_step))
+                      "".format(self.save_file_lock_path, iteration, system_eval_step))
         #ENDIF
 
 

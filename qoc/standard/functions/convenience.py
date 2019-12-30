@@ -84,7 +84,7 @@ def rms_norm(array):
     Returns:
     norm :: float - The rms norm of the array.
     """
-    square_norm = anp.sum(array * anp.conjugate(array))
+    square_norm = anp.sum(anp.real(array * anp.conjugate(array)))
     size = anp.prod(anp.shape(array))
     rms_norm_ = anp.sqrt(square_norm / size)
     

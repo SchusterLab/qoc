@@ -137,13 +137,21 @@ def plot_controls(file_path, amplitude_unit="GHz",
     # Plot the fft.
     ax = plt.subplot(2, 1, 2)
     freq_axis = np.fft.fftfreq(control_eval_count, d=control_dt)
-    for i in range(control_count):
-        color_fft = get_color(i)
-        control_fft = np.fft.fft(controls[:, i])
-        control_fft_squared = np.real(control_fft * np.conj(control_fft))
-        ax.plot(freq_axis,
-                control_fft_squared, marker_style, color=color_fft,
-                ms=2,alpha=0.9)
+    if complex_controls:
+        for i in range(control_count):
+            i2 = i * 2
+            color_fft_real = get_color(i2)
+            color_fft_imag = get_color(i2 + 1)
+            control_fft_real = np.real(np.fft.fft(controls[:, i]))
+            control_fft_imag = np.imag(np.fft.fft(controls[:, i]))
+            control_fft_squared_real = np.real(control_fft_real * np.conj(control_fft_real))
+            control_fft_squared_imag = np.real(control_fft_imag * np.conj(control_fft_imag))
+            ax.plot(freq_axis,
+                    control_fft_squared_real, marker_style, color=color_fft_real,
+                    ms=2,alpha=0.9)
+            ax.plot(freq_axis,
+                    control_fft_squared_imag, marker_style, color=color_fft_imag,
+                    ms=2,alpha=0.9)
     #ENDFOR
     ax.set_xlabel("Frequency ({})".format(amplitude_unit))
     ax.set_ylabel("FFT")
@@ -216,7 +224,7 @@ def plot_density_population(file_path,
     file_name = os.path.splitext(ntpath.basename(file_path))[0]
     if title is None:
         title = file_name
-    hilbert_size = intermediate_states.shape[-2]
+    hilbert_size = intermediate_densities.shape[-2]
     system_eval_times = np.linspace(0, evolution_time, system_eval_count)
 
     # Compile data.
