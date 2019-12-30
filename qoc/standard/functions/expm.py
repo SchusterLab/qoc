@@ -7,6 +7,7 @@ from autograd.extend import (defvjp as autograd_defvjp,
 import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
+from numba import jit
 
 ### FRECHET APPROXIMATION ###
 
