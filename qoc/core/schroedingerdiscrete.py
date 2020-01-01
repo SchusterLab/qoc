@@ -346,7 +346,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
     else:
         controls_norm = anp.linalg.norm(controls)
         controls_normalized = controls / controls_norm
-        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 1)
                         (controls_norm, controls_normalized,
                          pstate.hamiltonian_args, pstate, reporter))
         grads = grads * controls_norm
