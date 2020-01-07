@@ -278,6 +278,22 @@ $1$ nanosecond step size yields $3e4$ time steps.
 \end{figure}
 
 
+\subsection{Accuracy of the Derivative of the Matrix Exponential}
+To test the accuracy of the derivative of the matrix exponential,
+we compare the derivatives from the first iteration of QOC on
+piccolo experiment 10. We vary the derivative method used and the
+time steps in the integration.
+
+\begin{figure}[h]
+  \begin{center}
+    %% \includegraphics[width=\linewidth]{data/dexpm_piccolo_exp10.png}
+    \caption{Here we plot the percent difference in the gradients
+      using the stated derivative method to the full frechet method,
+      normalized for the number of time steps.}
+  \end{center}
+\end{figure}
+
+
 \bibliography{report/refs}
 \bibliographystyle{plainnat}
 
