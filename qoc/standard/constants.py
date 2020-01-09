@@ -24,7 +24,7 @@ def get_creation_operator(size):
         value should be g.t.e. 1.
 
     Returns:
-    creation_operator :: ndarray (size, size)
+    creation_operator :: ndarray (size x size)
         - The creation operator at level `size`.
     """
     return np.diag(np.sqrt(np.arange(1, size)), k=-1)
@@ -39,7 +39,7 @@ def get_annihilation_operator(size):
         should be g.t.e. 1.
 
     Returns:
-    annihilation_operator :: ndarray (size, size)
+    annihilation_operator :: ndarray (size x size)
         - The annihilation operator at level `size`.
     """
     return np.diag(np.sqrt(np.arange(1, size)), k=1)
@@ -57,9 +57,54 @@ def get_eij(i, j, size):
     size :: int - the size of the matrix
 
     Returns:
-    eij :: ndarray (size, size)
+    eij :: ndarray (size x size)
         - The requested Eij matrix.
     """
     eij = np.zeros((size, size))
     eij[i, j] = 1
     return eij
+
+
+def RX(theta):
+    """
+    The X rotation gate.
+    
+    Arguments:
+    theta :: float - the argument of the gate
+    
+    Returns:
+    gate :: ndarray(2 x 2) - the X rotation gate with
+        the given argument
+    """
+    return np.array(((np.cos(theta / 2), -1j * np.sin(theta / 2)),
+                     (-1j * np.sin(theta / 2), np.cos(theta / 2))))
+
+
+def RY(theta):
+    """
+    The Y rotation gate.
+    
+    Arguments:
+    theta :: float - the argument of the gate
+    
+    Returns:
+    gate :: ndarray(2 x 2) - the Y rotation gate with
+        the given argument
+    """
+    return np.array(((np.cos(theta / 2), -np.sin(theta / 2)),
+                     (np.sin(theta / 2), np.cos(theta / 2))))
+
+
+def RZ(theta):
+    """
+    The Z rotation gate.
+    
+    Arguments:
+    theta :: float - the argument of the gate
+    
+    Returns:
+    gate :: ndarray(2 x 2) - the Z rotation gate with
+        the given argument
+    """
+    return np.array(((np.cos(theta / 2) - 1j * np.sin(theta / 2), 0),
+                     (0, np.cos(theta / 2) + 1j * np.sin(theta / 2))))
