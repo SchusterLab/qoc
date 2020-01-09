@@ -78,8 +78,8 @@ class EvolveSchroedingerDiscreteState(ProgramState):
                     with h5py.File(self.save_file_path, "w") as save_file:
                         save_file["controls"] = controls
                         save_file["cost_eval_step"] = self.cost_eval_step
-                        save_file["costs"] = np.array(["{}".format(cost)
-                                                       for cost in self.costs])
+                        save_file["cost_names"] = np.array([np.string_("{}".format(cost))
+                                                            for cost in self.costs])
                         save_file["evolution_time"] = self.evolution_time
                         save_file["initial_states"] = self.initial_states
                         save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
