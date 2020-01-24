@@ -393,7 +393,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
 def _evaluate_schroedinger_discrete_amp(controls, pstate, reporter):
     controls_norm = anp.linalg.norm(controls)
     controls_normalized = controls / controls_norm
-    amp_grads = (jacobian(_evaluate_schroedinger_discrete, 0)
+    amp_grads = (jacobian(jacobian(_evaluate_schroedinger_discrete, 0), 0)
                  (controls_norm, controls_normalized, pstate.hamiltonian_args,
                   pstate, reporter))
     amp_grads_norm = rms_norm(amp_grads)
@@ -422,7 +422,7 @@ def _evaluate_schroedinger_discrete_hargs(controls, pstate, reporter):
     """
     controls_norm = anp.linalg.norm(controls)
     controls_normalized = controls / controls_norm
-    hamiltonian_args_grads = (jacobian(_evaluate_schroedinger_discrete, 2)
+    hamiltonian_args_grads = (jacobian(jacobian(_evaluate_schroedinger_discrete, 2), 2)
                               (controls_norm, controls_normalized,
                                pstate.hamiltonian_args, pstate, reporter))
     hamiltonian_args_grads_norm = rms_norm(hamiltonian_args_grads)
