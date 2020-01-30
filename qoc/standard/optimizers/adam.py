@@ -98,10 +98,12 @@ class Adam(object):
         self.iteration_count = 0
         self.gradient_moment = np.zeros_like(initial_params)
         self.gradient_square_moment = np.zeros_like(initial_params)
-        
+
         params = initial_params
         for i in range(iteration_count):
-            grads = jacobian(params, *args)
+            grads, terminate = jacobian(params, *args)
+            if terminate:
+                break
             params = self.update(grads, params)
 
 
@@ -161,58 +163,3 @@ class Adam(object):
         return params - learning_rate * np.divide(gradient_moment_hat,
                                                   np.sqrt(gradient_square_moment_hat)
                                                   + self.epsilon)
-
-
-### MODULE TESTS ###
-
-def _test():
-    """
-    Run tests on the module.
-    """
-    # Use the functions that are used in the core module.
-    from qoc.core.common import (strip_params, slap_params)
-    from qoc.models.dummy import Dummy
-    
-    # Check that the update method was implemented correctly
-    # using hand-checked values.
-    adam = Adam()
-    grads = np.array([[0, 1],
-                      [2, 3]])
-    params = np.array([[0, 1],
-                       [2, 3]], dtype=np.float64)
-    params1 = np.array([[0,         0.999],
-                        [1.999, 2.999]])
-    params2 = np.array([[0,          0.99900003],
-                        [1.99900001, 2.99900001]])
-    
-    adam.run(None, None, 0, params, None)
-    params1_test = adam.update(params, grads)
-    params2_test = adam.update(params1, grads)
-    
-    assert(np.allclose(params1_test, params1))
-    assert(np.allclose(params2_test, params2))
-
-    # Check that complex mapping works and params
-    # without gradients are unaffected.
-    gstate = Dummy()
-    gstate.complex_params = True
-    grads = np.array([[1+1j, 0+0j],
-                      [0+0j, -1-1j]])
-    params = np.array([[1+2j, 3+4j],
-                       [5+6j, 7+8j]])
-    gstate.params_shape = params.shape
-    gstate.max_param_norms = np.ones(gstate.params_shape[0]) * 10
-    
-    flat_params = strip_params(gstate, params)
-    flat_grads = strip_params(gstate, grads)
-    
-    adam.run(None, None, 0, flat_params, None)
-    params1 = adam.update(flat_grads, flat_params)
-    params1 = slap_params(gstate, params1)
-    
-    assert(np.allclose(params1[0][1], params[0][1]))
-    assert(np.allclose(params1[1][0], params[1][0]))
-
-
-if __name__ == "__main__":
-    _test()

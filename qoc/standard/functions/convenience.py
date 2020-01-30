@@ -13,26 +13,25 @@ from qoc.autograd_extensions.pycuda.pycudawrapper import (matmul_gpu, sum_gpu,)
 
 ### COMPUTATIONS ###
 
-def commutator(a, b, operation_policy=OperationPolicy.CPU):
+def commutator(a, b):
     """
     Compute the commutator of two matrices.
-    Args:
+
+    Arguments:
     a :: numpy.ndarray - the left matrix
     b :: numpy.ndarray - the right matrix
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
+
     Returns:
     _commutator :: numpy.ndarray - the commutator of a and b
     """
     if operation_policy == OperationPolicy.CPU:
-        _commutator = anp.matmul(a, b) - anp.matmul(b, a)
+        commutator_ = anp.matmul(a, b) - anp.matmul(b, a)
     elif operation_policy == OperationPolicy.GPU:
-        _commutator = matmul_gpu(a, b) - matmul_gpu(b, a)
+        commutator_ = matmul_gpu(a, b) - matmul_gpu(b, a)
     else:
         _not_implemented(operation_policy)
 
-    return _commutator
-
+    return commutator_
 
 def conjugate(x, operation_policy=OperationPolicy.CPU):
     """
@@ -69,7 +68,7 @@ def conjugate_transpose(a, operation_policy=OperationPolicy.CPU):
                      operation_policy=operation_policy)
 
 
-def krons(*matrices, operation_policy=OperationPolicy.CPU):
+def krons(*matrices):
     """
     Compute the kronecker product of a list of matrices.
     Args:
@@ -79,11 +78,11 @@ def krons(*matrices, operation_policy=OperationPolicy.CPU):
         used to perform the operation and with which method
     """
     if operation_policy == OperationPolicy.CPU:
-        _krons = reduce(anp.kron, matrices)
+        krons_ = reduce(anp.kron, matrices)
     else:
         _not_implemented(operation_policy)
 
-    return _krons
+    return krons_
 
 
 def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
@@ -105,24 +104,24 @@ def matmuls(*matrices, operation_policy=OperationPolicy.CPU):
     return reduce(matmul, matrices)
 
 
-def mult_cols(matrix, vector, operation_policy=OperationPolicy.CPU):
+def rms_norm(array, operation_policy=OperationPolicy.CPU):
     """
-    Multiply each column vector in `matrix` by the corresponding
-    element in `vector`.
-    Args:
-    matrix :: numpy.ndarray - an N x N matrix
-    vector :: numpy.ndarray - an N vector
-    operation_policy :: qoc.OperationPolicy - what data type is
-        used to perform the operation and with which method
+    Compute the rms norm of the array.
+
+    Arguments:
+    array :: ndarray (N) - The array to compute the norm of.
+
     Returns:
-    _matrix :: numpy.ndarray - the requested matrix
+    norm :: float - The rms norm of the array.
     """
     if operation_policy == OperationPolicy.CPU:
-        _matrix = matrix * vector
+        square_norm = anp.sum(anp.real(array * anp.conjugate(array)))
+        size = anp.prod(anp.shape(array))
+        rms_norm_ = anp.sqrt(square_norm / size)
     else:
         _not_implemented(operation_policy)
-
-    return _matrix
+        
+    return rms_norm_
 
 
 def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
@@ -138,15 +137,15 @@ def mult_rows(matrix, vector, operation_policy=OperationPolicy.CPU):
     _matrix :: numpy.ndarray - the requested matrix
     """
     if operation_policy == OperationPolicy.CPU:
-        _matrix = transpose(transpose(matrix, operation_policy)
+        matrix_ = transpose(transpose(matrix, operation_policy)
                             * vector, operation_policy)
     else:
         _not_implemented(operation_policy)
 
-    return _matrix
+    return matrix_
 
 
-def square(a):
+def square(a, operation_policy=OperationPolicy.CPU):
     """
     Square an array.
 
@@ -180,13 +179,13 @@ def sum_axis(*args, **kwargs):
         operation_policy = OperationPolicy.CPU
     
     if operation_policy == OperationPolicy.CPU:
-        _sum = anp.sum(*args, **kwargs)
+        sum_ = anp.sum(*args, **kwargs)
     elif operation_policy == OperationPolicy.GPU:
-        _sum = sum_gpu(*args, **kwargs)
+        sum_ = sum_gpu(*args, **kwargs)
     else:
         _not_implemented(operation_policy)
 
-    return _sum
+    return sum_
 
 
 def transpose(a, operation_policy=OperationPolicy.CPU):
@@ -284,3 +283,5 @@ def _tests():
 
 if __name__ == "__main__":
     _tests()
+=======
+>>>>>>> dev

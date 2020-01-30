@@ -9,6 +9,10 @@ NAME = "qoc"
 VERSION = "0.1alpha"
 DEPENDENCIES = [
     "autograd",
+    "filelock",
+    "h5py",
+    "matplotlib",
+    "numba",
     "numpy",
     "scipy",
 ]

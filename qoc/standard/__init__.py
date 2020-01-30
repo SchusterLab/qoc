@@ -5,9 +5,11 @@ standard - a directory for standard definitions
 from .constants import (get_annihilation_operator,
                         get_creation_operator,
                         get_eij,SIGMA_X, SIGMA_Y, SIGMA_Z,
-                        SIGMA_MINUS, SIGMA_PLUS,)
+                        SIGMA_MINUS, SIGMA_PLUS,
+                        RX, RY, RZ)
 
 from .costs import (ControlArea,
+                    ControlBandwidthMax,
                     ControlNorm,
                     ControlVariation,
                     ForbidDensities,
@@ -17,31 +19,32 @@ from .costs import (ControlArea,
                     TargetStateInfidelity,
                     TargetStateInfidelityTime,)
 
-from .functions import (commutator, conjugate, conjugate_transpose,
+from .functions import (commutator, conjugate_transpose,
                         expm, krons, matmuls,
-                        mult_cols, mult_rows, transpose,
+                        rms_norm,
                         column_vector_list_to_matrix,
-                        matrix_to_column_vector_list,
-                        complex_to_real_imag_flat,
-                        real_imag_to_complex_flat,)
+                        matrix_to_column_vector_list,)
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 
-from .util import (CustomJSONEncoder,
-                   generate_save_file_path,)
+from .plot import (plot_controls, plot_density_population,
+                   plot_state_population,)
+
+from .utils import (ans_jacobian, generate_save_file_path, CustomJSONEncoder,)
 
 __all__ = [
     "get_annihilation_operator", "get_creation_operator",
     "get_eij", "SIGMA_X", "SIGMA_Y", "SIGMA_Z", "SIGMA_MINUS",
-    "SIGMA_PLUS",
-    "ControlArea", "ControlNorm", "ControlVariation", "ForbidDensities",
+    "SIGMA_PLUS", "RX", "RY", "RZ",
+    "ControlArea", "ControlBandwidthMax",
+    "ControlNorm", "ControlVariation", "ForbidDensities",
     "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
-    "commutator", "conjugate", "conjugate_transpose", "expm", "krons",
-    "mult_cols", "mult_rows", "transpose",
+    "commutator", "conjugate_transpose", "expm", "krons",
+    "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
-    "complex_to_real_imag_flat", "real_imag_to_complex_flat",
     "Adam", "LBFGSB", "SGD",
-    "CustomJSONEncoder", "generate_save_file_path",
+    "plot_controls", "plot_density_population", "plot_state_population",
+    "ans_jacobian", "generate_save_file_path", "CustomJSONEncoder",
 ]

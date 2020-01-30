@@ -1,124 +1,132 @@
 """
-programstate.py - This module defines classes that encapsulate the necessary
-information to execute programs.
+programstate.py - This module defines classes to encapsulate data fields
+necessary to execute qoc programs.
 """
+
+from filelock import FileLock
+import numpy as np
+
+from qoc.models.programtype import ProgramType
 
 class ProgramState(object):
     """
+    This class encapsulates data fields that are used
+    by most programs.
+
     Fields:
-    control_step_count :: int - the number of time steps at which the
-        evolution time should be initially split into and the number
-        of control parameter updates
-    costs :: iterable(qoc.models.Cost) - the cost functions that
-        define the cost model for evolution
-    dt :: float - the time step used for evolution, it is the time
-        inbetween system steps
-    evolution_time :: float - the time over which the system will evolve
-    final_control_step :: int - the ultimate index into the control array
-    final_system_step :: int - the last time step
-    hamiltonian :: (controls :: ndarray, time :: float)
-                    -> hamiltonian :: ndarray
-        - an autograd compatible function that returns the system
-          hamiltonian for the specified control parameters and time
-    interpolation_policy :: qoc.InterpolationPolicy - defines how
-        the control parameters should be interpolated between
-        control steps
-    operation_policy :: qoc.models.OperationPolicy - defines how
-        computations should be performed, e.g. CPU, GPU, sparse, etc.
-    step_cost_indices :: iterable(int)- a list of the indices in the costs
-        array which are step costs
-    step_costs :: iterable(qoc.models.Cost) - the cost functions that
-        define the cost model for evolution that should be evaluated
-        at every time step
-    system_step_multiplier :: int - this value times `control_step_count`
-        determines how many time steps are used in evolution
+    control_eval_count
+    control_eval_times
+    cost_eval_step
+    costs
+    dt
+    evolution_time
+    final_system_eval_step
+    hamiltonian
+    interpolation_policy
+    program_type
+    save_file_lock_path
+    save_file_path
+    step_cost_indices
+    step_costs
+    system_eval_count
     """
-    def __init__(self, control_step_count, costs, evolution_time,
-                 hamiltonian,
-                 interpolation_policy,
-                 operation_policy, system_step_multiplier):
+    def __init__(self, control_eval_count, cost_eval_step, costs,
+                 evolution_time, hamiltonian, interpolation_policy,
+                 program_type,
+                 save_file_path, system_eval_count):
         """
-        See class definition for arguments not listed here.
+        See class fields for arguments not listed here.
         """
-        self.control_step_count = control_step_count
+        self.control_eval_count = control_eval_count
+        self.control_eval_times = np.linspace(0, evolution_time, control_eval_count)
+        self.cost_eval_step = cost_eval_step
         self.costs = costs
-        system_step_count = control_step_count * system_step_multiplier
-        self.dt = evolution_time / system_step_count
+        self.dt = evolution_time / (system_eval_count - 1)
         self.evolution_time = evolution_time
-        self.final_control_step = control_step_count - 1
-        self.final_system_step = system_step_count - 1
+        self.final_system_eval_step = system_eval_count - 1
         self.hamiltonian = hamiltonian
         self.interpolation_policy = interpolation_policy
-        self.operation_policy = operation_policy
-        self.step_cost_indices = list()
-        self.step_costs = list()
+        self.program_type = program_type
+        self.save_file_lock_path = "{}.lock".format(save_file_path)
+        self.save_file_path = save_file_path
+        step_cost_indices = list()
+        step_costs = list()
         for i, cost in enumerate(costs):
             if cost.requires_step_evaluation:
-                self.step_costs.append(cost)
-                self.step_cost_indices.append(i)
+                step_costs.append(cost)
+                step_cost_indices.append(i)
         #ENDFOR
-        self.system_step_multiplier = system_step_multiplier
+        self.step_cost_indices = step_cost_indices
+        self.step_costs = step_costs
+        self.system_eval_count = system_eval_count
 
 
 class GrapeState(ProgramState):
     """
-    This class encapsulates the necessary information to execute
-    a grape program.
+    This class encapsulates data fields that are used
+    by most grape programs.
     
     Fields:
     complex_controls
     control_count
+    control_eval_count
+    control_eval_times
     controls_shape
+    cost_eval_step
     costs
     dt
-    final_control_step
+    evolution_time
     final_iteration
-    final_system_step
+    final_system_eval_step
     hamiltonian
+    impose_control_conditions
     initial_controls
     interpolation_policy
     iteration_count
     log_iteration_step
     max_control_norms
-    minimum_error
-    operation_policy
+    min_error
     optimizer
+    program_type
+    save_file_lock_path
     save_file_path
     save_iteration_step
     should_log
     should_save
     step_cost_indices
     step_costs
-    system_step_multiplier
+    system_eval_count
     """
 
     def __init__(self, complex_controls,
                  control_count,
-                 control_step_count, costs, evolution_time,
-                 hamiltonian, initial_controls,
+                 control_eval_count, cost_eval_step, costs,
+                 evolution_time, hamiltonian,
+                 impose_control_conditions,
+                 initial_controls,
                  interpolation_policy, iteration_count,
                  log_iteration_step, max_control_norms,
-                 minimum_error,
-                 operation_policy, optimizer,
+                 min_error, optimizer,
                  save_file_path, save_iteration_step,
-                 system_step_multiplier,):
+                 system_eval_count,):
         """
-        See class definition for arguments not listed here.
+        See class fields for arguments not listed here.
         """
-        super().__init__(control_step_count, costs, evolution_time,
-                         hamiltonian, interpolation_policy, operation_policy,
-                         system_step_multiplier)
+        super().__init__(control_eval_count, cost_eval_step, costs,
+                         evolution_time, hamiltonian, interpolation_policy,
+                         ProgramType.GRAPE,
+                         save_file_path, system_eval_count,)
         self.complex_controls = complex_controls
         self.control_count = control_count
-        self.controls_shape = (control_step_count, control_count)
+        self.controls_shape = (control_eval_count, control_count)
         self.final_iteration = iteration_count - 1
+        self.impose_control_conditions = impose_control_conditions
         self.initial_controls = initial_controls
         self.iteration_count = iteration_count
         self.log_iteration_step = log_iteration_step
         self.max_control_norms = max_control_norms
-        self.minimum_error = minimum_error
+        self.min_error = min_error
         self.optimizer = optimizer
-        self.save_file_path = save_file_path
         self.save_iteration_step = save_iteration_step
         self.should_log = log_iteration_step != 0
         self.should_save = ((save_iteration_step != 0)

@@ -39,7 +39,9 @@ class SGD(object):
         """
         params = initial_params
         for i in range(iteration_count):
-            grads = jacobian(params, *args)
+            grads, terminate = jacobian(params, *args)
+            if terminate:
+                break
             params = self.update(grads, params)
 
 
@@ -55,18 +57,3 @@ class SGD(object):
             next iteration
         """
         return params - self.learning_rate * grads
-        
-
-def _test():
-    """
-    Run tests on the module.
-    """
-    sgd = SGD(learning_rate=1)
-    params = np.ones(5)
-    grads = np.ones(5)
-    params = sgd.update(grads, params)
-    assert(np.allclose(params, np.zeros_like(params)))
-
-
-if __name__ == "__main__":
-    _test()

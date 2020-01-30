@@ -1,18 +1,20 @@
-PDF=pdflatex
-BIB=bibtex
-LATEXOBJS= *.aux *.log *.out *.pdf *.bbl *.blg
+# Minimal makefile for Sphinx documentation
+#
 
-RDIR=report
-RHEADER=report
-RSRCS=$(RDIR)/$(RHEADER).tex
+# You can set these variables from the command line, and also
+# from the environment for the first two.
+SPHINXOPTS    ?=
+SPHINXBUILD   ?= sphinx-build
+SOURCEDIR     = .
+BUILDDIR      = _build
 
-.PHONY: clean report
+# Put it first so that "make" without argument is like "make help".
+help:
+	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-report:
-	$(PDF) $(RSRCS)
-	$(BIB) $(RHEADER)
-	$(PDF) $(RSRCS)
-	$(PDF) $(RSRCS)
+.PHONY: help Makefile
 
-clean:
-	rm -rf $(LATEXOBJS)
+# Catch-all target: route all unknown targets to Sphinx using the new
+# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
+%: Makefile
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

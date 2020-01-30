@@ -5,59 +5,52 @@ multiple core functionalities.
 
 import numpy as np
 
-from qoc.standard import(complex_to_real_imag_flat,
-                         real_imag_to_complex_flat)
-
-def clip_control_norms(max_control_norms, controls):
+def clip_control_norms(controls, max_control_norms):
     """
     Me: I need the entry-wise norms of the column entries of my
         control array to each be scaled to a fixed
         maximum norm if they exceed that norm
-    Barber: u wot m8?
+    Barber: Say no more fam
 
-    Args:
-    max_control_norms :: ndarray (control_count) - an array that
-        specifies the maximum norm for each control for all time
-    controls :: ndarray - the controls to be clipped
+    Arguments:
+    controls
+    max_control_norms
 
-    Returns: none
+    Returns: None
     """
     for i, max_control_norm in enumerate(max_control_norms):
         control = controls[:, i]
-        mag_control = np.abs(control)
-        offending_indices = np.nonzero(np.less(max_control_norm, mag_control))
+        control_norm = np.abs(control)
+        offending_indices = np.nonzero(np.less(max_control_norm, control_norm))
         offending_control_points = control[offending_indices]
-        resolved_control_points = (np.divide(offending_control_points, mag_control[offending_indices])
+        # Rescale the offending points to `max_control_norm`.
+        resolved_control_points = ((offending_control_points / control_norm[offending_indices])
                                    * max_control_norm)
         control[offending_indices] = resolved_control_points
     #ENDFOR
 
 
-def gen_controls_cos(complex_controls, control_count, control_step_count,
-                     evolution_time,
-                     max_control_norms, periods=10.):
+def gen_controls_cos(complex_controls, control_count, control_eval_count,
+                     evolution_time, max_control_norms, periods=10.):
     """
     Create a discrete control set that is shaped like
     a cosine function.
 
-    Args:
-    complex_controls :: bool - whether or not the controls should be complex
-    control_count :: int - how many controls are given to the hamiltonian
-        at each time step
-    control_step_count :: int - the number of time steps at which
-        controleters are discretized
-    evolution_time :: float - the duration of the system evolution
-    max_control_norms :: ndarray (control count) - an array that
-        specifies the maximum norm for each control for all time
-    periods :: float - the number of periods that the wave should complete
+    Arguments:
+    complex_controls
+    control_count
+    control_eval_count
+    evolution_time
+    max_control_norms
+    
+    periods
 
     Returns:
-    controls :: ndarray(control_step_count, control_count) - controls for
-        the specified control_step_count and control_count with a cosine fit
+    controls
     """
-    period = np.divide(control_step_count, periods)
+    period = np.divide(control_eval_count, periods)
     b = np.divide(2 * np.pi, period)
-    controls = np.zeros((control_step_count, control_count))
+    controls = np.zeros((control_eval_count, control_count))
     
     # Create a wave for each control over all time
     # and add it to the controls.
@@ -66,7 +59,7 @@ def gen_controls_cos(complex_controls, control_count, control_step_count,
         # half of the max.
         max_norm = max_control_norms[i]
         _controls = (np.divide(max_norm, 2)
-                   * np.cos(b * np.arange(control_step_count)))
+                   * np.cos(b * np.arange(control_eval_count)))
         # Replace all controls that have zero value
         # with small values.
         small_norm = max_norm * 1e-1
@@ -80,25 +73,69 @@ def gen_controls_cos(complex_controls, control_count, control_step_count,
 
     return controls
 
+def gen_controls_white(complex_controls, control_count, control_eval_count,
+                      evolution_time, max_control_norms, periods=10.):
+    """
+    Create a discrete control set of random white noise.
 
-def gen_controls_flat(complex_controls, control_count, control_step_count,
-                      evolution_time,
-                      max_control_norms, periods=10.):
+    Arguments:
+    complex_controls
+    control_count
+    control_eval_count
+    evolution_time
+    max_control_norms
+    
+    periods
+    
+    Returns:
+    controls
+    """
+    controls = np.zeros((control_eval_count, control_count))
+
+    # Make each control a random distribution of white noise.
+    for i in range(control_count):
+        max_norm = max_control_norms[i]
+        stddev = max_norm/5.0
+        control = np.random.normal(0, stddev, control_eval_count)
+        controls[:, i] = control
+    #ENDFOR
+
+    # Mimic the white noise for the imaginary parts, and normalize.
+    if complex_controls:
+        controls = (controls - 1j * controls) / np.sqrt(2)
+
+    return controls
+
+
+def gen_controls_flat(complex_controls, control_count, control_eval_count,
+                      evolution_time, max_control_norms, periods=10.):
     """
     Create a discrete control set that is shaped like
     a flat line with small amplitude.
+
+    Arguments:
+    complex_controls
+    control_count
+    control_eval_count
+    evolution_time
+    max_control_norms
+    
+    periods
+    
+    Returns:
+    controls
     """
-    controls = np.zeros((control_step_count, control_count))
+    controls = np.zeros((control_eval_count, control_count))
 
     # Make each control a flat line for all time.
     for i in range(control_count):
         max_norm = max_control_norms[i]
         small_norm = max_norm * 1e-1
-        control = np.repeat(small_norm, control_step_count)
+        control = np.repeat(small_norm, control_eval_count)
         controls[:, i] = control
     #ENDFOR
 
-    # Mimic the flat line for the imaginary parts and normalize.
+    # Mimic the flat line for the imaginary parts, and normalize.
     if complex_controls:
         controls = (controls - 1j * controls) / np.sqrt(2)
 
@@ -108,32 +145,29 @@ def gen_controls_flat(complex_controls, control_count, control_step_count,
 _NORM_TOLERANCE = 1e-10
 def initialize_controls(complex_controls,
                         control_count,
-                        control_step_count,
-                        evolution_time,
-                        initial_controls, max_control_norms,):
+                        control_eval_count, evolution_time,
+                        initial_controls, max_control_norms):
     """
     Sanitize `initial_controls` with `max_control_norms`.
     Generate both if either was not specified.
 
-    Args:
-    complex_controls :: bool - whether or not the controls should be complex
-    control_count :: int - number of controls per control_step
-    control_step_count :: int - number of pulse steps
-    initial_controls :: ndarray (control_count, control_step_count)
-        - the user specified initial controls
-    max_control_norms :: ndarray (control_count) - the user specified max
-        control norms
-    evolution_time :: float - the duration of the pulse
+    Arguments:
+    complex_controls
+    control_count
+    control_eval_count
+    evolution_time
+    initial_controls
+    max_control_norms
 
     Returns:
-    controls :: ndarray - the initial controls
-    max_control_norms :: ndarray - the maximum control norms
+    controls
+    max_control_norms
     """
     if max_control_norms is None:
         max_control_norms = np.ones(control_count)
         
     if initial_controls is None:
-        controls = gen_controls_flat(complex_controls, control_count, control_step_count,
+        controls = gen_controls_flat(complex_controls, control_count, control_eval_count,
                                      evolution_time, max_control_norms)
     else:
         # Check that the user-specified controls match the specified data type.
@@ -156,7 +190,7 @@ def initialize_controls(complex_controls,
                 raise ValueError("The program expected that the initial_controls specified by "
                                  "the user conformed to max_control_norms, but the program "
                                  "found a conflict at initial_controls[{}]={} and "
-                                 "max_control_norms={}"
+                                 "max_control_norms={}."
                                  "".format(control_step, step_controls, max_control_norms))
         #ENDFOR
         controls = initial_controls
@@ -169,16 +203,20 @@ def slap_controls(complex_controls, controls, controls_shape,):
     Reshape and transform controls in optimizer format
     to controls in cost function format.
 
-    Args:
-    controls :: ndarray - the controls in question
-    pstate :: qoc.models.GrapeState - information about the optimization
-
+    Arguments:
+    complex_controls :: bool - whether or not the controls in cost function
+         format are complex
+    controls :: ndarray (2 * controls_size if COMPLEX else controls_size)
+        - the controls in optimizer format
+    controls_shape :: tuple(int) - 
+    
     Returns:
-    new_controls :: ndarray - the reshapen, transformed controls
+    controls :: ndarray (controls_shape)- the controls in cost function format
     """
     # Transform the controls to C if they are complex.
     if complex_controls:
-        controls = real_imag_to_complex_flat(controls)
+        real, imag = np.split(controls, 2)
+        controls = real + 1j * imag
     # Reshape the controls.
     controls = np.reshape(controls, controls_shape)
     
@@ -187,92 +225,22 @@ def slap_controls(complex_controls, controls, controls_shape,):
 
 def strip_controls(complex_controls, controls):
     """
-    Reshape and transform controls understood by the cost
-    function to controls understood by the optimizer.
+    Reshape and transform controls in cost function format
+    to controls in optimizer format.
 
-    Args:
-    controls :: ndarray - the controls in question
+    Arguments:
+    complex_controls :: bool - whether or not the controls in cost function
+        format are complex
+    controls :: ndarray (controls_shape) - the controls in cost function format
 
     Returns:
-    new_controls :: ndarray - the reshapen, transformed controls
+    controls :: ndarray (2 * controls_size if COMPLEX else controls_size)
+        - the controls in optimizer format
     """
     # Flatten the controls.
-    controls = controls.flatten()
+    controls = np.ravel(controls)
     # Transform the controls to R2 if they are complex.
     if complex_controls:
-        controls = complex_to_real_imag_flat(controls)
-
-    return controls
-
-
-### MODULE TESTS ###
-
-_BIG = 100
-
-def _test():
-    """
-    Run test on the module's methods.
-    """
-    from qoc.models.dummy import Dummy
-
-    # Test control optimizer transformations.
-    pstate = Dummy()
-    pstate.complex_controls = True
-    shape_range = np.arange(_BIG) + 1
-    for step_count in shape_range:
-        for control_count in shape_range:
-            pstate.controls_shape = controls_shape = (step_count, control_count)
-            pstate.max_control_norms = np.ones(control_count) * 2
-            controls = np.random.rand(*controls_shape) + 1j * np.random.rand(*controls_shape)
-            stripped_controls = strip_controls(pstate, controls)
-            assert(stripped_controls.ndim == 1)
-            assert(not (stripped_controls.dtype in (np.complex64, np.complex128)))
-            transformed_controls = slap_controls(pstate, stripped_controls)
-            assert(np.allclose(controls, transformed_controls))
-            assert(controls.shape == transformed_controls.shape)
-    #ENDFOR
-
-    pstate.complex_controls = False
-    for step_count in shape_range:
-        for control_count in shape_range:
-            pstate.controls_shape = controls_shape = (step_count, control_count)
-            pstate.max_control_norms = np.ones(control_count)
-            controls = np.random.rand(*controls_shape)
-            stripped_controls = strip_controls(pstate, controls)
-            assert(stripped_controls.ndim == 1)
-            assert(not (stripped_controls.dtype in (np.complex64, np.complex128)))
-            transformed_controls = slap_controls(pstate, stripped_controls)
-            assert(np.allclose(controls, transformed_controls))
-            assert(controls.shape == transformed_controls.shape)
-    #ENDFOR
-
-    # Test control clipping.
-    for step_count in shape_range:
-        for control_count in shape_range:
-            controls_shape = (step_count, control_count)
-            max_control_norms = np.ones(control_count)
-            controls = np.random.rand(*controls_shape) * 2
-            clip_controls(max_control_norms, controls)
-            for step_controls in controls:
-                assert(np.less_equal(step_controls, max_control_norms).all())
-            controls = np.random.rand(*controls_shape) * -2
-            clip_controls(max_control_norms, controls)
-            for step_controls in controls:
-                assert(np.less_equal(-max_control_norms, step_controls).all())
-        #ENDFOR
-    #ENDFOR
-
-    # Control norm clipping.
-    controls = np.array(((1+2j, 7+8j), (3+4j, 5), (5+6j, 10,), (1-3j, -10),))
-    max_control_norms = np.array((7, 8,))
-    expected_clipped_controls = np.array(((1+2j, (7+8j) * np.divide(8, np.sqrt(113))),
-                                        (3+4j, 5),
-                                        ((5+6j) * np.divide(7, np.sqrt(61)), 8,),
-                                        (1-3j, -8)))
-    clip_control_norms(max_control_norms, controls)
+        controls = np.hstack((np.real(controls), np.imag(controls)))
     
-    assert(np.allclose(controls, expected_clipped_controls))
-
-
-if __name__ == "__main__":
-    _test()
+    return controls

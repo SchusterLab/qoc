@@ -1,5 +1,5 @@
 """
-constants.py - definitions of common constants
+constants.py - This module defines constants.
 """
 
 import numpy as np
@@ -9,8 +9,8 @@ import numpy as np
 SIGMA_X = np.array(((0, 1), (1, 0)))
 SIGMA_Y = np.array(((0, -1j), (1j, 0)))
 SIGMA_Z = np.array(((1, 0), (0, -1)))
-SIGMA_PLUS = np.array(((0, 2 / np.sqrt(2)), (0, 0)))
-SIGMA_MINUS = np.array(((0, 0), (2 / np.sqrt(2), 0)))
+SIGMA_PLUS = np.array(((0, 2), (0, 0))) # SIGMA_X + i * SIGMA_Y
+SIGMA_MINUS = np.array(((0, 0), (2, 0))) # SIGMA_X - i * SIGMA_Y
 
 
 ### GENERATIVE CONSTANTS ###
@@ -18,71 +18,93 @@ SIGMA_MINUS = np.array(((0, 0), (2 / np.sqrt(2), 0)))
 def get_creation_operator(size):
     """
     Construct the creation operator with the given matrix size.
-    Args:
-    size :: int - the matrix size to truncate the operator at (size >= 1).
+
+    Arguments:
+    size :: int - This is the size to truncate the operator at. This
+        value should be g.t.e. 1.
+
     Returns:
-    creation_operator :: np.ndarray - the creation operator at level size.
+    creation_operator :: ndarray (size x size)
+        - The creation operator at level `size`.
     """
-    creation_operator = np.zeros((size, size))
-    
-    for i in range(1, size):
-            creation_operator[i, i - 1] = np.sqrt(i)
-            
-    return creation_operator
+    return np.diag(np.sqrt(np.arange(1, size)), k=-1)
 
 
 def get_annihilation_operator(size):
     """
     Construct the annihilation operator with the given matrix size.
-    Args:
-    size :: int - the matrix size to truncate the operator at (size >= 1).
-    Returns:
-    annihilation_operator :: np.ndarray - the annihilation operator at level size.
-    """
-    annihilation_operator = np.zeros((size, size))
-    
-    for i in range(size - 1):
-        annihilation_operator[i, i + 1] = np.sqrt(i + 1)
 
-    return annihilation_operator
+    Arguments:
+    size :: int - This is hte size to truncate the operator at. This value
+        should be g.t.e. 1.
+
+    Returns:
+    annihilation_operator :: ndarray (size x size)
+        - The annihilation operator at level `size`.
+    """
+    return np.diag(np.sqrt(np.arange(1, size)), k=1)
 
 
 def get_eij(i, j, size):
     """
-    Construct the square matrix of the given size
+    Construct the square matrix of `size`
     where all entries are zero
     except for the element at row i column j which is one.
-    Args:
+
+    Arguments:
     i :: int - the row of the unit element
     j :: int - the column of the unit element
     size :: int - the size of the matrix
+
     Returns:
-    Eij :: np.ndarray - the requested Eij matrix
+    eij :: ndarray (size x size)
+        - The requested Eij matrix.
     """
     eij = np.zeros((size, size))
     eij[i, j] = 1
     return eij
 
 
-### MODULE TESTS ###
-
-_BIG = 100
-
-def _tests():
+def RX(theta):
     """
-    Run tests on the module.
-    Args: none
-    Returns: none
+    The X rotation gate.
+    
+    Arguments:
+    theta :: float - the argument of the gate
+    
+    Returns:
+    gate :: ndarray(2 x 2) - the X rotation gate with
+        the given argument
     """
+    return np.array(((np.cos(theta / 2), -1j * np.sin(theta / 2)),
+                     (-1j * np.sin(theta / 2), np.cos(theta / 2))))
 
-    # Use the fact that (create)(annihilate) is the number operator.
-    for i in range(1, _BIG):
-        number_operator = np.zeros((i, i))
-        for j in range(i):
-            number_operator[j][j] = j
-        supposed_number_operator = np.matmul(get_creation_operator(i), get_annihilation_operator(i))
-        assert np.allclose(number_operator, supposed_number_operator)
-        
 
-if __name__ == "__main__":
-    _tests()
+def RY(theta):
+    """
+    The Y rotation gate.
+    
+    Arguments:
+    theta :: float - the argument of the gate
+    
+    Returns:
+    gate :: ndarray(2 x 2) - the Y rotation gate with
+        the given argument
+    """
+    return np.array(((np.cos(theta / 2), -np.sin(theta / 2)),
+                     (np.sin(theta / 2), np.cos(theta / 2))))
+
+
+def RZ(theta):
+    """
+    The Z rotation gate.
+    
+    Arguments:
+    theta :: float - the argument of the gate
+    
+    Returns:
+    gate :: ndarray(2 x 2) - the Z rotation gate with
+        the given argument
+    """
+    return np.array(((np.cos(theta / 2) - 1j * np.sin(theta / 2), 0),
+                     (0, np.cos(theta / 2) + 1j * np.sin(theta / 2))))
