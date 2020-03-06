@@ -26,7 +26,7 @@ from qoc.standard import (Adam, ans_jacobian,
                           expm, matmuls,
                           rms_norm)
 
-AMPLITUDE_ROBUSTNESS = 0
+AMPLITUDE_ROBUSTNESS = 1
 HAMILTONIAN_PARAMETER_ROBUSTNESS = 0
 
 ### MAIN METHODS ###
@@ -109,9 +109,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              system_eval_count,)
     pstate.save_initial(controls)
     result = EvolveSchroedingerResult()
-    controls_norm = anp.linalg.norm(controls)
-    controls_normalized = controls / controls_norm
-    _ = _evaluate_schroedinger_discrete(controls_norm, controls_normalized,
+    _ = _evaluate_schroedinger_discrete(controls,
                                         pstate.hamiltonian_args, pstate, result)
 
     return result
@@ -298,9 +296,7 @@ def _esd_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the cost function.
-    controls_norm = anp.linalg.norm(controls)
-    controls_normalized = controls / controls_norm
-    error = _evaluate_schroedinger_discrete(controls_norm, controls_normalized,
+    error = _evaluate_schroedinger_discrete(controls,
                                             pstate.hamiltonian_args, pstate, reporter)
 
     # Determine if optimization should terminate.
@@ -338,18 +334,21 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Evaluate the jacobian.
     if AMPLITUDE_ROBUSTNESS:
-        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_amp, 0)
-                        (controls, pstate, reporter))
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+                        (controls, pstate.hamiltonian_args, pstate, reporter))
+        robust_amp_grads_ = robust_amp_grads(controls, pstate, reporter)
+        robust_amp_grads_norm_ = np.linalg.norm(robust_amp_grads_)
+        if not pstate.complex_controls:
+            print(robust_amp_grads_)
+            robust_amp_grads_ = np.real(robust_amp_grads_)
+        grads = grads + robust_amp_grads_norm_
     elif HAMILTONIAN_PARAMETER_ROBUSTNESS:
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_hargs, 0)
                         (controls, pstate, reporter))
     else:
-        controls_norm = anp.linalg.norm(controls)
-        controls_normalized = controls / controls_norm
-        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 1)
-                        (controls_norm, controls_normalized,
-                         pstate.hamiltonian_args, pstate, reporter))
-        grads = grads * controls_norm
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+                        (controls, pstate.hamiltonian_args,
+                         pstate, reporter))
     
     # Everything need to be unwrapped from its autograd box.
     final_states = reporter.final_states
@@ -391,14 +390,12 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
 
 def _evaluate_schroedinger_discrete_amp(controls, pstate, reporter):
-    controls_norm = anp.linalg.norm(controls)
-    controls_normalized = controls / controls_norm
+    
     amp_grads = (jacobian(jacobian(_evaluate_schroedinger_discrete, 0), 0)
-                 (controls_norm, controls_normalized, pstate.hamiltonian_args,
+                 (controls, pstate.hamiltonian_args,
                   pstate, reporter))
-    amp_grads_norm = rms_norm(amp_grads)
-    standard_costs_error = _evaluate_schroedinger_discrete(controls_norm,
-                                                           controls_normalized,
+    amp_grads_norm = rms_norm(amp_grads) / 3e2
+    standard_costs_error = _evaluate_schroedinger_discrete(controls,
                                                            pstate.hamiltonian_args,
                                                            pstate, reporter)
     error = amp_grads_norm + standard_costs_error
@@ -426,15 +423,14 @@ def _evaluate_schroedinger_discrete_hargs(controls, pstate, reporter):
                               (controls_norm, controls_normalized,
                                pstate.hamiltonian_args, pstate, reporter))
     hamiltonian_args_grads_norm = rms_norm(hamiltonian_args_grads)
-    standard_costs_error = _evaluate_schroedinger_discrete(controls_norm,
-                                                           controls_normalized,
+    standard_costs_error = _evaluate_schroedinger_discrete(controls,
                                                            pstate.hamiltonian_args,
                                                            pstate, reporter)
     error = hamiltonian_args_grads_norm + standard_costs_error
     return error
 
 
-def _evaluate_schroedinger_discrete(controls_norm, controls_normalized,
+def _evaluate_schroedinger_discrete(controls,
                                     hamiltonian_args, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
@@ -454,7 +450,7 @@ def _evaluate_schroedinger_discrete(controls_norm, controls_normalized,
     """
     # Initialize local variables (heap -> stack).
     control_eval_times = pstate.control_eval_times
-    controls = controls_norm * controls_normalized
+    # controls = controls_norm * controls_normalized
     cost_eval_step = pstate.cost_eval_step
     costs = pstate.costs
     dt = pstate.dt
@@ -588,3 +584,71 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     states = matmuls(step_unitary, states)
 
     return states
+
+
+def get_unitary_builder(pstate):
+    # Choose an interpolator.
+    if pstate.interpolation_policy == InterpolationPolicy.LINEAR:
+        interpolate = interpolate_linear_set
+    else:
+        raise NotImplementedError("The interpolation policy {} "
+                                  "is not yet supported for this method."
+                                  "".format(pstate.interpolation_policy))
+
+    if pstate.magnus_policy == MagnusPolicy.M2:
+        magnus = magnus_m2
+    elif pstate.magnus_policy == MagnusPolicy.M4:
+        magnus = magnus_m4
+    elif pstate.magnus_policy == MagnusPolicy.M6:
+        magnus = magnus_m6
+    else:
+        raise ValueError("Unrecognized magnus policy {}."
+                         "".format(magnus_policy))
+    #ENDIF
+
+    def unitary(controls, hamiltonian_args, time):
+        hamiltonian_ = pstate.hamiltonian(controls, hamiltonian_args, time)
+        return anp.real(expm(-1j * hamiltonian_ * pstate.dt))
+
+    return unitary
+    
+
+def robust_amp_grads(controls, pstate, reporter):
+    control_eval_times = pstate.control_eval_times
+    unitary = get_unitary_builder(pstate)
+    # TOOD: these can be changed to element-wise grad
+    d3u_dc3 = jacobian(lambda *args:
+                       anp.real(jacobian(lambda *args:
+                                         anp.real(jacobian(unitary,
+                                                           0)(*args)),
+                                         0)(*args)),
+                       0)
+    t = pstate.costs[0].target_states_dagger
+    s = pstate.initial_states
+    u_list = list()
+    s_list = list()
+    g3 = np.zeros(controls.shape, dtype=np.complex128)
+    for i in range(controls.shape[0]):
+        time = pstate.dt * i
+        unitary_ = unitary(controls, pstate.hamiltonian_args, time)
+        s = np.matmul(unitary_, s)
+        u_list.append(unitary_)
+        s_list.append(s)
+    for i in range(controls.shape[0] - 1, -1, -1):
+        time = pstate.dt * i
+        unitary_ = u_list[i]
+        d3u_dc3_ = d3u_dc3(controls[i], pstate.hamiltonian_args, time)
+        d3u_dc3s = np.zeros((controls.shape[1], pstate.hilbert_size, pstate.hilbert_size), dtype=np.complex128)
+        # d3u_dcj3
+        for j in range(controls.shape[1]):
+            d3u_dc3s[j] = d3u_dc3_[:,:, j, j, j]
+        if i  == 0:
+            # this will eventually have to be updated with something that sums over each initial state
+            g3[i] = matmuls(t, d3u_dc3s, pstate.initial_states)[:,0,0]
+        else:
+            g3[i] = matmuls(t, d3u_dc3s, s_list[i - 1])[:,0,0]
+        t = np.matmul(t, unitary_)
+
+    return g3
+    
+    
