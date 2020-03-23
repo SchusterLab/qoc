@@ -350,6 +350,88 @@ def plot_state_population(file_path,
     if show:
         plt.show()
 
+
+def plot_state_controls(file_path,
+                        dpi=1000,
+                        marker_style="o",
+                        save_file_path=None,
+                        save_index=None,
+                        show=False,
+                        state_index=0,
+                        time_unit="ns",
+                        title=None):
+    # Open file; extract data.
+    file_lock_path = "{}.lock".format(file_path)
+    try:
+        with FileLock(file_lock_path):
+            with h5py.File(file_path, "r") as file_:
+                evolution_time = file_["evolution_time"][()]
+                program_type = file_["program_type"][()]
+                system_eval_count = file_["system_eval_count"][()]
+                if program_type == ProgramType.EVOLVE.value:
+                    intermediate_states = file_["intermediate_states"][:, state_index, :, :]
+                else:
+                    # If no save index was specified, choose the index that achieved
+                    # the lowest error.
+                    if save_index is None:
+                        save_index = np.argmin(file_["error"])
+                    intermediate_states = file_["intermediate_states"][save_index, :, state_index, :, :]
+                control_eval_count = file_["control_eval_count"][()]
+                controls = file_["controls"][save_index][()]
+            #ENDWITH
+        #ENDWITH
+    except Timeout:
+        print("Could not access the specified file.")
+        return
+    file_name = os.path.splitext(ntpath.basename(file_path))[0]
+    if title is None:
+        title = file_name
+    hilbert_size = intermediate_states.shape[-2]
+    system_eval_times = np.linspace(0, evolution_time, system_eval_count)
+    control_eval_times = np.linspace(0, evolution_time, control_eval_count)
+
+        # Compile data.
+    intermediate_densities = np.matmul(intermediate_states, conjugate_transpose(intermediate_states))
+    population_data = list()
+    for i in range(hilbert_size):
+        population_data_ = np.real(intermediate_densities[:, i, i])
+        population_data.append(population_data_)
+
+    # Create labels and extra content.
+    patches = list()
+    labels = list()
+    for i in range(hilbert_size):
+        label = "{}".format(i)
+        labels.append(label)
+        color = get_color(i)
+        patches.append(mpatches.Patch(label=label, color=color))
+    #ENDFOR
+
+    # Plot the controls.
+    fig = plt.figure()
+    ax1 = plt.subplot(2, 1, 1)
+    ax1.set_ylabel("Amplitude (GHz)")
+    ax1.plot(control_eval_times, controls, marker_style, color="blue", ms=2, alpha=0.9)
+
+    # Plot the pop.
+    ax2 = plt.subplot(2, 1, 2)
+    ax2.legend(handles=patches, labels=labels, loc="lower left",
+                  framealpha=0.5)
+    ax2.set_xlabel("Time ({})".format(time_unit))
+    ax2.set_ylabel("Population")
+    for i in range(hilbert_size):
+        color = get_color(i)
+        ax2.plot(system_eval_times, population_data[i], marker_style,
+                 color=color, ms=2, alpha=0.9)
+
+
+    # Export.
+    if save_file_path is not None:
+        plt.savefig(save_file_path, dpi=dpi)
+
+    if show:
+        plt.show()
+
         
 ### HELPER FUNCTIONS ###
 
