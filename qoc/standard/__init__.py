@@ -28,7 +28,7 @@ from .functions import (commutator, conjugate_transpose,
 from .optimizers import (Adam, LBFGSB, SGD,)
 
 from .plot import (plot_controls, plot_density_population,
-                   plot_state_population,)
+                   plot_state_population, plot_state_controls)
 
 from .utils import (ans_jacobian, generate_save_file_path, CustomJSONEncoder,)
 

@@ -26,7 +26,7 @@ from qoc.standard import (Adam, ans_jacobian,
                           expm, matmuls,
                           rms_norm)
 
-AMPLITUDE_ROBUSTNESS = 1
+AMPLITUDE_ROBUSTNESS = 0
 HAMILTONIAN_PARAMETER_ROBUSTNESS = 0
 
 ### MAIN METHODS ###
