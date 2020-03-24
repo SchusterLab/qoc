@@ -334,14 +334,14 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Evaluate the jacobian.
     if AMPLITUDE_ROBUSTNESS:
-        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
-                        (controls, pstate.hamiltonian_args, pstate, reporter))
-        robust_amp_grads_ = robust_amp_grads(controls, pstate, reporter)
-        robust_amp_grads_norm_ = np.linalg.norm(robust_amp_grads_)
-        if not pstate.complex_controls:
-            print(robust_amp_grads_)
-            robust_amp_grads_ = np.real(robust_amp_grads_)
-        grads = grads + robust_amp_grads_norm_
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_amp, 0)
+                        (controls, pstate, reporter))
+        # robust_amp_grads_ = robust_amp_grads(controls, pstate, reporter)
+        # robust_amp_grads_norm_ = np.linalg.norm(robust_amp_grads_)
+        # if not pstate.complex_controls:
+        #     print(robust_amp_grads_)
+        #     robust_amp_grads_ = np.real(robust_amp_grads_)
+        # grads = grads + robust_amp_grads_norm_
     elif HAMILTONIAN_PARAMETER_ROBUSTNESS:
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_hargs, 0)
                         (controls, pstate, reporter))
@@ -614,9 +614,12 @@ def get_unitary_builder(pstate):
     
 
 def robust_amp_grads(controls, pstate, reporter):
+    """
+    This function is deprecated.
+    """
     control_eval_times = pstate.control_eval_times
     unitary = get_unitary_builder(pstate)
-    # TOOD: these can be changed to element-wise grad
+    # TODO: these can be changed to element-wise grad
     d3u_dc3 = jacobian(lambda *args:
                        anp.real(jacobian(lambda *args:
                                          anp.real(jacobian(unitary,
