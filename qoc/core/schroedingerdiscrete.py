@@ -5,7 +5,7 @@ optimization algorithm
 
 import autograd.numpy as anp
 from autograd.extend import Box
-from autograd import jacobian
+from autograd import (jacobian, elementwise_grad)
 import numpy as np
 
 from qoc.core.common import (initialize_controls,
@@ -27,7 +27,7 @@ from qoc.standard import (Adam, ans_jacobian,
                           rms_norm)
 
 AMPLITUDE_ROBUSTNESS = 0
-HAMILTONIAN_PARAMETER_ROBUSTNESS = 0
+HAMILTONIAN_PARAMETER_ROBUSTNESS = 1
 
 ### MAIN METHODS ###
 
@@ -249,6 +249,9 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_intermediate_states,
                                             save_iteration_step,
                                             system_eval_count,)
+    # TODO: This field should be initialized in pstate initiailizer.
+    pstate.rb_normalizer = 1
+
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -336,15 +339,27 @@ def _esdj_wrap(controls, pstate, reporter, result):
     if AMPLITUDE_ROBUSTNESS:
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_amp, 0)
                         (controls, pstate, reporter))
-        # robust_amp_grads_ = robust_amp_grads(controls, pstate, reporter)
-        # robust_amp_grads_norm_ = np.linalg.norm(robust_amp_grads_)
-        # if not pstate.complex_controls:
-        #     print(robust_amp_grads_)
-        #     robust_amp_grads_ = np.real(robust_amp_grads_)
-        # grads = grads + robust_amp_grads_norm_
     elif HAMILTONIAN_PARAMETER_ROBUSTNESS:
-        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete_hargs, 0)
-                        (controls, pstate, reporter))
+        # TODO: the reporter.augment thing is a quick fix and should
+        # be cleaned up.
+        # Do the robust thing.
+        reporter.augment = False
+        rb_error, rb_grads = (ans_jacobian(lambda *args: anp.linalg.norm(jacobian(jacobian(_evaluate_schroedinger_discrete, 1), 1)(*args)), 0)
+                              (controls, pstate.hamiltonian_args, pstate, reporter))
+        rb_error_norm = rms_norm(rb_error)
+        pstate.rb_normalizer = np.maximum(rb_error_norm, pstate.rb_normalizer)
+        rb_error = rb_error / pstate.rb_normalizer
+        rb_grads = rb_grads / pstate.rb_normalizer
+
+        # Do the regular thing.
+        reporter.augment = True
+        reg_error, reg_grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+                                (controls, pstate.hamiltonian_args, pstate, reporter))
+
+        # Put it all together.
+        error = reg_error + rb_error
+        grads = reg_grads + rb_grads
+        print("rbe: {}".format(rb_error))
     else:
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
                         (controls, pstate.hamiltonian_args,
@@ -402,43 +417,13 @@ def _evaluate_schroedinger_discrete_amp(controls, pstate, reporter):
     return error
 
 
-def _evaluate_schroedinger_discrete_hargs(controls, pstate, reporter):
-    """
-    Do the hamiltonian parameter robustness thing in addition to the
-    typical cost functions.
-    
-    Arguments:
-    controls :: ndarray (control_eval_count x control_count)
-        - the control parameters
-    pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
-        - static objects
-    reporter :: any - a reporter for mutable objects
-
-    Returns:
-    error :: float - total error of the evolution
-    """
-    controls_norm = anp.linalg.norm(controls)
-    controls_normalized = controls / controls_norm
-    hamiltonian_args_grads = (jacobian(jacobian(_evaluate_schroedinger_discrete, 2), 2)
-                              (controls_norm, controls_normalized,
-                               pstate.hamiltonian_args, pstate, reporter))
-    hamiltonian_args_grads_norm = rms_norm(hamiltonian_args_grads)
-    standard_costs_error = _evaluate_schroedinger_discrete(controls,
-                                                           pstate.hamiltonian_args,
-                                                           pstate, reporter)
-    error = hamiltonian_args_grads_norm + standard_costs_error
-    return error
-
-
 def _evaluate_schroedinger_discrete(controls,
                                     hamiltonian_args, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
 
     Arguments:
-    controls_norm :: float - The amplitude of `controls_normalized`
-    controls_normalized :: ndarray (control_eval_count x control_count)
-        - the control parameters normalized
+    controls :: ndarray(control_eval_count, control_count)
     hamiltonian_Args :: ndarray (hamiltonian_args_count) - Auxiliary parameters to pass
         to the hamiltonian function.
     pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
@@ -450,7 +435,6 @@ def _evaluate_schroedinger_discrete(controls,
     """
     # Initialize local variables (heap -> stack).
     control_eval_times = pstate.control_eval_times
-    # controls = controls_norm * controls_normalized
     cost_eval_step = pstate.cost_eval_step
     costs = pstate.costs
     dt = pstate.dt
@@ -511,6 +495,10 @@ def _evaluate_schroedinger_discrete(controls,
     # Compute non-step-costs.
     for i, cost in enumerate(costs):
         if not cost.requires_step_evaluation:
+            if reporter.augment:
+                cost.should_augment = True
+            else:
+                cost.should_augment = False
             cost_error = cost.cost(controls, states, final_system_eval_step)
             error = error + cost_error
 

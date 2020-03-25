@@ -210,7 +210,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                           and save_intermediate_states_)
 
 
-    def log_and_save(self, controls, error, final_states, grads, iteration,):
+    def log_and_save(self, controls, error, final_states, grads, iteration, misc=None):
         """
         If necessary, log to stdout and save to the save file.
 
@@ -237,9 +237,14 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             and ((np.mod(iteration, self.log_iteration_step) == 0)
                  or is_final_iteration)):
             grads_norm = np.linalg.norm(grads)
-            print("{:^6d} | {:^1.8e} | {:^1.8e}"
-                  "".format(iteration, error,
-                            grads_norm))
+            if misc is not None:
+                print("{:^6d} | {:^1.8e} | {:^1.8e} | {:^1.8e}"
+                      "".format(iteration, error,
+                                grads_norm, misc))
+            else:
+                print("{:^6d} | {:^1.8e} | {:^1.8e}"
+                      "".format(iteration, error,
+                                grads_norm))
 
         if (self.should_save
             and ((np.mod(iteration, self.save_iteration_step) == 0)

@@ -4,6 +4,8 @@ penalizes the infidelity of an evolved state and a target state.
 """
 
 import autograd.numpy as anp
+from autograd.extend import Box
+import copy
 import numpy as np
 
 from qoc.models import Cost
@@ -69,5 +71,10 @@ class TargetStateInfidelity(Cost):
             fidelity_normalized = anp.sum(fidelities) / self.state_count
             cost_ = 1 - fidelity_normalized
 
-        cost_ = self.augment_cost(cost_)
-        return cost_
+        augmented_cost = self.augment_cost(cost_)
+        if not isinstance(cost_._value, Box):
+            print("tsic: {}, tsia: {}"
+                  "".format(cost_._value,
+                            augmented_cost._value))
+
+        return augmented_cost

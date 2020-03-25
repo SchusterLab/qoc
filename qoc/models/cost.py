@@ -21,6 +21,7 @@ class Cost(object):
                                        at each optimization time step, False
                                        if it should be computed only at the
                                        final optimization time step
+    should_augment :: bool
     """
     name = "parent_cost"
     requires_step_evaluation = False
@@ -36,6 +37,7 @@ class Cost(object):
         self.cost_multiplier = cost_multiplier
         self.cost_multiplier_step = cost_multiplier_step
         self.lagrange_multiplier = 0
+        self.should_augment = constraint is not None
 
 
     def __str__(self):
@@ -60,9 +62,9 @@ class Cost(object):
         References:
         [0] https://en.wikipedia.org/wiki/Augmented_Lagrangian_method
         """
-        if self.constraint is not None:
+        if self.constraint is not None and self.should_augment:
             # Only add a cost if it is greater than the constraint.
-            cost_ = anp.max(cost_ - self.constraint, 0)
+            cost_ = anp.maximum(cost_ - self.constraint, 0)
             # Compute the augmented cost.
             augmented_cost = ((self.cost_multiplier / 2) * (cost_ ** 2)
                               + self.lagrange_multiplier * cost_)
