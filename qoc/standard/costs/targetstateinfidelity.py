@@ -15,7 +15,10 @@ class TargetStateInfidelity(Cost):
     and a target state.
 
     Fields:
+    constraint
     cost_multiplier
+    cost_multiplier_step
+    lagrange_multiplier
     name
     requires_step_evaluation
     state_count
@@ -24,14 +27,18 @@ class TargetStateInfidelity(Cost):
     name = "target_state_infidelity"
     requires_step_evaluation = False
 
-    def __init__(self, target_states, cost_multiplier=1.):
+    def __init__(self, target_states, constraint=None,
+                 cost_multiplier=1.,
+                 cost_multiplier_step=None):
         """
         See class fields for arguments not listed here.
         
         Arguments:
         target_states
         """
-        super().__init__(cost_multiplier=cost_multiplier)
+        super().__init__(constraint=constraint,
+                         cost_multiplier=cost_multiplier,
+                         cost_multiplier_step=cost_multiplier_step)
         self.state_count = target_states.shape[0]
         self.target_states_dagger = conjugate_transpose(target_states)
 
@@ -53,5 +60,6 @@ class TargetStateInfidelity(Cost):
         fidelities = anp.real(inner_products * anp.conjugate(inner_products))
         fidelity_normalized = anp.sum(fidelities) / self.state_count
         infidelity = 1 - fidelity_normalized
-        
-        return infidelity * self.cost_multiplier
+
+        cost_ = self.augment_cost(infidelity)
+        return cost_
