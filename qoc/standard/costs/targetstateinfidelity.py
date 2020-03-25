@@ -7,7 +7,9 @@ import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose
+from qoc.standard.functions import (
+    conjugate_transpose, rms_norm
+)
 
 class TargetStateInfidelity(Cost):
     """
@@ -21,6 +23,7 @@ class TargetStateInfidelity(Cost):
     lagrange_multiplier
     name
     requires_step_evaluation
+    rms :: bool - whether or not to use the rms norm
     state_count
     target_states_dagger
     """
@@ -29,7 +32,8 @@ class TargetStateInfidelity(Cost):
 
     def __init__(self, target_states, constraint=None,
                  cost_multiplier=1.,
-                 cost_multiplier_step=None):
+                 cost_multiplier_step=None,
+                 rms=False):
         """
         See class fields for arguments not listed here.
         
@@ -39,6 +43,7 @@ class TargetStateInfidelity(Cost):
         super().__init__(constraint=constraint,
                          cost_multiplier=cost_multiplier,
                          cost_multiplier_step=cost_multiplier_step)
+        self.rms = rms
         self.state_count = target_states.shape[0]
         self.target_states_dagger = conjugate_transpose(target_states)
 
@@ -55,11 +60,14 @@ class TargetStateInfidelity(Cost):
         Returns:
         cost
         """
-        # The cost is the infidelity of each evolved state and its target state.
-        inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-        fidelities = anp.real(inner_products * anp.conjugate(inner_products))
-        fidelity_normalized = anp.sum(fidelities) / self.state_count
-        infidelity = 1 - fidelity_normalized
+        if self.rms:
+            cost_ = rms_norm(states - self.target_states_dagger)
+        else:
+            # The cost is the infidelity of each evolved state and its target state.
+            inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
+            fidelities = anp.real(inner_products * anp.conjugate(inner_products))
+            fidelity_normalized = anp.sum(fidelities) / self.state_count
+            cost_ = 1 - fidelity_normalized
 
-        cost_ = self.augment_cost(infidelity)
+        cost_ = self.augment_cost(cost_)
         return cost_

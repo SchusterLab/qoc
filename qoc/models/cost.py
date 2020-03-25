@@ -66,8 +66,6 @@ class Cost(object):
             # Compute the augmented cost.
             augmented_cost = ((self.cost_multiplier / 2) * (cost_ ** 2)
                               + self.lagrange_multiplier * cost_)
-            print("c: {}, lm: {}, ac: {}"
-                  "".format(cost_, self.lagrange_multiplier, augmented_cost))
             # Update lagrange multiplier.
             self.lagrange_multiplier = self.lagrange_multiplier + self.cost_multiplier * cost_
         else:
