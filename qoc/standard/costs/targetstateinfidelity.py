@@ -21,8 +21,6 @@ class TargetStateInfidelity(Cost):
     Fields:
     constraint
     cost_multiplier
-    cost_multiplier_step
-    lagrange_multiplier
     name
     requires_step_evaluation
     rms :: bool - whether or not to use the rms norm
@@ -34,7 +32,6 @@ class TargetStateInfidelity(Cost):
 
     def __init__(self, target_states, constraint=None,
                  cost_multiplier=1.,
-                 cost_multiplier_step=None,
                  rms=False):
         """
         See class fields for arguments not listed here.
@@ -43,8 +40,7 @@ class TargetStateInfidelity(Cost):
         target_states
         """
         super().__init__(constraint=constraint,
-                         cost_multiplier=cost_multiplier,
-                         cost_multiplier_step=cost_multiplier_step)
+                         cost_multiplier=cost_multiplier,)
         self.rms = rms
         self.state_count = target_states.shape[0]
         self.target_states_dagger = conjugate_transpose(target_states)
@@ -72,9 +68,9 @@ class TargetStateInfidelity(Cost):
             cost_ = 1 - fidelity_normalized
 
         augmented_cost = self.augment_cost(cost_)
-        if not isinstance(cost_._value, Box):
-            print("tsic: {}, tsia: {}"
-                  "".format(cost_._value,
-                            augmented_cost._value))
+        # if not isinstance(cost_._value, Box):
+        #     print("tsic: {}, tsia: {}"
+        #           "".format(cost_._value,
+        #                     augmented_cost._value))
 
         return augmented_cost

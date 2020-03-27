@@ -2,6 +2,7 @@
 cost.py - This module defines the parent cost function class.
 """
 
+from autograd.extend import Box
 import autograd.numpy as anp
 
 class Cost(object):
@@ -9,13 +10,9 @@ class Cost(object):
     This class is the parent class for all cost functions.
     
     Fields:
-    constraint :: float - the maximum tolerable penalty, if set, the cost
-        will employ the augmented lagrangian method for constrained optimization
+    constraint :: float - the maximum tolerable cost, costs above this constraint
+        will not be penalized
     cost_multiplier :: float - the weight factor for this cost
-    cost_multiplier_step :: float - the increment to the cost multiplier
-        applied each iteration
-    lagrange_multiplier :: float - the lagrange multiplier used in the
-        augmented lagrangian method
     name :: str - a unique identifier for this cost
     requires_step_evaluation :: bool - True if the cost needs to be computed
                                        at each optimization time step, False
@@ -27,16 +24,13 @@ class Cost(object):
     requires_step_evaluation = False
     
     def __init__(self, constraint=None,
-                 cost_multiplier=1.,
-                 cost_multiplier_step=None):
+                 cost_multiplier=1.,):
         """
         See class definition for parameter specification.
         """
         super().__init__()
         self.constraint = constraint
         self.cost_multiplier = cost_multiplier
-        self.cost_multiplier_step = cost_multiplier_step
-        self.lagrange_multiplier = 0
         self.should_augment = constraint is not None
 
 
@@ -65,17 +59,10 @@ class Cost(object):
         if self.constraint is not None and self.should_augment:
             # Only add a cost if it is greater than the constraint.
             cost_ = anp.maximum(cost_ - self.constraint, 0)
-            # Compute the augmented cost.
-            augmented_cost = ((self.cost_multiplier / 2) * (cost_ ** 2)
-                              + self.lagrange_multiplier * cost_)
-            # Update lagrange multiplier.
-            self.lagrange_multiplier = self.lagrange_multiplier + self.cost_multiplier * cost_
-        else:
             augmented_cost = cost_ * self.cost_multiplier
-
-        # Update cost multiplier.
-        if self.cost_multiplier_step is not None:
-            self.cost_multiplier = self.cost_multiplier + self.cost_multiplier_step
+        else:
+            # augmented_cost = cost_ * self.cost_multiplier
+            augmented_cost = cost_
 
         return augmented_cost
 

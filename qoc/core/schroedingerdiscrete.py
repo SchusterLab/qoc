@@ -27,7 +27,7 @@ from qoc.standard import (Adam, ans_jacobian,
                           rms_norm)
 
 AMPLITUDE_ROBUSTNESS = 0
-HAMILTONIAN_PARAMETER_ROBUSTNESS = 1
+HAMILTONIAN_PARAMETER_ROBUSTNESS = 0
 
 ### MAIN METHODS ###
 
@@ -109,6 +109,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              system_eval_count,)
     pstate.save_initial(controls)
     result = EvolveSchroedingerResult()
+    result.augment = False
     _ = _evaluate_schroedinger_discrete(controls,
                                         pstate.hamiltonian_args, pstate, result)
 
@@ -250,7 +251,8 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_iteration_step,
                                             system_eval_count,)
     # TODO: This field should be initialized in pstate initiailizer.
-    pstate.rb_normalizer = 1
+    pstate.rbgn = 1
+    pstate.rbgn_multiplier = 1
 
     pstate.log_and_save_initial()
 
@@ -325,6 +327,9 @@ def _esdj_wrap(controls, pstate, reporter, result):
     Returns:
     grads
     """
+    # TODO: clean me
+    constraint_satisfied = 0
+    
     # Convert the controls from optimizer format to cost function format.
     controls = slap_controls(pstate.complex_controls, controls,
                              pstate.controls_shape)
@@ -342,25 +347,33 @@ def _esdj_wrap(controls, pstate, reporter, result):
     elif HAMILTONIAN_PARAMETER_ROBUSTNESS:
         # TODO: the reporter.augment thing is a quick fix and should
         # be cleaned up.
+        
         # Do the robust thing.
         reporter.augment = False
         rb_error, rb_grads = (ans_jacobian(lambda *args: anp.linalg.norm(jacobian(jacobian(_evaluate_schroedinger_discrete, 1), 1)(*args)), 0)
                               (controls, pstate.hamiltonian_args, pstate, reporter))
-        rb_error_norm = rms_norm(rb_error)
-        pstate.rb_normalizer = np.maximum(rb_error_norm, pstate.rb_normalizer)
-        rb_error = rb_error / pstate.rb_normalizer
-        rb_grads = rb_grads / pstate.rb_normalizer
+        rbgn = np.linalg.norm(rb_grads)
+        pstate.rbgn = np.maximum(pstate.rbgn, rbgn)
 
         # Do the regular thing.
         reporter.augment = True
         reg_error, reg_grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
                                 (controls, pstate.hamiltonian_args, pstate, reporter))
-
+        if reg_error == 0:
+            constraint_satisfied = 1
+            pstate.rbgn_multiplier = np.minimum(pstate.rbgn_multiplier * 2, 1e2)
+        else:
+            constraint_satisfied = 0
+            pstate.rbgn_multiplier = np.maximum(pstate.rbgn_multiplier / 2, 1)
+        rb_grads = pstate.rbgn_multiplier * rb_grads / pstate.rbgn
+            
         # Put it all together.
         error = reg_error + rb_error
         grads = reg_grads + rb_grads
-        print("rbe: {}".format(rb_error))
+        print("rbe: {}, rgn: {}, rbgn: {}"
+              "".format(rb_error, np.linalg.norm(reg_grads), np.linalg.norm(rb_grads)))
     else:
+        reporter.augment = True
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
                         (controls, pstate.hamiltonian_args,
                          pstate, reporter))
@@ -389,7 +402,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
     
     # Save and log optimization progress.
     pstate.log_and_save(controls, error, final_states,
-                        grads, reporter.iteration)
+                        grads, reporter.iteration, constraint=constraint_satisfied)
     reporter.iteration += 1
 
     # Convert the gradients from cost function to optimizer format.

@@ -210,7 +210,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                           and save_intermediate_states_)
 
 
-    def log_and_save(self, controls, error, final_states, grads, iteration, misc=None):
+    def log_and_save(self, controls, error, final_states, grads, iteration, constraint=0):
         """
         If necessary, log to stdout and save to the save file.
 
@@ -237,14 +237,9 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             and ((np.mod(iteration, self.log_iteration_step) == 0)
                  or is_final_iteration)):
             grads_norm = np.linalg.norm(grads)
-            if misc is not None:
-                print("{:^6d} | {:^1.8e} | {:^1.8e} | {:^1.8e}"
-                      "".format(iteration, error,
-                                grads_norm, misc))
-            else:
-                print("{:^6d} | {:^1.8e} | {:^1.8e}"
-                      "".format(iteration, error,
-                                grads_norm))
+            print("{:^6d} | {:^1.8e} | {:^1.8e}"
+                  "".format(iteration, error,
+                            grads_norm))
 
         if (self.should_save
             and ((np.mod(iteration, self.save_iteration_step) == 0)
@@ -253,6 +248,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             try:
                 with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "a") as save_file:
+                        save_file["constraint"][save_step,] = constraint
                         save_file["controls"][save_step,] = controls
                         save_file["error"][save_step,] = error
                         save_file["final_states"][save_step,] = final_states
@@ -284,6 +280,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                 with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "w") as save_file:
                         save_file["complex_controls"] = self.complex_controls
+                        save_file["constraint"] = np.zeros((save_count), dtype=np.int32)
                         save_file["control_count"] = self.control_count
                         save_file["control_eval_count"] = self.control_eval_count
                         save_file["controls"] = np.zeros((save_count, self.control_eval_count,
