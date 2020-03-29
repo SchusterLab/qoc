@@ -10,28 +10,39 @@ class Cost(object):
     This class is the parent class for all cost functions.
     
     Fields:
+    augmented_lagrangian :: bool - Whether or not to employ the augmented
+        lagrangian method. Set to true if this cost has a constraint
+        and the corresponding field is set in the optimization call.
     constraint :: float - the maximum tolerable cost, costs above this constraint
         will not be penalized
     cost_multiplier :: float - the weight factor for this cost
+    cost_multiplier_scale :: float - if the augmented lagrangian method
+        is employed, this is the factor by which the cost multiplier is
+        scaled
+    lagrange_multiplier :: float - this value is used by the
+        augmented lagrangian method
     name :: str - a unique identifier for this cost
     requires_step_evaluation :: bool - True if the cost needs to be computed
                                        at each optimization time step, False
                                        if it should be computed only at the
                                        final optimization time step
-    should_augment :: bool
     """
     name = "parent_cost"
     requires_step_evaluation = False
+
     
     def __init__(self, constraint=None,
-                 cost_multiplier=1.,):
+                 cost_multiplier=1.,
+                 cost_multiplier_scale=1.2,):
         """
         See class definition for parameter specification.
         """
         super().__init__()
+        self.augmented_lagrangian = False
         self.constraint = constraint
         self.cost_multiplier = cost_multiplier
-        self.should_augment = constraint is not None
+        self.cost_multiplier_scale = cost_multiplier_scale
+        self.lagrange_multiplier = 0
 
 
     def __str__(self):
@@ -56,15 +67,16 @@ class Cost(object):
         References:
         [0] https://en.wikipedia.org/wiki/Augmented_Lagrangian_method
         """
-        if self.constraint is not None and self.should_augment:
-            # Only add a cost if it is greater than the constraint.
+        
+        if self.constraint is not None:
             cost_ = anp.maximum(cost_ - self.constraint, 0)
-            augmented_cost = cost_ * self.cost_multiplier
-        else:
-            # augmented_cost = cost_ * self.cost_multiplier
-            augmented_cost = cost_
+        if self.augmented_lagrangian:
+            cost_ = (self.cost_multiplier * (cost_ ** 2)
+                              + self.lagrange_multiplier * cost_)
+        elif not self.cost_multiplier == 1.:
+            cost_ = cost_ * cost_multiplier
 
-        return augmented_cost
+        return cost_
 
         
     def cost(self, params, states, step):
@@ -83,4 +95,7 @@ class Cost(object):
         """
         raise NotImplementedError("The cost {} has not implemented an evaluation function."
                                   "".format(self))
-
+    
+    
+    def update(self):
+        pass

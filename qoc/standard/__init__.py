@@ -19,11 +19,13 @@ from .costs import (ControlArea,
                     TargetStateInfidelity,
                     TargetStateInfidelityTime,)
 
-from .functions import (commutator, conjugate_transpose,
-                        expm, krons, matmuls,
-                        rms_norm,
-                        column_vector_list_to_matrix,
-                        matrix_to_column_vector_list,)
+from .functions import (
+    commutator, conjugate_transpose,
+    expm, gram_schmidt, krons, matmuls,
+    project, rms_norm,
+    column_vector_list_to_matrix,
+    matrix_to_column_vector_list,
+)
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 

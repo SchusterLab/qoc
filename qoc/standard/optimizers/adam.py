@@ -128,6 +128,11 @@ class Adam(object):
         new_params :: numpy.ndarray - the learning parameters to be used
             for the next iteration
         """
+        if self.gradient_moment is None:
+            self.gradient_moment = np.zeros_like(params)
+        if self.gradient_square_moment is None:
+            self.gradient_square_moment = np.zeros_like(params)
+        
         # Apply learning rate decay.
         if self.apply_learning_rate_decay:
             learning_rate = (self.initial_learning_rate
@@ -147,18 +152,15 @@ class Adam(object):
 
 
         # Do the vanilla update procedure.
-        self.iteration_count += 1
-        beta_1 = self.beta_1
-        beta_2 = self.beta_2
-        iteration_count = self.iteration_count
-        self.gradient_moment = (beta_1 * self.gradient_moment
-                                + (1 - beta_1) * grads)
-        self.gradient_square_moment = (beta_2 * self.gradient_square_moment
-                                       + (1 - beta_2) * np.square(grads))
+        self.iteration_count = self.iteration_count + 1
+        self.gradient_moment = (self.beta_1 * self.gradient_moment
+                                + (1 - self.beta_1) * grads)
+        self.gradient_square_moment = (self.beta_2 * self.gradient_square_moment
+                                       + (1 - self.beta_2) * np.square(grads))
         gradient_moment_hat = np.divide(self.gradient_moment,
-                                        1 - np.power(beta_1, iteration_count))
+                                        1 - np.power(self.beta_1, self.iteration_count))
         gradient_square_moment_hat = np.divide(self.gradient_square_moment,
-                                               1 - np.power(beta_2, iteration_count))
+                                               1 - np.power(self.beta_2, self.iteration_count))
         
         return params - learning_rate * np.divide(gradient_moment_hat,
                                                   np.sqrt(gradient_square_moment_hat)

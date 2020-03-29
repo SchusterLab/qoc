@@ -2,7 +2,10 @@
 mathmethods.py - mathematical methods in physics
 """
 
+from autograd.extend import Box
 import autograd.numpy as anp
+import jax.numpy as jnp
+from jax.interpreters.ad import JVPTracer
 import numpy as np
 
 from qoc.standard.functions.convenience import (commutator, conjugate_transpose,
@@ -418,6 +421,9 @@ def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
     else:
         h1 = anp.power(0.01 / anp.maximum(d1, d2), 1 / (P + 1))
     step_current = anp.minimum(100 * h0, h1)
+    # If autograd tracks step updates we run into numerical issues.
+    while isinstance(step_current, Box):
+        step_current = step_current._value
 
     # Integrate.
     y_eval_list = list()
@@ -462,6 +468,10 @@ def integrate_rkdp5(rhs, x_eval, x_initial, y_initial,
                 step_update_factor = anp.maximum(step_update_factor_min,
                                                  step_safety_factor * anp.power(error_norm, ERROR_EXP))
                 step_current = step_current * step_update_factor
+
+            # If autograd tracks step updates we run into numerical issues.
+            while isinstance(step_current, Box):
+                step_current = step_current._value
         #ENDWHILE
         # Interpolate any output points that ocurred in the step.
         x_eval_step_indices = anp.nonzero(anp.logical_and(x_current <= x_eval, x_eval <= x_new))[0]

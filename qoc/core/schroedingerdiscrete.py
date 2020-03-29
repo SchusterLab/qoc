@@ -47,7 +47,9 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
     Args:
     evolution_time :: float - This value specifies the duration of the
         system's evolution.
-    hamiltonian :: (controls :: ndarray (control_count), hamiltonian_args :: ndarray (hamiltonian_args_count), time :: float)
+    hamiltonian :: (controls :: ndarray (control_count),
+                    hamiltonian_args :: ndarray (hamiltonian_args_count),
+                    time :: float)
                    -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
         - This function provides the system's hamiltonian given a set
         of control parameters and a time value.

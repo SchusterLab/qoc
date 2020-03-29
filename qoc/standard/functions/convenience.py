@@ -8,6 +8,7 @@ from functools import reduce
 
 from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
+import jax.numpy as jnp
 import numpy as np
 import scipy.linalg as la
 
@@ -46,6 +47,25 @@ def conjugate_transpose(matrix):
     return conjugate_transpose_
 
 
+def gram_schmidt(X, row_vecs=True, norm=True):
+    """
+    References:
+    [0] https://gist.github.com/iizukak/1287876/edad3c337844fac34f7e56ec09f9cb27d4907cc7
+    """
+    if not row_vecs:
+        X = X.T
+    Y = X[0:1,:].copy()
+    for i in range(1, X.shape[0]):
+        proj = np.diag((X[i,:].dot(Y.T)/np.linalg.norm(Y,axis=1)**2).flat).dot(Y)
+        Y = np.vstack((Y, X[i,:] - proj.sum(0)))
+    if norm:
+        Y = np.diag(1/np.linalg.norm(Y,axis=1)).dot(Y)
+    if row_vecs:
+        return Y
+    else:
+        return Y.T
+
+
 def krons(*matrices):
     """
     Compute the kronecker product of a list of matrices.
@@ -72,6 +92,16 @@ def matmuls(*matrices):
     matmuls_ = reduce(anp.matmul, matrices)
 
     return matmuls_
+
+
+def project(x, basis):
+    """
+    Assumes basis is orthonormal
+    """
+    y = np.zeros_like(x)
+    for i in range(basis.shape[0]):
+        y = y + anp.dot(x, basis[i]) * basis[i]
+    return y
 
 
 def rms_norm(array):
