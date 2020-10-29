@@ -326,6 +326,8 @@ def _esdj_wrap(controls, pstate, reporter, result):
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_states, Box):
         final_states = reporter.final_states._value
+    else:
+        final_states = reporter.final_states
 
     # Update best configuration.
     if error < result.best_error:
