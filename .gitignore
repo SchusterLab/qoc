@@ -2,6 +2,7 @@
 *.h5
 *.png
 *.lock
+*.DS_Store
 
 # docs
 docs/_build
