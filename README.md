@@ -1,11 +1,12 @@
 # QOC
-This package is an implementation of GRAPE using [autograd](https://github.com/HIPS/autograd) to perform automatic
-differentiation. This package provides an extensible framework for cost functions and supports problems on
+QOC is an implementation of the GRAPE algorithm for Quantum Optimal Control.
+QOC uses [autograd](https://github.com/HIPS/autograd) to perform automatic
+differentiation. QOC provides an extensible framework for adding cost functions and supports problems on
 the Schroedinger Equation and the Lindblad Master Equation.
 
 Formal documentation for this package does not exist, but the code is heavily commented.
-See the [Tutorial](https://github.com/SchusterLab/qoc/tree/master/examples) to get started
-or check out the [docstring](https://github.com/SchusterLab/qoc/blob/master/qoc/core/schroedingerdiscrete.py#L123)
+See the [tutorial](https://github.com/SchusterLab/qoc/tree/master/examples) to get started
+or check out the [docstrings](https://github.com/SchusterLab/qoc/blob/master/qoc/core/schroedingerdiscrete.py#L123)
 for the core functions.
 
 ### Installation ###
