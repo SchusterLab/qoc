@@ -1,16 +1,17 @@
 # QOC
-QOC performs quantum optimal control. It uses automatic differentiation to do backpropagation through the Schroedinger Equation or the Lindblad Master Equation.
+This package is an implementation of GRAPE using [autograd](https://github.com/HIPS/autograd) to perform automatic
+differentiation. This package provides an extensible framework for cost functions and supports problems on
+the Schroedinger Equation and the Lindblad Master Equation.
 
-[Documentation](https://qoc.readthedocs.io/en/latest/) is coming soon. For now, you can read the docstrings in the source code.
-
-[Tutorial](https://github.com/SchusterLab/qoc/tree/master/examples)
+Formal documentation for this package does not exist, but the code is heavily commented.
+See the [Tutorial](https://github.com/SchusterLab/qoc/tree/master/examples) to get started
+or check out the [docstring](https://github.com/SchusterLab/qoc/blob/master/qoc/core/schroedingerdiscrete.py#L123)
+for the core functions.
 
 ### Installation ###
-You can install QOC locally via pip.
+You can install QOC via pip.
 ```
-git clone https://github.com/SchusterLab/qoc.git
-cd qoc
-pip install -e .
+pip install git+https://github.com/SchusterLab/qoc
 ```
 
 ### Contact ###

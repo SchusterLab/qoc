@@ -21,6 +21,8 @@ _test/*
 *.pyc
 *.egg-info
 **/.ipynb_checkpoints/*
+build
+dist
 
 # latex files
 *.aux
