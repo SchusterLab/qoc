@@ -42,7 +42,8 @@ class ControlVariation(Cost):
         self.diffs_size = control_count * (control_eval_count - order)
         self.order = order
         self.cost_normalization_constant = self.diffs_size * (2 ** self.order)
-
+        self.type = "control"
+        self.control_eval_account=control_eval_count
 
     def cost(self, controls, states, system_eval_step):
         """
@@ -56,7 +57,7 @@ class ControlVariation(Cost):
         Returns:
         cost
         """
-        if self.max_control_norms is None:
+        if self.max_control_norms is not None:
             normalized_controls = controls / self.max_control_norms
         else:
             normalized_controls = controls
@@ -73,3 +74,36 @@ class ControlVariation(Cost):
         cost_normalized = cost / self.cost_normalization_constant
 
         return cost_normalized * self.cost_multiplier
+
+    def gradient_initialize(self, reporter):
+        return
+    def update_state(self, propagator):
+        return
+
+    def gradient(self, controls,j,k):
+        grads=self.cost_multiplier/self.cost_normalization_constant
+        if self.max_control_norms is not None:
+            grads = grads / (self.max_control_norms) ** 2
+        if self.order==1:
+                if j==0 :
+                    grads=-grads*2*(controls[j+1][k]-controls[j][k])
+                elif j == self.control_eval_account-1:
+                    grads = grads * 2 * (controls[j ][k] - controls[j-1][k])
+                else:
+                    grads = grads * 2 *( (controls[j][k] - controls[j - 1][k])-(controls[j+1][k]-controls[j][k]))
+        if self.order==2:
+                if j==0 :
+                    grads=grads*2*(controls[j+2][k]-2*controls[j+1][k]+controls[j][k])
+                elif j==1:
+                    grads = grads *(-4*(controls[j+1][k]-2*controls[j][k]+controls[j-1][k])
+                                        +2*(controls[j+2][k]-2*controls[j+1][k]+controls[j][k]))
+                elif j==self.control_eval_account-2:
+                    grads=grads*(2*(controls[j][k]-2*controls[j-1][k]+controls[j-2][k])
+                                    -4*(controls[j+1][k]-2*controls[j][k]+controls[j-1][k]))
+                elif j == self.control_eval_account-1:
+                    grads = grads * 2*(controls[j][k]-2*controls[j-1][k]+controls[j-2][k])
+                else:
+                    grads = grads *(2*(controls[j][k]-2*controls[j-1][k]+controls[j-2][k])
+                                    -4*(controls[j+1][k]-2*controls[j][k]+controls[j-1][k])
+                                        +2*(controls[j+2][k]-2*controls[j+1][k]+controls[j][k]))
+        return grads

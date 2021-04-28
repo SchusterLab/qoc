@@ -5,10 +5,10 @@ optimization algorithm
 
 from autograd.extend import Box
 import numpy as np
-
+import autograd.numpy as anp
 from qoc.core.common import (initialize_controls,
                              slap_controls, strip_controls,
-                             clip_control_norms,)
+                             clip_control_norms,gradient_trans, interpolate_tran, get_Hkbar, get_magnus)
 from qoc.core.mathmethods import (interpolate_linear_set,
                                   magnus_m2,
                                   magnus_m4,
@@ -21,14 +21,15 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         MagnusPolicy,
                         ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
-                          expm, matmuls)
+                          expm, matmuls,conjugate_transpose)
 
 ### MAIN METHODS ###
+
 
 def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                  initial_states, system_eval_count,
                                  controls=None,
-                                 cost_eval_step=1, costs=list(), 
+                                 cost_eval_step=1, costs=list(),
                                  interpolation_policy=InterpolationPolicy.LINEAR,
                                  magnus_policy=MagnusPolicy.M2,
                                  save_file_path=None,
@@ -95,7 +96,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              magnus_policy,
                                              save_file_path,
                                              save_intermediate_states,
-                                             system_eval_count,)
+                                             system_eval_count,control_hamiltonian=None, manual_gradient_mode=None,)
     pstate.save_initial(controls)
     result = EvolveSchroedingerResult()
     _ = _evaluate_schroedinger_discrete(controls, pstate, result)
@@ -111,7 +112,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 impose_control_conditions=None,
                                 initial_controls=None,
                                 interpolation_policy=InterpolationPolicy.LINEAR,
-                                iteration_count=1000, 
+                                iteration_count=1000,
                                 log_iteration_step=10,
                                 magnus_policy=MagnusPolicy.M2,
                                 max_control_norms=None,
@@ -119,7 +120,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 optimizer=Adam(),
                                 save_file_path=None,
                                 save_intermediate_states=False,
-                                save_iteration_step=0,):
+                                save_iteration_step=0, manual_parameter=None,):
     """
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
@@ -231,7 +232,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count,)
+                                            system_eval_count, manual_parameter['control_hamiltonian'], manual_parameter['manual_gradient_mode'], )
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -315,8 +316,11 @@ def _esdj_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
-    error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
-                          (controls, pstate, reporter))
+    if pstate.manual_gradient_mode is True:
+        error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
+        grads = manual_gradient(controls, pstate, reporter)
+    else :
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)(controls, pstate, reporter))
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
@@ -443,7 +447,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
                                        control_eval_times=None,
                                        controls=None,
                                        interpolation_policy=InterpolationPolicy.LINEAR,
-                                       magnus_policy=MagnusPolicy.M2,):
+                                       magnus_policy=MagnusPolicy.M2,if_back=None,):
     """
     Use the exponential series method via magnus expansion to evolve the state vectors
     to the next time step under the schroedinger equation for time-discrete controls.
@@ -484,7 +488,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
         controls_ = interpolate_controls(time_, control_eval_times, controls)
         hamiltonian_ = hamiltonian(controls_, time_)
         return -1j * hamiltonian_
-    
+
     if magnus_policy == MagnusPolicy.M2:
         magnus = magnus_m2(get_hamiltonian, dt, time)
     elif magnus_policy == MagnusPolicy.M4:
@@ -497,6 +501,53 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     #ENDIF
 
     step_unitary = expm(magnus)
-    states = matmuls(step_unitary, states)
+    if if_back is True:
+        states = matmuls(conjugate_transpose(step_unitary), states)
+    else:
+        states = matmuls(step_unitary, states)
 
     return states
+
+
+def manual_gradient(controls,pstate, reporter):
+    control_eval_times = pstate.control_eval_times
+    costs = pstate.costs
+    system_eval_count = pstate.system_eval_count-1
+    dt = pstate.dt
+    hamiltonian = pstate.hamiltonian
+    interpolation_policy = pstate.interpolation_policy
+    magnus_policy = pstate.magnus_policy
+    control_hamiltonian=pstate.control_hamiltonian
+    controls_ = interpolate_tran(control_eval_times, controls, dt)
+    grads = np.zeros_like(controls_)
+
+    for l in range(len(costs)):
+        if costs[l].type == "non-control":
+            costs[l].gradient_initialize(reporter)
+    for i in range(system_eval_count):
+        for k in range(len((control_hamiltonian))):
+            for m in range(len(costs)):
+                if costs[m].type=="non-control" :
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt, get_Hkbar(dt,control_hamiltonian[k],get_magnus(dt, hamiltonian,
+                                                                (system_eval_count-1 - i) * dt,
+                                                                control_eval_times=control_eval_times,
+                                                                controls=controls,
+                                                                interpolation_policy=interpolation_policy,
+                                                                magnus_policy=magnus_policy)[0]))
+
+        for l in range(len((costs))):
+            if costs[l].type == "non-control":
+                costs[l].update_state(get_magnus(dt, hamiltonian,
+                                         (system_eval_count- 1 - i) * dt,
+                                         control_eval_times=control_eval_times,
+                                         controls=controls,
+                                         interpolation_policy=interpolation_policy,
+                                         magnus_policy=magnus_policy,if_back=True)[1])
+    grads=gradient_trans(grads,control_eval_times,dt)
+    for i in range(len(grads)):
+        for k in range(len((control_hamiltonian))):
+            for m in range(len(costs)):
+                if costs[m].type=="control" :
+                    grads[i][k] = grads[i][k] +costs[m].gradient(controls,i,k)
+    return grads
+

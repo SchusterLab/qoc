@@ -48,7 +48,8 @@ class ControlBandwidthMax(Cost):
         self.control_count = control_count
         dt = evolution_time / (control_eval_count - 1)
         self.freqs = np.fft.fftfreq(control_eval_count, d=dt)
-        
+        self.type = "control"
+
     def cost(self, controls, states, system_eval_step):
         """
         Compute the penalty.

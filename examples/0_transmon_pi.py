@@ -37,7 +37,7 @@ COMPLEX_CONTROLS = True
 CONTROL_COUNT = 1
 EVOLUTION_TIME = 10 # nanoseconds
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME + 1
-ITERATION_COUNT = 1000
+ITERATION_COUNT = 10
 
 # Define output.
 LOG_ITERATION_STEP = 1
@@ -45,7 +45,7 @@ SAVE_ITERATION_STEP = 1
 SAVE_PATH = "./out"
 SAVE_FILE_NAME = "transmon_pi"
 SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
-
+CONTROL_HAMILTONIAN=ANNIHILATION_OPERATOR+CREATION_OPERATOR
 
 def main():
     result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
@@ -55,7 +55,9 @@ def main():
                                          iteration_count=ITERATION_COUNT,
                                          log_iteration_step=LOG_ITERATION_STEP,
                                          save_file_path=SAVE_FILE_PATH,
-                                         save_iteration_step=SAVE_ITERATION_STEP,)
+                                         save_iteration_step=SAVE_ITERATION_STEP,
+                                         control_hamiltonian=CONTROL_HAMILTONIAN,
+                                         manual_gradient_mode=True,)
 
 
 if __name__ == "__main__":

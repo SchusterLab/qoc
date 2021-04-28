@@ -3,6 +3,19 @@ common.py - This module defines methods that are used by
 multiple core functionalities.
 """
 
+import autograd.numpy as anp
+import scipy as scipy
+
+from qoc.core.mathmethods import (interpolate_linear_set,
+                                  magnus_m2,
+                                  magnus_m4,
+                                  magnus_m6,)
+from qoc.models import (
+                        InterpolationPolicy,
+                        MagnusPolicy,
+                        )
+from qoc.standard import (
+                          expm,conjugate_transpose)
 import numpy as np
 
 def clip_control_norms(controls, max_control_norms):
@@ -244,3 +257,102 @@ def strip_controls(complex_controls, controls):
         controls = np.hstack((np.real(controls), np.imag(controls)))
     
     return controls
+
+def interpolate_tran(control_eval_times,controls,dt):
+    _M2_C1 = 0.5
+    controls_=[]
+    for j in range(len(controls)-1):
+        t1 = dt * (_M2_C1+j)
+        controls_.append(interpolate_linear_set(t1, control_eval_times, controls))
+    return controls_
+
+def gradient_trans(gradient,control_eval_times,dt):
+    grads=np.zeros((len(gradient)+1,len(gradient[0])))
+    time=intermidiate_time(dt,len(control_eval_times))
+    for i in range(len(control_eval_times)):
+        if i ==0:
+            grads[i]=(gradient[i]*((control_eval_times[i+1]-time[i])/(control_eval_times[i+1]-control_eval_times[i])))
+        elif i ==len(control_eval_times)-1:
+            grads[i]=(gradient[i-1] * (
+                        (-control_eval_times[i-1]+time[i-1]) / (control_eval_times[i] - control_eval_times[i-1])))
+        else:
+            grads[i]=(gradient[i]*((control_eval_times[i+1]-time[i])/(control_eval_times[i+1]-control_eval_times[i]))
+                         +gradient[i-1] * ((-control_eval_times[i-1]+time[i-1]) / (control_eval_times[i] - control_eval_times[i-1])))
+    return grads
+
+def intermidiate_time(dt,system_eval_count):
+    _M2_C1 = 0.5
+    time=[]
+    for j in range(system_eval_count-1):
+        time.append(dt * (_M2_C1+j))
+    return time
+
+
+def get_magnus(dt, hamiltonian,
+                                        time,
+                                       control_eval_times=None,
+                                       controls=None,
+                                       interpolation_policy=InterpolationPolicy.LINEAR,
+                                       magnus_policy=MagnusPolicy.M2, if_back=None, ):
+    """
+    Use the exponential series method via magnus expansion to evolve the state vectors
+    to the next time step under the schroedinger equation for time-discrete controls.
+    Magnus expansions are implemented using the methods described in
+    https://arxiv.org/abs/1709.06483.
+
+    Arguments:
+    dt
+    hamiltonian
+    states
+    time
+
+    control_eval_times
+    controls
+    interpolation_policy
+    magnus_policy
+
+    Returns:
+    states
+    """
+    # Choose an interpolator.
+    if interpolation_policy == InterpolationPolicy.LINEAR:
+        interpolate = interpolate_linear_set
+    else:
+        raise NotImplementedError("The interpolation policy {} "
+                                  "is not yet supported for this method."
+                                  "".format(interpolation_policy))
+
+    # Choose a control interpolator.
+    if controls is not None and control_eval_times is not None:
+        interpolate_controls = interpolate
+    else:
+        interpolate_controls = lambda x, xs, ys: None
+
+    # Construct a function to interpolate the hamiltonian
+    # for all time.
+    def get_hamiltonian(time_):
+        controls_ = interpolate_controls(time_, control_eval_times, controls)
+        hamiltonian_ = hamiltonian(controls_, time_)
+        return -1j * hamiltonian_
+
+    if magnus_policy == MagnusPolicy.M2:
+        magnus = magnus_m2(get_hamiltonian, dt, time)
+    elif magnus_policy == MagnusPolicy.M4:
+        magnus = magnus_m4(get_hamiltonian, dt, time)
+    elif magnus_policy == MagnusPolicy.M6:
+        magnus = magnus_m6(get_hamiltonian, dt, time)
+    else:
+        raise ValueError("Unrecognized magnus policy {}."
+                         "".format(magnus_policy))
+    # ENDIF
+
+    step_unitary = expm(magnus)
+    if if_back is True:
+        propagator = conjugate_transpose(step_unitary)
+    else:
+        propagator = step_unitary
+
+    return magnus,propagator
+
+def get_Hkbar(dt,Hk,H_total):
+    return anp.matmul(1j*scipy.linalg.expm_frechet(H_total, -1j*dt*Hk,compute_expm = False),conjugate_transpose(expm(H_total)))/dt

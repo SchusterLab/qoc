@@ -38,6 +38,7 @@ class ControlArea(Cost):
         self.control_count = control_count
         self.control_size = control_count * control_eval_count
         self.max_control_norms = max_control_norms
+        self.type="control"
 
 
     def cost(self, controls, states, system_eval_step):
@@ -60,8 +61,23 @@ class ControlArea(Cost):
         # The cost is the discrete integral of each normalized control parameter
         # over the evolution time.
         cost = 0
+        self.sign = []
         for i in range(self.control_count):
+            self.sign.append(anp.sum(normalized_controls[:, i])/anp.abs(anp.sum(normalized_controls[:, i])))
             cost = cost + anp.abs(anp.sum(normalized_controls[:, i]))
         cost_normalized = cost / self.control_size
 
         return cost_normalized * self.cost_multiplier
+    def gradient_initialize(self, reporter):
+        return
+    def update_state(self, propagator):
+        return
+
+    def gradient(self,controls,i,k):
+        if self.max_control_norms is not None:
+            return  self.sign[k]*self.cost_multiplier/((self.control_size)*self.max_control_norms)
+        else:
+            return self.sign[k]*self.cost_multiplier/(self.control_size)
+
+
+

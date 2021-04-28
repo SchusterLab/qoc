@@ -33,6 +33,7 @@ _test/*
 !report/data/*.png
 
 
-
+venv
+.idea
 
 

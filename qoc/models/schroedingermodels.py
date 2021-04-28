@@ -41,14 +41,14 @@ class EvolveSchroedingerDiscreteState(ProgramState):
     """
     method = "evolve_schroedinger_discrete"
     
-    def __init__(self,control_eval_count,
+    def __init__(self, control_eval_count,
                  cost_eval_step, costs,
                  evolution_time, hamiltonian, initial_states,
                  interpolation_policy,
                  magnus_policy,
                  save_file_path,
                  save_intermediate_states_,
-                 system_eval_count,):
+                 system_eval_count, control_hamiltonian=None, manual_gradient_mode=None, ):
         """
         See class definition for arguments not listed here.
         """
@@ -56,7 +56,7 @@ class EvolveSchroedingerDiscreteState(ProgramState):
                          cost_eval_step, costs,
                          evolution_time, hamiltonian, interpolation_policy,
                          ProgramType.EVOLVE,
-                         save_file_path, system_eval_count,)
+                         save_file_path, system_eval_count, control_hamiltonian, manual_gradient_mode, )
         self.initial_states = initial_states
         self.magnus_policy = magnus_policy
         self.save_intermediate_states_ = (save_file_path is not None
@@ -185,7 +185,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                  magnus_policy, min_error, optimizer,
                  save_file_path, save_intermediate_states_,
                  save_iteration_step,
-                 system_eval_count,):
+                 system_eval_count, control_hamiltonian=None, manual_gradient_mode=None, ):
         """
         See class fields for arguments not listed here.
         """
@@ -198,7 +198,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                          log_iteration_step, max_control_norms,
                          min_error, optimizer,
                          save_file_path, save_iteration_step,
-                         system_eval_count,)
+                         system_eval_count, control_hamiltonian, manual_gradient_mode, )
         self.hilbert_size = initial_states[0].shape[0]
         self.initial_states = initial_states
         self.magnus_policy = magnus_policy

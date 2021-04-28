@@ -8,7 +8,7 @@ import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose
+from qoc.standard.functions import conjugate_transpose,matmuls
 
 class TargetStateInfidelityTime(Cost):
     """
@@ -41,7 +41,8 @@ class TargetStateInfidelityTime(Cost):
         self.cost_eval_count, _ = np.divmod(system_eval_count - 1, cost_eval_step)
         self.state_count = target_states.shape[0]
         self.target_states_dagger = conjugate_transpose(anp.stack(target_states))
-
+        self.target_states = target_states
+        self.type="non-control"
 
     def cost(self, controls, states, system_eval_step):
         """
@@ -56,11 +57,32 @@ class TargetStateInfidelityTime(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
-        inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-        fidelities = anp.real(inner_products * anp.conjugate(inner_products))
+        self.inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
+        fidelities = anp.real(self.inner_products * anp.conjugate(self.inner_products))
         fidelity_normalized = anp.sum(fidelities) / self.state_count
         infidelity = 1 - fidelity_normalized
         # Normalize the cost for the number of times the cost is evaluated.
         cost_normalized = infidelity / self.cost_eval_count
 
         return cost_normalized * self.cost_multiplier
+
+    def gradient_initialize(self, reporter):
+        self.final_states = reporter.final_states
+        self.back_states = np.zeros_like(self.target_states, dtype="complex_")
+        for i in range(self.state_count):
+            self.back_states[i] = self.target_states[i] * self.inner_products[i]
+
+    def update_state(self, propagator):
+        self.final_states = matmuls(propagator, self.final_states)
+        self.inner_products = anp.matmul(self.target_states_dagger, self.final_states)[:, 0, 0]
+        self.back_states=anp.matmul(propagator, self.back_states)
+        for i in range(self.state_count):
+            self.back_states[i] = self.back_states[i]+self.inner_products[i]*self.target_states[i]
+
+    def gradient(self, dt, Hk):
+        grads = 0
+        for i in range(self.state_count):
+            grads = grads + self.cost_multiplier * (-2 * dt * np.imag(
+                anp.matmul(conjugate_transpose(self.back_states[i]), anp.matmul(Hk, self.final_states[i])))) /( self.state_count*self.cost_eval_count)
+
+        return grads

@@ -30,7 +30,7 @@ def expm_scipy(matrix):
 @jit(nopython=True, parallel=True)
 def _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
     dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
-
+    #scipy.linalg.expm_frechet(A, E, method=None, compute_expm=True, check_finite=True)
     # Compute a first order approximation of the frechet derivative of the matrix
     # exponential in every unit direction Eij.
     for i in range(matrix_size):
