@@ -34,7 +34,7 @@ class TargetStateInfidelity(Cost):
         super().__init__(cost_multiplier=cost_multiplier)
         self.state_count = target_states.shape[0]
         self.target_states_dagger = conjugate_transpose(target_states)
-
+        self.target_states  =target_states
 
     def cost(self, controls, states, system_eval_step):
         """

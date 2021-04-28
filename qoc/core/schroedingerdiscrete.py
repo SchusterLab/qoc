@@ -5,6 +5,7 @@ optimization algorithm
 
 from autograd.extend import Box
 import numpy as np
+import autograd.numpy as anp
 
 from qoc.core.common import (initialize_controls,
                              slap_controls, strip_controls,
@@ -21,14 +22,14 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         MagnusPolicy,
                         ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
-                          expm, matmuls)
+                          expm, matmuls,conjugate_transpose)
 
 ### MAIN METHODS ###
 
 def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                  initial_states, system_eval_count,
                                  controls=None,
-                                 cost_eval_step=1, costs=list(), 
+                                 cost_eval_step=1, costs=list(),
                                  interpolation_policy=InterpolationPolicy.LINEAR,
                                  magnus_policy=MagnusPolicy.M2,
                                  save_file_path=None,
@@ -95,7 +96,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                              magnus_policy,
                                              save_file_path,
                                              save_intermediate_states,
-                                             system_eval_count,)
+                                             system_eval_count,control_hamiltonian=None, manual_gradient_mode=None,)
     pstate.save_initial(controls)
     result = EvolveSchroedingerResult()
     _ = _evaluate_schroedinger_discrete(controls, pstate, result)
@@ -111,7 +112,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 impose_control_conditions=None,
                                 initial_controls=None,
                                 interpolation_policy=InterpolationPolicy.LINEAR,
-                                iteration_count=1000, 
+                                iteration_count=1000,
                                 log_iteration_step=10,
                                 magnus_policy=MagnusPolicy.M2,
                                 max_control_norms=None,
@@ -119,7 +120,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 optimizer=Adam(),
                                 save_file_path=None,
                                 save_intermediate_states=False,
-                                save_iteration_step=0,):
+                                save_iteration_step=0, control_hamiltonian=None, manual_gradient_mode=False):
     """
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
@@ -231,7 +232,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count,)
+                                            system_eval_count, control_hamiltonian, manual_gradient_mode, )
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -315,8 +316,12 @@ def _esdj_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
-    error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
-                          (controls, pstate, reporter))
+    if pstate.manual_gradient_mode is False:
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)(controls, pstate, reporter))
+    else :
+        error=_evaluate_schroedinger_discrete(controls, pstate, reporter)
+        grads=manual_gradient(controls,pstate, reporter)
+    #grads=yunwei_grads(controls,pstate)
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
@@ -443,7 +448,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
                                        control_eval_times=None,
                                        controls=None,
                                        interpolation_policy=InterpolationPolicy.LINEAR,
-                                       magnus_policy=MagnusPolicy.M2,):
+                                       magnus_policy=MagnusPolicy.M2,if_back=None,):
     """
     Use the exponential series method via magnus expansion to evolve the state vectors
     to the next time step under the schroedinger equation for time-discrete controls.
@@ -497,6 +502,72 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     #ENDIF
 
     step_unitary = expm(magnus)
-    states = matmuls(step_unitary, states)
+    if if_back is True:
+        states = matmuls(conjugate_transpose(step_unitary), states)
+    else:
+        states = matmuls(step_unitary, states)
 
     return states
+
+
+def manual_gradient(controls,pstate, reporter):
+    control_eval_times = pstate.control_eval_times
+    costs = pstate.costs
+    dt = pstate.dt
+
+    hamiltonian = pstate.hamiltonian
+    interpolation_policy = pstate.interpolation_policy
+    magnus_policy = pstate.magnus_policy
+    system_eval_count = pstate.system_eval_count
+    control_hamiltonian=pstate.control_hamiltonian
+    back_states = costs[0].target_states
+    controls_=interpolate_tran(control_eval_times, controls, dt)
+    grads=np.zeros_like(controls_)
+    final_states=reporter.final_states
+    inner_products = matmuls(conjugate_transpose( final_states),back_states)
+    for i in range(len(controls_)):
+        for k in range(len((control_hamiltonian))):
+            grads[len(controls_)-1-i][k]=(-2 * dt * np.imag(anp.matmul(conjugate_transpose(back_states),anp.matmul(control_hamiltonian[k],final_states))*inner_products))
+        final_states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
+                                                                final_states, (len(controls_)-1 - i) * dt,
+                                                                control_eval_times=control_eval_times,
+                                                                controls=controls,
+                                                                interpolation_policy=interpolation_policy,
+                                                                magnus_policy=magnus_policy,if_back=True)
+        back_states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
+                                                           back_states, (len(controls_)-1 - i) * dt,
+                                                           control_eval_times=control_eval_times,
+                                                           controls=controls,
+                                                           interpolation_policy=interpolation_policy,
+                                                           magnus_policy=magnus_policy,if_back=True )
+    grads_=gradient_trans(grads,control_eval_times,dt)
+    return grads_
+
+def interpolate_tran(control_eval_times,controls,dt):
+    _M2_C1 = 0.5
+    controls_=[]
+    for j in range(len(controls)-1):
+        t1 = dt * (_M2_C1+j)
+        controls_.append(interpolate_linear_set(t1, control_eval_times, controls))
+    return controls_
+
+def gradient_trans(gradient,control_eval_times,dt):
+    grads=np.zeros((len(gradient)+1,len(gradient[0])))
+    time=intermidiate_time(dt,len(control_eval_times))
+    for i in range(len(control_eval_times)):
+        if i ==0:
+            grads[i]=(gradient[i]*((control_eval_times[i+1]-time[i])/(control_eval_times[i+1]-control_eval_times[i])))
+        elif i ==len(control_eval_times)-1:
+            grads[i]=(gradient[i-1] * (
+                        (-control_eval_times[i-1]+time[i-1]) / (control_eval_times[i] - control_eval_times[i-1])))
+        else:
+            grads[i]=(gradient[i]*((control_eval_times[i+1]-time[i])/(control_eval_times[i+1]-control_eval_times[i]))
+                         +gradient[i-1] * ((-control_eval_times[i-1]+time[i-1]) / (control_eval_times[i] - control_eval_times[i-1])))
+    return grads
+
+def intermidiate_time(dt,system_eval_count):
+    _M2_C1 = 0.5
+    time=[]
+    for j in range(system_eval_count-1):
+        time.append(dt * (_M2_C1+j))
+    return time

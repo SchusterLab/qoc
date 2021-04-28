@@ -33,7 +33,7 @@ class ProgramState(object):
     def __init__(self, control_eval_count, cost_eval_step, costs,
                  evolution_time, hamiltonian, interpolation_policy,
                  program_type,
-                 save_file_path, system_eval_count):
+                 save_file_path, system_eval_count, control_hamiltonian=None, manual_gradient_mode=None, ):
         """
         See class fields for arguments not listed here.
         """
@@ -49,6 +49,8 @@ class ProgramState(object):
         self.program_type = program_type
         self.save_file_lock_path = "{}.lock".format(save_file_path)
         self.save_file_path = save_file_path
+        self.control_hamiltonian=control_hamiltonian
+        self.manual_gradient_mode=manual_gradient_mode
         step_cost_indices = list()
         step_costs = list()
         for i, cost in enumerate(costs):
@@ -108,14 +110,14 @@ class GrapeState(ProgramState):
                  log_iteration_step, max_control_norms,
                  min_error, optimizer,
                  save_file_path, save_iteration_step,
-                 system_eval_count,):
+                 system_eval_count, control_hamiltonian=None, manual_gradient_mode=None, ):
         """
         See class fields for arguments not listed here.
         """
         super().__init__(control_eval_count, cost_eval_step, costs,
                          evolution_time, hamiltonian, interpolation_policy,
                          ProgramType.GRAPE,
-                         save_file_path, system_eval_count,)
+                         save_file_path, system_eval_count, control_hamiltonian, manual_gradient_mode, )
         self.complex_controls = complex_controls
         self.control_count = control_count
         self.controls_shape = (control_eval_count, control_count)
