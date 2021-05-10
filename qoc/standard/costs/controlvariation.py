@@ -57,9 +57,9 @@ class ControlVariation(Cost):
         cost
         """
         if self.max_control_norms is None:
-            normalized_controls = controls / self.max_control_norms
-        else:
             normalized_controls = controls
+        else:
+            normalized_controls = controls / self.max_control_norms
 
         # Penalize the square of the absolute value of the difference
         # in value of the control parameters from one step to the next.
