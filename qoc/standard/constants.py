@@ -9,8 +9,8 @@ import numpy as np
 SIGMA_X = np.array(((0, 1), (1, 0)))
 SIGMA_Y = np.array(((0, -1j), (1j, 0)))
 SIGMA_Z = np.array(((1, 0), (0, -1)))
-SIGMA_PLUS = np.array(((0, 2), (0, 0))) # SIGMA_X + i * SIGMA_Y
-SIGMA_MINUS = np.array(((0, 0), (2, 0))) # SIGMA_X - i * SIGMA_Y
+SIGMA_PLUS = np.array(((0, 1), (0, 0))) # (SIGMA_X + i * SIGMA_Y) / 2
+SIGMA_MINUS = np.array(((0, 0), (1, 0))) # (SIGMA_X - i * SIGMA_Y) / 2
 
 
 ### GENERATIVE CONSTANTS ###
