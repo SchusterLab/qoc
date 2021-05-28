@@ -219,7 +219,8 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                                               initial_controls,
                                                               max_control_norms)
     # Construct the program state.
-    pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
+    if manual_parameter==None:
+        pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
                                             control_eval_count, cost_eval_step,
                                             costs, evolution_time, hamiltonian,
                                             impose_control_conditions,
@@ -232,7 +233,23 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count, manual_parameter['control_hamiltonian'], manual_parameter['manual_gradient_mode'], )
+                                            system_eval_count,  )
+    else:
+        pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
+                                            control_eval_count, cost_eval_step,
+                                            costs, evolution_time, hamiltonian,
+                                            impose_control_conditions,
+                                            initial_controls,
+                                            initial_states, interpolation_policy,
+                                            iteration_count,
+                                            log_iteration_step,
+                                            max_control_norms, magnus_policy,
+                                            min_error, optimizer,
+                                            save_file_path,
+                                            save_intermediate_states,
+                                            save_iteration_step,
+                                            system_eval_count, manual_parameter['control_hamiltonian'],
+                                            manual_parameter['manual_gradient_mode'], )
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from

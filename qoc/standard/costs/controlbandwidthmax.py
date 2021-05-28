@@ -47,6 +47,7 @@ class ControlBandwidthMax(Cost):
         self.max_bandwidths = max_bandwidths
         self.control_count = control_count
         dt = evolution_time / (control_eval_count - 1)
+        self.control_eval_count=control_eval_count
         self.freqs = np.fft.fftfreq(control_eval_count, d=dt)
         self.type = "control"
 
@@ -74,5 +75,29 @@ class ControlBandwidthMax(Cost):
             penalty_normalized = penalty / (penalty_freq_indices.shape[0] * anp.max(penalized_ffts))
             cost = cost + penalty_normalized
         cost_normalized =  cost / self.control_count
-                       
+        self.normalization=(penalty_freq_indices.shape[0] * anp.max(penalized_ffts))
+        self.penalty_freq_indices=penalty_freq_indices
         return cost_normalized * self.cost_multiplier
+
+    def gradient_initialize(self, reporter):
+        return
+    def update_state(self, propagator):
+        return
+
+    def gradient(self,controls,j,k):
+        grads=self.cost_multiplier/self.normalization
+        grads_=0
+        cs=0
+        sn=0
+        para=[[],[]]
+        for m in range(len(self.penalty_freq_indices)):
+            for i in range(len(controls)):
+                cs=cs+controls[self.penalty_freq_indices[m]][k]*np.cos(2*np.pi*i*self.penalty_freq_indices[m]/self.control_eval_count)
+                sn=sn+controls[self.penalty_freq_indices[m]][k]*np.sin(2*np.pi*i*self.penalty_freq_indices[m]/self.control_eval_count)
+            para[0].append(cs)
+            para[1].append(sn)
+        for i in range(len(self.penalty_freq_indices)):
+            grads_=grads_+(grads*(np.cos(2*np.pi*j*self.penalty_freq_indices[i]/self.control_eval_count)*para[0][i]
+                        +np.sin(2*np.pi*j*self.penalty_freq_indices[i]/self.control_eval_count)*para[1][i]))/np.sqrt(para[0][i]**2+para[1][i]**2)
+
+        return grads_
