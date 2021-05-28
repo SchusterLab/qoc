@@ -50,8 +50,8 @@ class TargetStateInfidelity(Cost):
         """
         # The cost is the infidelity of each evolved state and its target state.
         inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-        fidelities = anp.real(inner_products * anp.conjugate(inner_products))
-        fidelity_normalized = anp.sum(fidelities) / self.state_count
+        inner_products_sum = anp.sum(inner_products)
+        fidelity_normalized = anp.real(inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
         infidelity = 1 - fidelity_normalized
         
         return infidelity * self.cost_multiplier
