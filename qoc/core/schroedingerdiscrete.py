@@ -249,7 +249,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_intermediate_states,
                                             save_iteration_step,
                                             system_eval_count, manual_parameter['control_hamiltonian'],
-                                            manual_parameter['manual_gradient_mode'], )
+                                            manual_parameter['manual_gradient_mode'], manual_parameter['Hk_approximation'])
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -550,7 +550,7 @@ def manual_gradient(controls,pstate, reporter):
                                                                 control_eval_times=control_eval_times,
                                                                 controls=controls,
                                                                 interpolation_policy=interpolation_policy,
-                                                                magnus_policy=magnus_policy)[0]))
+                                                                magnus_policy=magnus_policy)[0],approximation=pstate.approximation))
 
         for l in range(len((costs))):
             if costs[l].type == "non-control":
