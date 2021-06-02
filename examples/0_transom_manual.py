@@ -49,7 +49,7 @@ COSTS = [TargetStateInfidelity(TARGET_STATES )]
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 2
 EVOLUTION_TIME = 10 # nanoseconds
-CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME*10 + 1
+CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME + 1
 ITERATION_COUNT = 1000
 
 # Define output.
@@ -60,7 +60,7 @@ SAVE_FILE_NAME = "transmon_pi"
 SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
 
-manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"Hk_approximation":True}
+manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"Hk_approximation":False}
 
 def main():
     result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,

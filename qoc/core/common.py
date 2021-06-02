@@ -357,4 +357,5 @@ def get_magnus(dt, hamiltonian,
 def get_Hkbar(dt,Hk,H_total,approximation):
     if approximation==True:
         return Hk
-    return anp.matmul(1j*scipy.linalg.expm_frechet(H_total, -1j*dt*Hk,compute_expm = False),conjugate_transpose(expm(H_total)))/dt
+    else:
+        return anp.matmul(1j*scipy.linalg.expm_frechet(H_total, -1j*dt*Hk,compute_expm = False),conjugate_transpose(expm(H_total)))/dt
