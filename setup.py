@@ -14,6 +14,7 @@ DEPENDENCIES = [
     "matplotlib",
     "numba",
     "numpy",
+    "qutip",
     "scipy",
 ]
 DESCRIPTION = "a package for performing quantum optimal control"
