@@ -56,7 +56,7 @@ class ControlVariation(Cost):
         Returns:
         cost
         """
-        if self.max_control_norms is None:
+        if self.max_control_norms is not None:
             normalized_controls = controls / self.max_control_norms
         else:
             normalized_controls = controls
