@@ -11,7 +11,7 @@ docs/_static
 
 # editor files
 *~
-*#
+*\#
 
 # local
 _test/*
