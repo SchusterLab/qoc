@@ -64,19 +64,25 @@ class ControlBandwidthMax(Cost):
         cost
         """
         cost = 0
+        self.penalty_freq_indices=[]
+        self.normalization=[]
+        self.max_indices=[]
         # Iterate over the controls, penalize each control that has
         # frequencies greater than its maximum frequency.
         for i, max_bandwidth in enumerate(self.max_bandwidths):
             control_fft = anp.fft.fft(controls[:, i])
             control_fft_sq  = anp.abs(control_fft)
             penalty_freq_indices = anp.nonzero(self.freqs >= max_bandwidth)[0]
+            self.penalty_freq_indices.append(penalty_freq_indices)
             penalized_ffts = control_fft_sq[penalty_freq_indices]
             penalty = anp.sum(penalized_ffts)
             penalty_normalized = penalty / (penalty_freq_indices.shape[0] * anp.max(penalized_ffts))
+            self.normalization.append( penalty_freq_indices.shape[0])
+            index=penalty_freq_indices[(anp.max(penalized_ffts).argmax())]
+            self.max_indices.append(index)
             cost = cost + penalty_normalized
         cost_normalized =  cost / self.control_count
-        self.normalization=(penalty_freq_indices.shape[0] * anp.max(penalized_ffts))
-        self.penalty_freq_indices=penalty_freq_indices
+
         return cost_normalized * self.cost_multiplier
 
     def gradient_initialize(self, reporter):
@@ -85,19 +91,24 @@ class ControlBandwidthMax(Cost):
         return
 
     def gradient(self,controls,j,k):
-        grads=self.cost_multiplier/self.normalization
         grads_=0
-        cs=0
-        sn=0
-        para=[[],[]]
-        for m in range(len(self.penalty_freq_indices)):
+        N = len(controls)
+        maximum_index=self.max_indices[k]
+        max=0
+        for i in range(len(controls)):
+            max = max + controls[i][k] * np.exp(-1j * 2 * i * maximum_index * np.pi / N)
+        for m in range(len(self.penalty_freq_indices[k])):
+            fre_number=self.penalty_freq_indices[k][m]
+            fft=0
             for i in range(len(controls)):
-                cs=cs+controls[self.penalty_freq_indices[m]][k]*np.cos(2*np.pi*i*self.penalty_freq_indices[m]/self.control_eval_count)
-                sn=sn+controls[self.penalty_freq_indices[m]][k]*np.sin(2*np.pi*i*self.penalty_freq_indices[m]/self.control_eval_count)
-            para[0].append(cs)
-            para[1].append(sn)
-        for i in range(len(self.penalty_freq_indices)):
-            grads_=grads_+(grads*(np.cos(2*np.pi*j*self.penalty_freq_indices[i]/self.control_eval_count)*para[0][i]
-                        +np.sin(2*np.pi*j*self.penalty_freq_indices[i]/self.control_eval_count)*para[1][i]))/np.sqrt(para[0][i]**2+para[1][i]**2)
+                fft=fft+controls[i][k]*np.exp(-1j*2*i*fre_number*np.pi/N)
+            current_grad=(np.real(fft) * np.real(np.exp(-1j * 2 * j * fre_number * np.pi / N)) + np.imag(fft) * np.imag(
+                np.exp(-1j * 2 * j * fre_number * np.pi / N))) / np.abs(fft)
+            max_grad=(np.real(max) * np.real(np.exp(-1j * 2 * j * maximum_index * np.pi / N)) + np.imag(max) * np.imag(
+                np.exp(-1j * 2 * j * maximum_index * np.pi / N))) / np.abs(max)
+            grads=(current_grad*np.abs(max)-max_grad*np.abs(fft))/(np.abs(max)**2)
+            grads=grads/self.normalization[k]
+            grads_=grads_+grads
+        grads_=grads_/ self.control_count
+        return  grads_
 
-        return grads_
