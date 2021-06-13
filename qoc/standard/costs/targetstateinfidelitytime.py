@@ -29,7 +29,7 @@ class TargetStateInfidelityTime(Cost):
     requires_step_evaluation = True
 
 
-    def __init__(self, system_eval_count, target_states,neglect_relative_pahse=False,
+    def __init__(self, system_eval_count, target_states,neglect_relative_phase=False,
                  cost_eval_step=1, cost_multiplier=1.,):
         """
         See class fields for arguments not listed here.
@@ -44,7 +44,7 @@ class TargetStateInfidelityTime(Cost):
         self.target_states = target_states
         self.type="non-control"
         self.inner_products_sum=[]
-        self.neglect_relative_pahse=neglect_relative_pahse
+        self.neglect_relative_phase=neglect_relative_phase
 
     def cost(self, controls, states, system_eval_step):
         """
@@ -59,7 +59,7 @@ class TargetStateInfidelityTime(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             if len(self.inner_products_sum)==self.cost_eval_count :
                 self.inner_products_sum=[]
             inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
@@ -79,7 +79,7 @@ class TargetStateInfidelityTime(Cost):
         return cost_normalized * self.cost_multiplier
 
     def gradient_initialize(self, reporter):
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             self.final_states = reporter.final_states
             self.back_states = self.target_states * self.inner_products_sum[self.cost_eval_count-1]
             self.i=self.cost_eval_count-2
@@ -91,7 +91,7 @@ class TargetStateInfidelityTime(Cost):
 
 
     def update_state(self, propagator):
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             self.final_states = matmuls(propagator, self.final_states)
             self.back_states=anp.matmul(propagator, self.back_states)
             for i in range(self.state_count):
@@ -107,7 +107,7 @@ class TargetStateInfidelityTime(Cost):
 
     def gradient(self, dt, Hk):
         grads = 0
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * dt * np.imag(
                     anp.matmul(conjugate_transpose(self.back_states[i]), anp.matmul(Hk, self.final_states[i])))) /(( self.state_count**2)*self.cost_eval_count)

@@ -13,9 +13,10 @@ Tips for manual gradient:
 it will not do expansion of exponential matrix. It works well when time step is large.
 But when time step is small, approximation fails, gradient value in the interface largely deviates from the correct one
 , and the the optimization will not follow the gradient direction. And then, it's hard get the minimum cost, but sometimes
-it works.
-About definition of Hk_bar and approximation, please see the Eq(4) to Eq(13) reference:
+it works. About definition of Hk_bar and approximation, please see the Eq(4) to Eq(13) reference:
 https://www.sciencedirect.com/science/article/abs/pii/S1090780704003696
+4.Manual mode only supports cost_eval_step=1
+
 """
 import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete

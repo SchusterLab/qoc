@@ -25,7 +25,7 @@ class TargetStateInfidelity(Cost):
     name = "target_state_infidelity"
     requires_step_evaluation = False
 
-    def __init__(self, target_states, cost_multiplier=1.,neglect_relative_pahse=False):
+    def __init__(self, target_states, cost_multiplier=1., neglect_relative_phase=False):
         """
         See class fields for arguments not listed here.
 
@@ -37,7 +37,7 @@ class TargetStateInfidelity(Cost):
         self.target_states_dagger = conjugate_transpose(target_states)
         self.target_states = target_states
         self.type = "non-control"
-        self.neglect_relative_pahse = neglect_relative_pahse
+        self.neglect_relative_phase = neglect_relative_phase
     def cost(self, controls, states, system_eval_step):
         """
         Compute the penalty.
@@ -51,7 +51,7 @@ class TargetStateInfidelity(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
             self.inner_products_sum = anp.sum(inner_products)
             fidelity_normalized = anp.real(
@@ -66,7 +66,7 @@ class TargetStateInfidelity(Cost):
         return infidelity * self.cost_multiplier
 
     def gradient_initialize(self, reporter):
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             self.final_states = reporter.final_states
             self.back_states = self.target_states * self.inner_products_sum
         else:
@@ -81,7 +81,7 @@ class TargetStateInfidelity(Cost):
 
     def gradient(self, dt, Hk):
         grads = 0
-        if self.neglect_relative_pahse == False:
+        if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * dt * np.imag(
                     anp.matmul(conjugate_transpose(self.back_states[i]), anp.matmul(Hk, self.final_states[i])))) / (
