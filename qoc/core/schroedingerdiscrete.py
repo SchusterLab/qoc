@@ -550,7 +550,7 @@ def manual_gradient(controls,pstate, reporter):
                                                                 control_eval_times=control_eval_times,
                                                                 controls=controls,
                                                                 interpolation_policy=interpolation_policy,
-                                                                magnus_policy=magnus_policy)[0],approximation=pstate.approximation))
+                                                                magnus_policy=magnus_policy,if_magnus=True),approximation=pstate.approximation))
 
         for l in range(len((costs))):
             if costs[l].type == "non-control":
@@ -559,7 +559,7 @@ def manual_gradient(controls,pstate, reporter):
                                          control_eval_times=control_eval_times,
                                          controls=controls,
                                          interpolation_policy=interpolation_policy,
-                                         magnus_policy=magnus_policy,if_back=True)[1])
+                                         magnus_policy=magnus_policy,if_back=True))
     grads=gradient_trans(grads,control_eval_times,dt)
     for i in range(len(grads)):
         for k in range(len((control_hamiltonian))):
