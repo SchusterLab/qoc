@@ -293,7 +293,7 @@ def get_magnus(dt, hamiltonian,
                                        control_eval_times=None,
                                        controls=None,
                                        interpolation_policy=InterpolationPolicy.LINEAR,
-                                       magnus_policy=MagnusPolicy.M2, if_back=None, ):
+                                       magnus_policy=MagnusPolicy.M2, if_back=None, if_magnus=None):
     """
     Use the exponential series method via magnus expansion to evolve the state vectors
     to the next time step under the schroedinger equation for time-discrete controls.
@@ -345,14 +345,15 @@ def get_magnus(dt, hamiltonian,
         raise ValueError("Unrecognized magnus policy {}."
                          "".format(magnus_policy))
     # ENDIF
-
-    step_unitary = expm(magnus)
-    if if_back is True:
-        propagator = conjugate_transpose(step_unitary)
+    if if_magnus==True:
+        return magnus
     else:
-        propagator = step_unitary
-
-    return magnus,propagator
+        step_unitary = expm(magnus)
+        if if_back is True:
+            propagator = conjugate_transpose(step_unitary)
+        else:
+            propagator = step_unitary
+        return propagator
 
 def get_Hkbar(dt,Hk,H_total,approximation):
     if approximation==True:
