@@ -16,10 +16,17 @@ from .costs import (ControlArea,
                     TargetDensityInfidelity,
                     TargetDensityInfidelityTime,
                     TargetStateInfidelity,
-                    TargetStateInfidelityTime,)
+                    TargetStateInfidelityTime,
+                    ControlArea_manual,
+                    ControlNorm_manual,
+                    ControlVariation_manual,
+                    ControlBandwidthMax_manual,
+                    TargetStateInfidelity_manual,
+                    TargetStateInfidelityTime_manual,
+                    ForbidStates_manual)
 
 from .functions import (commutator, conjugate_transpose,
-                        expm, krons, matmuls,
+                        expm,expm_manual, krons, matmuls,
                         rms_norm,
                         column_vector_list_to_matrix,
                         matrix_to_column_vector_list,)
@@ -40,10 +47,14 @@ __all__ = [
     "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
     "TargetStateInfidelity", "TargetStateInfidelityTime",
-    "commutator", "conjugate_transpose", "expm", "krons",
+    "commutator", "conjugate_transpose", "expm", "expm_manual","krons",
     "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "Adam", "LBFGSB", "SGD",
     "plot_controls", "plot_density_population", "plot_state_population",
     "ans_jacobian", "generate_save_file_path", "CustomJSONEncoder",
+    "ControlArea_manual","ControlBandwidthMax_manual",
+    "ControlNorm_manual","ControlVariation_manual",
+    "ForbidStates_manual","TargetStateInfidelity_manual",
+    "TargetStateInfidelityTime_manual"
 ]

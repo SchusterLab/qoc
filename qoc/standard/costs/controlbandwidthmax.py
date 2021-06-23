@@ -85,30 +85,4 @@ class ControlBandwidthMax(Cost):
 
         return cost_normalized * self.cost_multiplier
 
-    def gradient_initialize(self, reporter):
-        return
-    def update_state(self, propagator):
-        return
-
-    def gradient(self,controls,j,k):
-        grads_=0
-        N = len(controls)
-        maximum_index=self.max_indices[k]
-        max=0
-        for i in range(len(controls)):
-            max = max + controls[i][k] * np.exp(-1j * 2 * i * maximum_index * np.pi / N)
-        for m in range(len(self.penalty_freq_indices[k])):
-            fre_number=self.penalty_freq_indices[k][m]
-            fft=0
-            for i in range(len(controls)):
-                fft=fft+controls[i][k]*np.exp(-1j*2*i*fre_number*np.pi/N)
-            current_grad=(np.real(fft) * np.real(np.exp(-1j * 2 * j * fre_number * np.pi / N)) + np.imag(fft) * np.imag(
-                np.exp(-1j * 2 * j * fre_number * np.pi / N))) / np.abs(fft)
-            max_grad=(np.real(max) * np.real(np.exp(-1j * 2 * j * maximum_index * np.pi / N)) + np.imag(max) * np.imag(
-                np.exp(-1j * 2 * j * maximum_index * np.pi / N))) / np.abs(max)
-            grads=(current_grad*np.abs(max)-max_grad*np.abs(fft))/(np.abs(max)**2)
-            grads=grads/self.normalization[k]
-            grads_=grads_+grads
-        grads_=grads_/ self.control_count
-        return  grads_
 

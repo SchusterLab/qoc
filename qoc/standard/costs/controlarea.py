@@ -68,16 +68,5 @@ class ControlArea(Cost):
         cost_normalized = cost / self.control_size
 
         return cost_normalized * self.cost_multiplier
-    def gradient_initialize(self, reporter):
-        return
-    def update_state(self, propagator):
-        return
-
-    def gradient(self,controls,i,k):
-        if self.max_control_norms is not None:
-            return  self.sign[k]*self.cost_multiplier/((self.control_size)*self.max_control_norms)
-        else:
-            return self.sign[k]*self.cost_multiplier/(self.control_size)
-
 
 

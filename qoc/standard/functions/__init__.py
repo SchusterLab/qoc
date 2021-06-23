@@ -15,5 +15,5 @@ __all__ = [
     "commutator", "conjugate_transpose", "krons", "matmuls",
     "rms_norm",
     "column_vector_list_to_matrix", "matrix_to_column_vector_list",
-    "expm",
+    "expm","expm_manual"
 ]

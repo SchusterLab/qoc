@@ -72,17 +72,3 @@ class ControlNorm(Cost):
         cost_normalized = cost / self.controls_size
         
         return cost_normalized * self.cost_multiplier
-
-    def gradient_initialize(self, reporter):
-        return
-    def update_state(self, propagator):
-        return
-
-    def gradient(self,controls,j,k):
-        grads=(2*controls[j][k]*self.cost_multiplier)/(self.controls_size)
-        if self.max_control_norms is not None:
-            grads=grads/(self.max_control_norms)**2
-        # Weight the controls.
-        if self.control_weights is not None:
-            grads = grads * (self.control_weights[j][k]**2)
-        return grads

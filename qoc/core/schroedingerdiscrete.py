@@ -5,7 +5,7 @@ optimization algorithm
 
 from autograd.extend import Box
 import numpy as np
-import autograd.numpy as anp
+from memory_profiler import profile
 from qoc.core.common import (initialize_controls,
                              slap_controls, strip_controls,
                              clip_control_norms,gradient_trans, interpolate_tran, get_Hkbar, get_magnus)
@@ -87,7 +87,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
         control_eval_count = controls.shape[0]
     else:
         control_eval_count = 0
-    
+
     pstate = EvolveSchroedingerDiscreteState(control_eval_count,
                                              cost_eval_step,
                                              costs, evolution_time,
@@ -161,7 +161,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
     impose_control_conditions :: (controls :: (control_eval_count x control_count))
                                  -> (controls :: (control_eval_count x control_count))
         - This function is called after every optimization update. Example uses
-        include setting boundary conditions on the control parameters.                             
+        include setting boundary conditions on the control parameters.
     initial_controls :: ndarray (control_step_count x control_count)
         - This array specifies the control parameters at each
         control step. These values will be used to determine the `controls`
@@ -310,7 +310,7 @@ def _esd_wrap(controls, pstate, reporter, result):
 
 def _esdj_wrap(controls, pstate, reporter, result):
     """
-    Do intermediary work between the optimizer feeding controls to 
+    Do intermediary work between the optimizer feeding controls to
     the jacobian of _evaluate_schroedinger_discrete.
 
     Args:
@@ -356,7 +356,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
         result.best_error = error
         result.best_final_states = final_states
         result.best_iteration = reporter.iteration
-    
+
     # Save and log optimization progress.
     pstate.log_and_save(controls, error, final_states,
                         grads, reporter.iteration)
@@ -370,93 +370,11 @@ def _esdj_wrap(controls, pstate, reporter, result):
         terminate = True
     else:
         terminate = False
-    
+
     return grads, terminate
 
 
-def _evaluate_schroedinger_discrete(controls, pstate, reporter):
-    """
-    Compute the value of the total cost function for one evolution.
 
-    Arguments:
-    controls :: ndarray (control_eval_count x control_count)
-        - the control parameters
-    pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
-        - static objects
-    reporter :: any - a reporter for mutable objects
-
-    Returns:
-    error :: float - total error of the evolution
-    """
-    # Initialize local variables (heap -> stack).
-    control_eval_times = pstate.control_eval_times
-    cost_eval_step = pstate.cost_eval_step
-    costs = pstate.costs
-    dt = pstate.dt
-    evolution_time = pstate.evolution_time
-    final_system_eval_step = pstate.final_system_eval_step
-    hamiltonian = pstate.hamiltonian
-    interpolation_policy = pstate.interpolation_policy
-    magnus_policy = pstate.magnus_policy
-    program_type = pstate.program_type
-    if program_type == ProgramType.GRAPE:
-        iteration = reporter.iteration
-    else:
-        iteration = 0
-    save_intermediate_states = pstate.save_intermediate_states_
-    states = pstate.initial_states
-    step_costs = pstate.step_costs
-    system_eval_count = pstate.system_eval_count
-    error = 0
-
-    # Evolve the states to `evolution_time`.
-    # Compute step-costs along the way.
-    for system_eval_step in range(system_eval_count):
-        # If applicable, save the current states.
-        if save_intermediate_states:
-            if isinstance(states, Box):
-                intermediate_states = states._value
-            else:
-                intermediate_states = states
-            pstate.save_intermediate_states(iteration,
-                                            intermediate_states,
-                                            system_eval_step,)
-        
-        # Determine where we are in the mesh.
-        cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
-        is_cost_step = cost_step_remainder == 0
-        is_first_system_eval_step = system_eval_step == 0
-        is_final_system_eval_step = system_eval_step == final_system_eval_step
-        time = system_eval_step * dt
-        
-        # Compute step costs every `cost_step`.
-        if is_cost_step and not is_first_system_eval_step:
-            for i, step_cost in enumerate(step_costs):
-                cost_error = step_cost.cost(controls, states, system_eval_step)
-                error = error + cost_error
-            #ENDFOR
-
-        # Evolve the states to the next time step.
-        if not is_final_system_eval_step:
-            states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
-                                                        states, time,
-                                                        control_eval_times=control_eval_times,
-                                                        controls=controls,
-                                                        interpolation_policy=interpolation_policy,
-                                                        magnus_policy=magnus_policy,)
-    #ENDFOR
-
-    # Compute non-step-costs.
-    for i, cost in enumerate(costs):
-        if not cost.requires_step_evaluation:
-            cost_error = cost.cost(controls, states, final_system_eval_step)
-            error = error + cost_error
-
-    # Report reults.
-    reporter.error = error
-    reporter.final_states = states
-    
-    return error
 
 
 def _evolve_step_schroedinger_discrete(dt, hamiltonian,
@@ -481,7 +399,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     controls
     interpolation_policy
     magnus_policy
-    
+
     Returns:
     states
     """
@@ -543,23 +461,25 @@ def manual_gradient(controls,pstate, reporter):
             costs[l].gradient_initialize(reporter)
     for i in range(system_eval_count):
         for k in range(len((control_hamiltonian))):
-            for m in range(len(costs)):
-                if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt, get_Hkbar(dt,control_hamiltonian[k],get_magnus(dt, hamiltonian,
-                                                                (system_eval_count-1 - i) * dt,
-                                                                control_eval_times=control_eval_times,
-                                                                controls=controls,
-                                                                interpolation_policy=interpolation_policy,
-                                                                magnus_policy=magnus_policy,if_magnus=True),approximation=pstate.approximation))
-
-        for l in range(len((costs))):
-            if costs[l].type == "non-control":
-                costs[l].update_state(get_magnus(dt, hamiltonian,
+            propagator=get_magnus(dt, hamiltonian,
                                          (system_eval_count- 1 - i) * dt,
                                          control_eval_times=control_eval_times,
                                          controls=controls,
                                          interpolation_policy=interpolation_policy,
-                                         magnus_policy=magnus_policy,if_back=True))
+                                         magnus_policy=magnus_policy,if_back=True)
+            H_total=get_magnus(dt, hamiltonian,
+                              (system_eval_count-1 - i) * dt,
+                               control_eval_times=control_eval_times,
+                               controls=controls,
+                               interpolation_policy=interpolation_policy,
+                               magnus_policy=magnus_policy,if_magnus=True)
+            for m in range(len(costs)):
+                if costs[m].type=="non-control" :
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt, get_Hkbar(dt,control_hamiltonian[k],H_total,propagator,approximation=pstate.approximation))
+
+        for l in range(len((costs))):
+            if costs[l].type == "non-control":
+                costs[l].update_state(propagator)
     grads=gradient_trans(grads,control_eval_times,dt)
     for i in range(len(grads)):
         for k in range(len((control_hamiltonian))):
@@ -568,3 +488,94 @@ def manual_gradient(controls,pstate, reporter):
                     grads[i][k] = grads[i][k] +costs[m].gradient(controls,i,k)
     return grads
 
+def _evaluate_schroedinger_discrete(controls, pstate, reporter):
+    """
+    Compute the value of the total cost function for one evolution.
+
+    Arguments:
+    controls :: ndarray (control_eval_count x control_count)
+        - the control parameters
+    pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
+        - static objects
+    reporter :: any - a reporter for mutable objects
+
+    Returns:
+    error :: float - total error of the evolution
+    """
+    # Initialize local variables (heap -> stack).
+    control_eval_times = pstate.control_eval_times
+    cost_eval_step = pstate.cost_eval_step
+    costs = pstate.costs
+    dt = pstate.dt
+    evolution_time = pstate.evolution_time
+    final_system_eval_step = pstate.final_system_eval_step
+    hamiltonian = pstate.hamiltonian
+    interpolation_policy = pstate.interpolation_policy
+    magnus_policy = pstate.magnus_policy
+    program_type = pstate.program_type
+    if program_type == ProgramType.GRAPE:
+        iteration = reporter.iteration
+    else:
+        iteration = 0
+    save_intermediate_states = pstate.save_intermediate_states_
+    states = pstate.initial_states
+    step_costs = pstate.step_costs
+    system_eval_count = pstate.system_eval_count
+    error = 0
+
+    # Evolve the states to `evolution_time`.
+    # Compute step-costs along the way.
+    for system_eval_step in range(system_eval_count):
+        # If applicable, save the current states.
+        if save_intermediate_states:
+            if isinstance(states, Box):
+                intermediate_states = states._value
+            else:
+                intermediate_states = states
+            pstate.save_intermediate_states(iteration,
+                                            intermediate_states,
+                                            system_eval_step,)
+
+        # Determine where we are in the mesh.
+        cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
+        is_cost_step = cost_step_remainder == 0
+        is_first_system_eval_step = system_eval_step == 0
+        is_final_system_eval_step = system_eval_step == final_system_eval_step
+        time = system_eval_step * dt
+
+        # Compute step costs every `cost_step`.
+        if is_cost_step and not is_first_system_eval_step:
+            for i, step_cost in enumerate(step_costs):
+                cost_error = step_cost.cost(controls, states, system_eval_step)
+                error = error + cost_error
+            #ENDFOR
+
+        # Evolve the states to the next time step.
+        if not is_final_system_eval_step:
+            if pstate.manual_gradient_mode==True:
+                states = np.matmul(get_magnus(dt, hamiltonian,
+                                     time,
+                                    control_eval_times=control_eval_times,
+                                    controls=controls,
+                                    interpolation_policy=interpolation_policy,
+                                    magnus_policy=magnus_policy,),states)
+            else:
+                states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
+                                                            states, time,
+                                                            control_eval_times=control_eval_times,
+                                                            controls=controls,
+                                                            interpolation_policy=interpolation_policy,
+                                                            magnus_policy=magnus_policy, )
+    #ENDFOR
+
+    # Compute non-step-costs.
+    for i, cost in enumerate(costs):
+        if not cost.requires_step_evaluation:
+            cost_error = cost.cost(controls, states, final_system_eval_step)
+            error = error + cost_error
+
+    # Report reults.
+    reporter.error = error
+    reporter.final_states = states
+
+    return error

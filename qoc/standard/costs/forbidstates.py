@@ -84,28 +84,3 @@ class ForbidStates(Cost):
         cost_normalized = cost / self.cost_normalization_constant
         
         return cost_normalized * self.cost_multiplier
-
-
-    def gradient_initialize(self, reporter):
-        self.final_states=reporter.final_states
-        self.back_states = np.zeros_like(self.forbidden_states, dtype="complex_")
-        for i in range(len(self.inner_products)):
-            for j in range(len(self.inner_products[i])):
-                self.back_states[i] = self.forbidden_states[i][j] * self.inner_products[i][j]
-
-    def update_state(self, propagator):
-        self.final_states = matmuls(propagator, self.final_states)
-        self.inner_products = np.zeros_like(self.inner_products)
-        for i in range(len(self.inner_products)):
-            for j in range(len(self.inner_products[i])):
-                self.inner_products[i][j]=anp.matmul(self.forbidden_states_dagger[j], self.final_states[i])
-                self.back_states[i][j]=anp.matmul(propagator, self.back_states[i][j])+self.inner_products[i][j]*self.forbidden_states[i][j]
-
-    def gradient(self, dt, Hk):
-        grads = 0
-        for i in range(len(self.inner_products)):
-            for j in range(len(self.inner_products[i])):
-                grads = grads + self.cost_multiplier * (2 * dt * np.imag(
-                    anp.matmul(conjugate_transpose(self.back_states[i][j]), anp.matmul(Hk, self.final_states[i])))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
-
-        return grads
