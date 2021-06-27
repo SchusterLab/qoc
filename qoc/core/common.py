@@ -2,10 +2,6 @@
 common.py - This module defines methods that are used by
 multiple core functionalities.
 """
-
-import autograd.numpy as anp
-import scipy as scipy
-
 from qoc.core.mathmethods import (interpolate_linear_set,
                                   magnus_m2,
                                   magnus_m4,
@@ -19,7 +15,7 @@ from qoc.standard import (
 from qoc.standard.functions.expm_manual import expm_pade
 import numpy as np
 import scipy.linalg
-from memory_profiler import  profile
+import gc
 def clip_control_norms(controls, max_control_norms):
     """
     Me: I need the entry-wise norms of the column entries of my
@@ -57,7 +53,7 @@ def gen_controls_cos(complex_controls, control_count, control_eval_count,
     control_eval_count
     evolution_time
     max_control_norms
-    
+
     periods
 
     Returns:
@@ -66,7 +62,7 @@ def gen_controls_cos(complex_controls, control_count, control_eval_count,
     period = np.divide(control_eval_count, periods)
     b = np.divide(2 * np.pi, period)
     controls = np.zeros((control_eval_count, control_count))
-    
+
     # Create a wave for each control over all time
     # and add it to the controls.
     for i in range(control_count):
@@ -99,9 +95,9 @@ def gen_controls_white(complex_controls, control_count, control_eval_count,
     control_eval_count
     evolution_time
     max_control_norms
-    
+
     periods
-    
+
     Returns:
     controls
     """
@@ -134,9 +130,9 @@ def gen_controls_flat(complex_controls, control_count, control_eval_count,
     control_eval_count
     evolution_time
     max_control_norms
-    
+
     periods
-    
+
     Returns:
     controls
     """
@@ -180,7 +176,7 @@ def initialize_controls(complex_controls,
     """
     if max_control_norms is None:
         max_control_norms = np.ones(control_count)
-        
+
     if initial_controls is None:
         controls = gen_controls_flat(complex_controls, control_count, control_eval_count,
                                      evolution_time, max_control_norms)
@@ -198,7 +194,7 @@ def initialize_controls(complex_controls,
                                  "the user conformed to complex_controls, but "
                                  "the program found that the initial_controls were complex "
                                  "and complex_controls was set to False.")
-        
+
         # Check that the user-specified controls conform to max_control_norms.
         for control_step, step_controls in enumerate(initial_controls):
             if not (np.less_equal(np.abs(step_controls), max_control_norms + _NORM_TOLERANCE).all()):
@@ -223,8 +219,8 @@ def slap_controls(complex_controls, controls, controls_shape,):
          format are complex
     controls :: ndarray (2 * controls_size if COMPLEX else controls_size)
         - the controls in optimizer format
-    controls_shape :: tuple(int) - 
-    
+    controls_shape :: tuple(int) -
+
     Returns:
     controls :: ndarray (controls_shape)- the controls in cost function format
     """
@@ -234,7 +230,7 @@ def slap_controls(complex_controls, controls, controls_shape,):
         controls = real + 1j * imag
     # Reshape the controls.
     controls = np.reshape(controls, controls_shape)
-    
+
     return controls
 
 
@@ -257,7 +253,7 @@ def strip_controls(complex_controls, controls):
     # Transform the controls to R2 if they are complex.
     if complex_controls:
         controls = np.hstack((np.real(controls), np.imag(controls)))
-    
+
     return controls
 
 def interpolate_tran(control_eval_times,controls,dt):
@@ -503,8 +499,6 @@ def _diff_pade9(A, E, ident):
     return U, V, Lu, Lv
 
 
-
-
 def expm_frechet_algo_64(A, E):
     n = A.shape[0]
     s = None
@@ -523,6 +517,7 @@ def expm_frechet_algo_64(A, E):
     if s is None:
         # scaling
         s = max(0, int(np.ceil(np.log2(A_norm_1 / ell_table_61[13]))))
+        del A_norm_1
         A = A * 2.0 ** -s
         E = E * 2.0 ** -s
         # pade order 13
@@ -540,29 +535,37 @@ def expm_frechet_algo_64(A, E):
         W2 = b[7] * A6 + b[5] * A4 + b[3] * A2 + b[1] * ident
         Z2 = b[6] * A6 + b[4] * A4 + b[2] * A2 + b[0] * ident
         del ident
+        gc.collect()
         A2=b[8] * A2
         A2=A2+b[10] * A4
         del A4
+        gc.collect()
         Z1=b[12] * A6+A2
         del A2#10
+        gc.collect()
         W = np.dot(A6, W1) + W2
         del W2
+        gc.collect()
         V = np.dot(A6, Z1) + Z2
         del Z2
+        gc.collect()
         U = np.dot(A, W)
         E = np.dot(E, W)
         del W#11
+        gc.collect()
         Lw1 =  b[9] * M2
         Lw1=Lw1+b[11] * M4
         Lw1=Lw1+b[13] * M6
         Lw1=np.dot(A6, Lw1,Lw1)+ np.dot(M6, W1,W1)
         del W1
+        gc.collect()
         M6=b[7] * M6
         M4=b[5] * M4
         M2=b[3] * M2
 
         Lw = Lw1+M2+M4+M6
         del Lw1
+        gc.collect()
         M6=M6/b[7]
         M4=M4/b[5]
         M2=M2/b[3]
@@ -572,15 +575,18 @@ def expm_frechet_algo_64(A, E):
         M2 = b[6] * M6 +M2
         Lz2 = M2#13
         del M2,M4
-
+        gc.collect()
         Lu = np.dot(A, Lw) +E
         del E,Lw
+        gc.collect()
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
+        gc.collect()
         lu_piv = scipy.linalg.lu_factor(-U + V)
         R = scipy.linalg.lu_solve(lu_piv, U + V)
         L = scipy.linalg.lu_solve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
         del lu_piv,Lu,Lv,U,V
+        gc.collect()
         # squaring
         for k in range(s):
             L = np.dot(R, L) + np.dot(L, R)
