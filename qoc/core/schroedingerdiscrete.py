@@ -461,25 +461,29 @@ def manual_gradient(controls,pstate, reporter):
             costs[l].gradient_initialize(reporter)
     for i in range(system_eval_count):
         for k in range(len((control_hamiltonian))):
-            propagator=get_magnus(dt, hamiltonian,
+            for m in range(len(costs)):
+                if costs[m].type=="non-control" :
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt, get_Hkbar(dt,control_hamiltonian[k],get_magnus(dt, hamiltonian,
+                              (system_eval_count-1 - i) * dt,
+                               control_eval_times=control_eval_times,
+                               controls=controls,
+                               interpolation_policy=interpolation_policy,
+                               magnus_policy=magnus_policy,if_magnus=True),get_magnus(dt, hamiltonian,
+                                         (system_eval_count- 1 - i) * dt,
+                                         control_eval_times=control_eval_times,
+                                         controls=controls,
+                                         interpolation_policy=interpolation_policy,
+                                         magnus_policy=magnus_policy,if_back=True),approximation=pstate.approximation))
+        propagator=get_magnus(dt, hamiltonian,
                                          (system_eval_count- 1 - i) * dt,
                                          control_eval_times=control_eval_times,
                                          controls=controls,
                                          interpolation_policy=interpolation_policy,
                                          magnus_policy=magnus_policy,if_back=True)
-            H_total=get_magnus(dt, hamiltonian,
-                              (system_eval_count-1 - i) * dt,
-                               control_eval_times=control_eval_times,
-                               controls=controls,
-                               interpolation_policy=interpolation_policy,
-                               magnus_policy=magnus_policy,if_magnus=True)
-            for m in range(len(costs)):
-                if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt, get_Hkbar(dt,control_hamiltonian[k],H_total,propagator,approximation=pstate.approximation))
-
         for l in range(len((costs))):
             if costs[l].type == "non-control":
                 costs[l].update_state(propagator)
+        del propagator
     grads=gradient_trans(grads,control_eval_times,dt)
     for i in range(len(grads)):
         for k in range(len((control_hamiltonian))):
