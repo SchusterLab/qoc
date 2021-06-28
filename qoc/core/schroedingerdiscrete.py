@@ -473,7 +473,7 @@ def manual_gradient(controls,pstate, reporter):
                                    interpolation_policy=interpolation_policy,
                                    magnus_policy=magnus_policy, if_back=True)
                     else:
-                        H_kbar=sci.linalg.expm_frechet(get_magnus(dt, hamiltonian,
+                        H_kbar=expm_frechet(get_magnus(dt, hamiltonian,
                               (system_eval_count-1 - i) * dt,
                                control_eval_times=control_eval_times,
                                controls=controls,

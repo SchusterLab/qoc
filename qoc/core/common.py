@@ -577,7 +577,7 @@ def expm_frechet_algo_64(A, E):
         del M2,M4
         gc.collect()
         Lu = np.dot(A, Lw) +E
-        del E,Lw
+        del E,Lw,A
         gc.collect()
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
