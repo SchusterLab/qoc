@@ -499,7 +499,7 @@ def _diff_pade9(A, E, ident):
     return U, V, Lu, Lv
 
 
-def expm_frechet_algo_64(A, E):
+def expm_frechet_algo_64(A,E ):
     n = A.shape[0]
     s = None
     ident = np.identity(n)
@@ -518,11 +518,9 @@ def expm_frechet_algo_64(A, E):
         # scaling
         s = max(0, int(np.ceil(np.log2(A_norm_1 / ell_table_61[13]))))
         del A_norm_1
-        A = A * 2.0 ** -s
-        E = E * 2.0 ** -s
         # pade order 13
-        A2 = np.dot(A, A)
-        M2 = np.dot(A, E) + np.dot(E, A)
+        A2 = np.dot(A * 2.0 ** -s ,A * 2.0 ** -s)
+        M2 = np.dot(A * 2.0 ** -s, E * 2.0 ** -s) + np.dot(E * 2.0 ** -s, A * 2.0 ** -s)
         A4 = np.dot(A2, A2)
         M4 = np.dot(A2, M2) + np.dot(M2, A2)
         A6 = np.dot(A2, A4)
@@ -549,9 +547,7 @@ def expm_frechet_algo_64(A, E):
         V = np.dot(A6, Z1) + Z2
         del Z2
         gc.collect()
-        U = np.dot(A, W)
-        E = np.dot(E, W)
-        del W#11
+
         gc.collect()
         Lw1 =  b[9] * M2
         Lw1=Lw1+b[11] * M4
@@ -576,8 +572,11 @@ def expm_frechet_algo_64(A, E):
         Lz2 = M2#13
         del M2,M4
         gc.collect()
-        Lu = np.dot(A, Lw) +E
-        del E,Lw,A
+
+        Lu = np.dot(A * 2.0 ** -s, Lw) +np.dot(E * 2.0 ** -s, W)
+        del Lw
+        U = np.dot(A * 2.0 ** -s, W)
+        del W  # 11
         gc.collect()
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
@@ -590,6 +589,7 @@ def expm_frechet_algo_64(A, E):
         # squaring
         for k in range(s):
             L = np.dot(R, L) + np.dot(L, R)
+            R = np.dot(R, R)
         return  L
     # factor once and solve twice
     lu_piv = scipy.linalg.lu_factor(-U + V)
@@ -598,4 +598,5 @@ def expm_frechet_algo_64(A, E):
     # squaring
     for k in range(s):
         L = np.dot(R, L) + np.dot(L, R)
+        R = np.dot(R, R)
     return  L
