@@ -18,7 +18,6 @@ https://www.sciencedirect.com/science/article/abs/pii/S1090780704003696
 4.Manual mode only supports cost_eval_step=1
 
 """
-import autograd.numpy as anp
 from qoc import grape_schroedinger_discrete
 from qoc.standard import (TargetStateInfidelity_manual,
                           conjugate_transpose,
@@ -40,10 +39,10 @@ hamiltonian = lambda controls, time: (H_SYSTEM_0
                                       + controls[0] * sigmax
                                       + controls[1]*sigmay)
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
-INITIAL_STATE_0 = anp.array([[1], [0]])
-TARGET_STATE_0 = anp.array([[0], [1]])
-INITIAL_STATES = anp.stack((INITIAL_STATE_0,), axis=0)
-TARGET_STATES = anp.stack((TARGET_STATE_0,), axis=0)
+INITIAL_STATE_0 = np.array([[1], [0]])
+TARGET_STATE_0 = np.array([[0], [1]])
+INITIAL_STATES = np.stack((INITIAL_STATE_0,), axis=0)
+TARGET_STATES = np.stack((TARGET_STATE_0,), axis=0)
 COSTS = [TargetStateInfidelity_manual(TARGET_STATES )]
 
 # Define the optimization.

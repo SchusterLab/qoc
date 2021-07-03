@@ -5,7 +5,7 @@ using time discrete control parameters to evolve a transmon qubit
 form the ground state to the first excited state.
 """
 
-import autograd.numpy as anp
+
 from qoc import grape_schroedinger_discrete
 from qoc.standard import (TargetStateInfidelity_manual,
                           conjugate_transpose,matrix_to_column_vector_list,
@@ -13,7 +13,7 @@ from qoc.standard import (TargetStateInfidelity_manual,
                           get_creation_operator,
                           SIGMA_Z,
                           generate_save_file_path,)
-
+import  numpy as np
 # Define the system.
 HILBERT_SIZE = 2
 ANNIHILATION_OPERATOR = get_annihilation_operator(HILBERT_SIZE)
@@ -42,17 +42,17 @@ SAVE_ITERATION_STEP = 1
 SAVE_PATH = "../out"
 SAVE_FILE_NAME = "transmon_pi"
 SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
-INITIAL_STATES = matrix_to_column_vector_list(anp.eye(2))
+INITIAL_STATES = matrix_to_column_vector_list(np.eye(2))
 # we could have equivalently done
-# initial_state0 = anp.array([[1], [0]])
-# initial_state1 = anp.array([[0], [1]])
-# initial_states = anp.stack((initial_state0, initial_state1))
-target_unitary = anp.array([[0, 1], [1, 0]])
+# initial_state0 = np.array([[1], [0]])
+# initial_state1 = np.array([[0], [1]])
+# initial_states = np.stack((initial_state0, initial_state1))
+target_unitary = np.array([[0, 1], [1, 0]])
 target_states = matrix_to_column_vector_list(target_unitary)
 # we could have equivalently done
-# target_state0 = anp.array([[0], [1]])
-# target_state1 = anp.array([[1], [0]])
-# target_states = anp.stack((target_state0, target_state1))
+# target_state0 = np.array([[0], [1]])
+# target_state1 = np.array([[1], [0]])
+# target_states = np.stack((target_state0, target_state1))
 COSTS = [TargetStateInfidelity_manual(target_states)]
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
 manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"Hk_approximation":False}
