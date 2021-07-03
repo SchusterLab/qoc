@@ -488,12 +488,12 @@ def manual_gradient(controls,pstate, reporter):
                                          magnus_policy=magnus_policy,if_back=True)
                         H_kbar=np.matmul(1j*H_kbar,propagator)/dt
                     grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt,H_kbar)
-                    if m is not len(costs)-1:
-                        del propagator
+
         for l in range(len((costs))):
             if costs[l].type == "non-control":
                 costs[l].update_state(propagator)
-        del propagator
+        if m is not len(costs) - 1:
+            del propagator
     grads=gradient_trans(grads,control_eval_times,dt)
     for i in range(len(grads)):
         for k in range(len((control_hamiltonian))):
