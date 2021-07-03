@@ -42,8 +42,7 @@ class ControlVariation(Cost):
         self.diffs_size = control_count * (control_eval_count - order)
         self.order = order
         self.cost_normalization_constant = self.diffs_size * (2 ** self.order)
-        self.type = "control"
-        self.control_eval_account=control_eval_count
+
 
     def cost(self, controls, states, system_eval_step):
         """
@@ -74,4 +73,3 @@ class ControlVariation(Cost):
         cost_normalized = cost / self.cost_normalization_constant
 
         return cost_normalized * self.cost_multiplier
-

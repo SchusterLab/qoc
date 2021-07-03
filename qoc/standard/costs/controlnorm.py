@@ -43,8 +43,7 @@ class ControlNorm(Cost):
         self.control_weights = control_weights
         self.controls_size = control_eval_count * control_count
         self.max_control_norms = max_control_norms
-        self.control_eval_count=control_eval_count
-        self.type = "control"
+
     
     def cost(self, controls, states, system_eval_step):
         """
