@@ -15,7 +15,6 @@ from qoc.standard import (
 from qoc.standard.functions.expm_manual import expm_pade
 import numpy as np
 import scipy.linalg
-import gc
 def clip_control_norms(controls, max_control_norms):
     """
     Me: I need the entry-wise norms of the column entries of my
@@ -533,35 +532,26 @@ def expm_frechet_algo_64(A,E ):
         W2 = b[7] * A6 + b[5] * A4 + b[3] * A2 + b[1] * ident
         Z2 = b[6] * A6 + b[4] * A4 + b[2] * A2 + b[0] * ident
         del ident
-        gc.collect()
         A2=b[8] * A2
         A2=A2+b[10] * A4
         del A4
-        gc.collect()
         Z1=b[12] * A6+A2
         del A2#10
-        gc.collect()
         W = np.dot(A6, W1) + W2
         del W2
-        gc.collect()
         V = np.dot(A6, Z1) + Z2
         del Z2
-        gc.collect()
-
-        gc.collect()
         Lw1 =  b[9] * M2
         Lw1=Lw1+b[11] * M4
         Lw1=Lw1+b[13] * M6
         Lw1=np.dot(A6, Lw1,Lw1)+ np.dot(M6, W1,W1)
         del W1
-        gc.collect()
         M6=b[7] * M6
         M4=b[5] * M4
         M2=b[3] * M2
 
         Lw = Lw1+M2+M4+M6
         del Lw1
-        gc.collect()
         M6=M6/b[7]
         M4=M4/b[5]
         M2=M2/b[3]
@@ -571,21 +561,18 @@ def expm_frechet_algo_64(A,E ):
         M2 = b[6] * M6 +M2
         Lz2 = M2#13
         del M2,M4
-        gc.collect()
 
         Lu = np.dot(A * 2.0 ** -s, Lw) +np.dot(E * 2.0 ** -s, W)
         del Lw
         U = np.dot(A * 2.0 ** -s, W)
         del W  # 11
-        gc.collect()
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
-        gc.collect()
+
         lu_piv = scipy.linalg.lu_factor(-U + V)
         R = scipy.linalg.lu_solve(lu_piv, U + V)
         L = scipy.linalg.lu_solve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
         del lu_piv,Lu,Lv,U,V
-        gc.collect()
         # squaring
         for k in range(s):
             L = np.dot(R, L) + np.dot(L, R)
