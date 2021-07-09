@@ -568,7 +568,6 @@ def expm_frechet_algo_64(A,E ):
         del W  # 11
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
-
         lu_piv = scipy.linalg.lu_factor(-U + V)
         R = scipy.linalg.lu_solve(lu_piv, U + V)
         L = scipy.linalg.lu_solve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
@@ -587,3 +586,4 @@ def expm_frechet_algo_64(A,E ):
         L = np.dot(R, L) + np.dot(L, R)
         R = np.dot(R, R)
     return  L
+
