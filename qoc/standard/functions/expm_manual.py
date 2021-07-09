@@ -146,7 +146,7 @@ THETA = (
     5.371920351148152,
 )
 
-
+@profile
 def expm_pade(a):
     """
     Compute the matrix exponential via pade approximation.
@@ -175,6 +175,7 @@ def expm_pade(a):
 
     # If the one norm is large, scaling and squaring
     # is required.
+    pade_order=None
     if pade_order is None:
         pade_order = 13
         scale = max(0, int(np.ceil(np.log2(one_norm_ / THETA[13]))))

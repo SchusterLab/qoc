@@ -225,6 +225,7 @@ def expm_pade(a):
     scale = 0
     size = a.shape[0]
     pade_order = None
+    pade_order=None
     one_norm_ = one_norm(a)
     for pade_order_ in PADE_ORDERS:
         if one_norm_ < THETA[pade_order_]:

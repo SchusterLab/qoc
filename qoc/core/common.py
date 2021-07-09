@@ -497,7 +497,7 @@ def _diff_pade9(A, E, ident):
     Lv = b[8]*M8 + b[6]*M6 + b[4]*M4 + b[2]*M2
     return U, V, Lu, Lv
 
-
+@profile
 def expm_frechet_algo_64(A,E ):
     n = A.shape[0]
     s = None
@@ -513,6 +513,7 @@ def expm_frechet_algo_64(A,E ):
             U, V, Lu, Lv = pade(A, E, ident)
             s = 0
             break
+    s=None
     if s is None:
         # scaling
         s = max(0, int(np.ceil(np.log2(A_norm_1 / ell_table_61[13]))))
@@ -568,7 +569,6 @@ def expm_frechet_algo_64(A,E ):
         del W  # 11
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
-
         lu_piv = scipy.linalg.lu_factor(-U + V)
         R = scipy.linalg.lu_solve(lu_piv, U + V)
         L = scipy.linalg.lu_solve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
@@ -587,3 +587,4 @@ def expm_frechet_algo_64(A,E ):
         L = np.dot(R, L) + np.dot(L, R)
         R = np.dot(R, R)
     return  L
+
