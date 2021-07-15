@@ -25,7 +25,7 @@ from qoc.standard import (TargetStateInfidelity_manual,
                           get_creation_operator,
                           SIGMA_Z,
                           generate_save_file_path,)
-
+import numpy as np
 # Define the system.
 HILBERT_SIZE = 2
 ANNIHILATION_OPERATOR = get_annihilation_operator(HILBERT_SIZE)
