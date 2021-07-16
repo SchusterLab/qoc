@@ -55,4 +55,3 @@ class TargetStateInfidelity(Cost):
         infidelity = 1 - fidelity_normalized
 
         return infidelity * self.cost_multiplier
-s

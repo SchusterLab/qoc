@@ -3,6 +3,8 @@ test_standard.py - This module provides unit tests on the qoc.standard module.
 """
 
 ### qoc.standard.constants ###
+import numpy
+
 
 def test_constants():
     import numpy as np
@@ -188,7 +190,9 @@ def test_targetstateinfidelity():
     targets = np.stack((target0, target1,), axis=0)
     ti = TargetStateInfidelity(targets)
     cost = ti.cost(None, states, None)
-    assert(np.allclose(cost, .25))
+    expected=1-(-1+1/numpy.sqrt(2))**2/4
+    assert (np.allclose(cost,expected))
+
 
 
 def test_targetstateinfidelitytime():
@@ -219,7 +223,8 @@ def test_targetstateinfidelitytime():
     targets = np.stack((target0, target1,), axis=0)
     ti = TargetStateInfidelityTime(system_eval_count, targets)
     cost = ti.cost(None, states, None)
-    expected_cost = 0.025
+    expected_cost=1-(-1+1/numpy.sqrt(2))**2/4
+    expected_cost=expected_cost/10
     assert(np.allclose(cost, expected_cost))
 
 
