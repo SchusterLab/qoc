@@ -497,7 +497,7 @@ def _diff_pade9(A, E, ident):
     Lv = b[8]*M8 + b[6]*M6 + b[4]*M4 + b[2]*M2
     return U, V, Lu, Lv
 
-@profile
+
 def expm_frechet_algo_64(A,E ):
     n = A.shape[0]
     s = None

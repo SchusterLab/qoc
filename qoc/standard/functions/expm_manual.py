@@ -146,7 +146,7 @@ THETA = (
     5.371920351148152,
 )
 
-@profile
+
 def expm_pade(a):
     """
     Compute the matrix exponential via pade approximation.
