@@ -352,11 +352,8 @@ def get_magnus(dt, hamiltonian,
             propagator = step_unitary
         return propagator
 
-def get_Hkbar(dt,Hk,H_total,propagator,approximation):
-    if approximation==True:
-        return Hk
-    else:
-        return np.matmul(1j*expm_frechet(H_total, -1j*dt*Hk,compute_expm = False,check_finite=False),propagator)/dt
+def get_Hkbar(dt,Hk,H_total,propagator):
+    return np.matmul(1j*expm_frechet(H_total, -1j*dt*Hk,compute_expm = False,check_finite=False),propagator)/dt
 
 
 

@@ -249,7 +249,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_intermediate_states,
                                             save_iteration_step,
                                             system_eval_count, manual_parameter['control_hamiltonian'],
-                                            manual_parameter['manual_gradient_mode'], manual_parameter['Hk_approximation'])
+                                            manual_parameter['manual_gradient_mode'],)
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -463,30 +463,20 @@ def manual_gradient(controls,pstate, reporter):
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
-
-                    if pstate.approximation ==True:
-                        H_kbar=control_hamiltonian[k]
-                        get_magnus(dt, hamiltonian,
-                                   (system_eval_count - 1 - i) * dt,
-                                   control_eval_times=control_eval_times,
-                                   controls=controls,
-                                   interpolation_policy=interpolation_policy,
-                                   magnus_policy=magnus_policy, if_back=True)
-                    else:
-                        H_kbar=expm_frechet(get_magnus(dt, hamiltonian,
+                    H_kbar=expm_frechet(get_magnus(dt, hamiltonian,
                               (system_eval_count-1 - i) * dt,
                                control_eval_times=control_eval_times,
                                controls=controls,
                                interpolation_policy=interpolation_policy,
                                magnus_policy=magnus_policy,if_magnus=True), -1j * dt * control_hamiltonian[k], compute_expm=False, check_finite=False)
 
-                        propagator=get_magnus(dt, hamiltonian,
+                    propagator=get_magnus(dt, hamiltonian,
                                          (system_eval_count- 1 - i) * dt,
                                          control_eval_times=control_eval_times,
                                          controls=controls,
                                          interpolation_policy=interpolation_policy,
                                          magnus_policy=magnus_policy,if_back=True)
-                        H_kbar=np.matmul(1j*H_kbar,propagator)/dt
+                    H_kbar=np.matmul(1j*H_kbar,propagator)/dt
                     grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt,H_kbar)
 
         for l in range(len((costs))):

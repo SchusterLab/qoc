@@ -9,13 +9,7 @@ form the ground state to the first excited state.
 Tips for manual gradient:
 1. Set COMPLEX_CONTROLS to False, only real control amplitudes are supported.
 2. The sequence of CONTROL_HAMILTONIAN should be consistent with the one in hamiltonia
-3. If set Hk_approximation=True, The Hk_bar will be truncated to it's first order and it will reduce the runtime because
-it will not do expansion of exponential matrix. It works well when time step is large.
-But when time step is small, approximation fails, gradient value in the interface largely deviates from the correct one
-, and the the optimization will not follow the gradient direction. And then, it's hard get the minimum cost, but sometimes
-it works. About definition of Hk_bar and approximation, please see the Eq(4) to Eq(13) reference:
-https://www.sciencedirect.com/science/article/abs/pii/S1090780704003696
-4.Manual mode only supports cost_eval_step=1
+3. Manual mode only supports cost_eval_step=1
 
 """
 from qoc import grape_schroedinger_discrete
@@ -60,7 +54,7 @@ SAVE_FILE_NAME = "transmon_pi"
 SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
 
-manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"Hk_approximation":False}
+manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,}
 
 def main():
     result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
