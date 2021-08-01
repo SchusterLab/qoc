@@ -5,16 +5,10 @@ using time discrete control parameters to evolve a transmon qubit
 form the ground state to the first excited state.
 """
 
-"""
-Tips for manual_gradient:
-1. Set COMPLEX_CONTROLS to False, only real control amplitudes are supported.
-2. The sequence of CONTROL_HAMILTONIAN should be consistent with the one in hamiltonia
-3. Manual mode only supports cost_eval_step=1
 
-"""
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (TargetStateInfidelity_manual,
-                          conjugate_transpose,
+from qoc.standard import (TargetStateInfidelity,
+
                           get_annihilation_operator,
                           get_creation_operator,
                           SIGMA_Z,
@@ -37,7 +31,7 @@ INITIAL_STATE_0 = np.array([[1], [0]])
 TARGET_STATE_0 = np.array([[0], [1]])
 INITIAL_STATES = np.stack((INITIAL_STATE_0,), axis=0)
 TARGET_STATES = np.stack((TARGET_STATE_0,), axis=0)
-COSTS = [TargetStateInfidelity_manual(TARGET_STATES )]
+COSTS = [TargetStateInfidelity(TARGET_STATES )]
 
 # Define the optimization.
 COMPLEX_CONTROLS = False

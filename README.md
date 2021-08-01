@@ -15,6 +15,7 @@ Tips for manual_gradient:
 1. Set COMPLEX_CONTROLS to False, only real control amplitudes are supported.
 2. The sequence of CONTROL_HAMILTONIAN should be consistent with the one in hamiltonia
 3. Manual mode only supports cost_eval_step=1
+4. Remember set cost funtion to manual like target_stateinfidelity_manual.
 
 ### Installation ###
 You can install QOC locally via pip.

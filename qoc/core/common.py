@@ -510,7 +510,6 @@ def expm_frechet_algo_64(A,E ):
             U, V, Lu, Lv = pade(A, E, ident)
             s = 0
             break
-    s=None
     if s is None:
         # scaling
         s = max(0, int(np.ceil(np.log2(A_norm_1 / ell_table_61[13]))))

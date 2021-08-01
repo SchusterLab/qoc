@@ -455,11 +455,19 @@ def manual_gradient(controls,pstate, reporter):
     control_hamiltonian=pstate.control_hamiltonian
     controls_ = interpolate_tran(control_eval_times, controls, dt)
     grads = np.zeros_like(controls_)
-    propagator=0
     for l in range(len(costs)):
         if costs[l].type == "non-control":
             costs[l].gradient_initialize(reporter)
     for i in range(system_eval_count):
+        propagator = get_magnus(dt, hamiltonian,
+                                (system_eval_count - 1 - i) * dt,
+                                control_eval_times=control_eval_times,
+                                controls=controls,
+                                interpolation_policy=interpolation_policy,
+                                magnus_policy=magnus_policy, if_back=True)
+        for l in range(len((costs))):
+            if costs[l].type == "non-control":
+                costs[l].update_state_forw(propagator)
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
@@ -469,21 +477,11 @@ def manual_gradient(controls,pstate, reporter):
                                controls=controls,
                                interpolation_policy=interpolation_policy,
                                magnus_policy=magnus_policy,if_magnus=True), -1j * dt * control_hamiltonian[k], compute_expm=False, check_finite=False)
-
-                    propagator=get_magnus(dt, hamiltonian,
-                                         (system_eval_count- 1 - i) * dt,
-                                         control_eval_times=control_eval_times,
-                                         controls=controls,
-                                         interpolation_policy=interpolation_policy,
-                                         magnus_policy=magnus_policy,if_back=True)
-                    H_kbar=np.matmul(1j*H_kbar,propagator)/dt
                     grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt,H_kbar)
 
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state(propagator)
-        if m is not len(costs) - 1:
-            del propagator
+                costs[l].update_state_back(propagator)
     grads=gradient_trans(grads,control_eval_times,dt)
     for i in range(len(grads)):
         for k in range(len((control_hamiltonian))):
@@ -550,7 +548,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         # Compute step costs every `cost_step`.
         if is_cost_step and not is_first_system_eval_step:
             for i, step_cost in enumerate(step_costs):
-                cost_error = step_cost.cost(controls, states, system_eval_step)
+                cost_error = step_cost.cost(controls, states, system_eval_step,pstate.manual_gradient_mode)
                 error = error + cost_error
             #ENDFOR
 
@@ -575,7 +573,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     # Compute non-step-costs.
     for i, cost in enumerate(costs):
         if not cost.requires_step_evaluation:
-            cost_error = cost.cost(controls, states, final_system_eval_step)
+            cost_error = cost.cost(controls, states, final_system_eval_step,pstate.manual_gradient_mode)
             error = error + cost_error
 
     # Report reults.

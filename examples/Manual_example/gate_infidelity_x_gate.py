@@ -7,7 +7,7 @@ form the ground state to the first excited state.
 
 
 from qoc import grape_schroedinger_discrete
-from qoc.standard import (TargetStateInfidelity_manual,
+from qoc.standard import (TargetStateInfidelity,TargetStateInfidelityTime,
                           conjugate_transpose,matrix_to_column_vector_list,
                           get_annihilation_operator,
                           get_creation_operator,
@@ -53,7 +53,7 @@ target_states = matrix_to_column_vector_list(target_unitary)
 # target_state0 = np.array([[0], [1]])
 # target_state1 = np.array([[1], [0]])
 # target_states = np.stack((target_state0, target_state1))
-COSTS = [TargetStateInfidelity_manual(target_states)]
+COSTS = [TargetStateInfidelity(SYSTEM_EVAL_COUNT,target_states)]
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
 manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True}
 

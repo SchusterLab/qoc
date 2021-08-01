@@ -17,13 +17,7 @@ from .costs import (ControlArea,
                     TargetDensityInfidelityTime,
                     TargetStateInfidelity,
                     TargetStateInfidelityTime,
-                    ControlArea_manual,
-                    ControlNorm_manual,
-                    ControlVariation_manual,
-                    ControlBandwidthMax_manual,
-                    TargetStateInfidelity_manual,
-                    TargetStateInfidelityTime_manual,
-                    ForbidStates_manual)
+                    )
 
 from .functions import (commutator, conjugate_transpose,
                         expm,expm_manual, krons, matmuls,
@@ -53,8 +47,5 @@ __all__ = [
     "Adam", "LBFGSB", "SGD",
     "plot_controls", "plot_density_population", "plot_state_population",
     "ans_jacobian", "generate_save_file_path", "CustomJSONEncoder",
-    "ControlArea_manual","ControlBandwidthMax_manual",
-    "ControlNorm_manual","ControlVariation_manual",
-    "ForbidStates_manual","TargetStateInfidelity_manual",
-    "TargetStateInfidelityTime_manual"
+
 ]
