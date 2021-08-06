@@ -166,6 +166,7 @@ def expm_pade(a):
     scale = 0
     size = a.shape[0]
     one_norm_ = one_norm(a)
+    pade_order=None
     for pade_order_ in PADE_ORDERS:
         if one_norm_ < THETA[pade_order_]:
             pade_order = pade_order_
@@ -208,7 +209,8 @@ def expm_eigh(h):
     p_dagger = np.conjugate(np.swapaxes(p, -1, -2))
     d = np.exp(-1j * eigvals)
     return np.matmul(p *d, p_dagger)
-
+def conjugate_transpose_m(matrix):
+    return (matrix.transpose()).conjugate()
 
 ### EXPORT ###
 

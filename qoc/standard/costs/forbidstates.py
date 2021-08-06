@@ -7,7 +7,8 @@ the occupation of a set of forbidden states.
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose,matmuls
+from qoc.standard.functions import conjugate_transpose
+
 import autograd.numpy as anp
 class ForbidStates(Cost):
     """
@@ -119,7 +120,7 @@ class ForbidStates(Cost):
                 self.back_states[i][j]=np.matmul(propagator, self.back_states[i][j])+self.inner_products[i][j]*self.forbidden_states[i][j]
 
     def update_state_forw(self, propagator):
-        self.final_states = matmuls(propagator, self.final_states)
+        self.final_states = np.matmul(propagator, self.final_states)
 
     def gradient(self, dt, Hk):
         grads = 0

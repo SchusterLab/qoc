@@ -10,8 +10,7 @@ from qoc.models import (
                         InterpolationPolicy,
                         MagnusPolicy,
                         )
-from qoc.standard import (
-                          conjugate_transpose)
+from qoc.standard import conjugate_transpose
 from qoc.standard.functions.expm_manual import expm_pade
 import numpy as np
 import scipy.linalg
@@ -376,7 +375,7 @@ def expm_frechet(A, E, method=None, compute_expm=True, check_finite=True):
     if method is None:
         method = 'SPS'
     if method == 'SPS':
-        expm_frechet_AE = expm_frechet_algo_64(A, E)
+        expm_A, expm_frechet_AE = expm_frechet_algo_64(A, E)
     elif method == 'blockEnlarge':
         expm_A, expm_frechet_AE = expm_frechet_block_enlarge(A, E)
     else:
@@ -573,7 +572,7 @@ def expm_frechet_algo_64(A,E ):
         for k in range(s):
             L = np.dot(R, L) + np.dot(L, R)
             R = np.dot(R, R)
-        return  L
+        return  R,L
     # factor once and solve twice
     lu_piv = scipy.linalg.lu_factor(-U + V)
     R = scipy.linalg.lu_solve(lu_piv, U + V)
@@ -582,5 +581,5 @@ def expm_frechet_algo_64(A,E ):
     for k in range(s):
         L = np.dot(R, L) + np.dot(L, R)
         R = np.dot(R, R)
-    return  L
+    return  R,L
 

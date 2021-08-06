@@ -8,7 +8,7 @@ at each cost evaluation step.
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose,matmuls
+from qoc.standard.functions import conjugate_transpose
 import autograd.numpy as anp
 class TargetStateInfidelityTime(Cost):
     """
@@ -111,9 +111,9 @@ class TargetStateInfidelityTime(Cost):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
     def update_state_forw(self, propagator):
         if self.neglect_relative_phase == False:
-            self.final_states = matmuls(propagator, self.final_states)
+            self.final_states = np.matmul(propagator, self.final_states)
         else:
-            self.final_states = matmuls(propagator, self.final_states)
+            self.final_states = np.matmul(propagator, self.final_states)
 
     def gradient(self, dt, Hk):
         grads = 0

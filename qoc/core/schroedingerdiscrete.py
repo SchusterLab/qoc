@@ -8,7 +8,7 @@ import numpy as np
 
 from qoc.core.common import (initialize_controls,expm_frechet,
                              slap_controls, strip_controls,
-                             clip_control_norms,gradient_trans, interpolate_tran, get_Hkbar, get_magnus)
+                             clip_control_norms,gradient_trans, interpolate_tran ,get_magnus)
 from qoc.core.mathmethods import (interpolate_linear_set,
                                   magnus_m2,
                                   magnus_m4,
@@ -21,7 +21,8 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         MagnusPolicy,
                         ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
-                          expm, matmuls,conjugate_transpose)
+                          expm, matmuls)
+from qoc.standard.functions import conjugate_transpose_m
 
 ### MAIN METHODS ###
 
@@ -437,7 +438,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
 
     step_unitary = expm(magnus)
     if if_back is True:
-        states = matmuls(conjugate_transpose(step_unitary), states)
+        states = matmuls(conjugate_transpose_m(step_unitary), states)
     else:
         states = matmuls(step_unitary, states)
 
@@ -459,25 +460,29 @@ def manual_gradient(controls,pstate, reporter):
         if costs[l].type == "non-control":
             costs[l].gradient_initialize(reporter)
     for i in range(system_eval_count):
-        propagator = get_magnus(dt, hamiltonian,
-                                (system_eval_count - 1 - i) * dt,
-                                control_eval_times=control_eval_times,
-                                controls=controls,
-                                interpolation_policy=interpolation_policy,
-                                magnus_policy=magnus_policy, if_back=True)
+        propagator,dUdt = expm_frechet(get_magnus(dt, hamiltonian,
+                                       (system_eval_count - 1 - i) * dt,
+                                       control_eval_times=control_eval_times,
+                                       controls=controls,
+                                       interpolation_policy=interpolation_policy,
+                                       magnus_policy=magnus_policy, if_magnus=True),
+                            -1j * dt * control_hamiltonian[0], compute_expm=True, check_finite=False)
+        propagator=conjugate_transpose_m(propagator)
         for l in range(len((costs))):
             if costs[l].type == "non-control":
                 costs[l].update_state_forw(propagator)
         for k in range(len((control_hamiltonian))):
+            if k is not 0:
+                dUdt = expm_frechet(get_magnus(dt, hamiltonian,
+                                               (system_eval_count - 1 - i) * dt,
+                                               control_eval_times=control_eval_times,
+                                               controls=controls,
+                                               interpolation_policy=interpolation_policy,
+                                               magnus_policy=magnus_policy, if_magnus=True),
+                                    -1j * dt * control_hamiltonian[k], compute_expm=False, check_finite=False)
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
-                    H_kbar=expm_frechet(get_magnus(dt, hamiltonian,
-                              (system_eval_count-1 - i) * dt,
-                               control_eval_times=control_eval_times,
-                               controls=controls,
-                               interpolation_policy=interpolation_policy,
-                               magnus_policy=magnus_policy,if_magnus=True), -1j * dt * control_hamiltonian[k], compute_expm=False, check_finite=False)
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt,H_kbar)
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt,dUdt)
 
         for l in range(len((costs))):
             if costs[l].type == "non-control":

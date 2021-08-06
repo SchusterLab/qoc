@@ -7,7 +7,8 @@ import autograd.numpy as anp
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose, matmuls
+from qoc.standard.functions import conjugate_transpose
+from qoc.standard.functions import conjugate_transpose_m
 
 
 class TargetStateInfidelity(Cost):
@@ -82,22 +83,22 @@ class TargetStateInfidelity(Cost):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
     def update_state_forw(self, propagator):
-        self.final_states = matmuls(propagator, self.final_states)
+        self.final_states = np.matmul(propagator, self.final_states)
 
     def update_state_back(self, propagator):
-        self.back_states = matmuls(propagator, self.back_states)
+        self.back_states = np.matmul(propagator, self.back_states)
 
     def gradient(self, dt, Hk):
         grads = 0
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), np.matmul(Hk, self.final_states[i])))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), np.matmul(Hk, self.final_states[i])))) / (
                                     self.state_count ** 2)
         else:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), np.matmul(Hk, self.final_states[i])))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), np.matmul(Hk, self.final_states[i])))) / (
                                     self.state_count )
         return grads
 
