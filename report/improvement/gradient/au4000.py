@@ -20,4 +20,4 @@ def derivative_Expansion(HILBERT_SIZE):
     c = np.block([[A, B], [np.zeros_like(A), A]])
     c=bsr_matrix(c).tocsc()
     return expm(c)
-derivative_Expansion(400)
+derivative_Expansion(4000)
