@@ -8,12 +8,12 @@ from qoc.standard.functions.convenience import (commutator,
                                                 matmuls,
                                                 rms_norm,
                                                 column_vector_list_to_matrix,
-                                                matrix_to_column_vector_list,)
+                                                matrix_to_column_vector_list,krylov,block_fre)
 from qoc.standard.functions.expm import expm
 from qoc.standard.functions.expm_manual import conjugate_transpose_m
 __all__ = [
     "commutator", "conjugate_transpose", "krons", "matmuls",
     "rms_norm",
     "column_vector_list_to_matrix", "matrix_to_column_vector_list",
-    "expm","expm_manual","conjugate_transpose_m"
+    "expm","expm_manual","conjugate_transpose_m","krylov","block_fre"
 ]

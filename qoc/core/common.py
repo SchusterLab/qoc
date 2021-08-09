@@ -14,6 +14,7 @@ from qoc.standard import conjugate_transpose
 from qoc.standard.functions.expm_manual import expm_pade
 import numpy as np
 import scipy.linalg
+
 def clip_control_norms(controls, max_control_norms):
     """
     Me: I need the entry-wise norms of the column entries of my
@@ -582,4 +583,5 @@ def expm_frechet_algo_64(A,E ):
         L = np.dot(R, L) + np.dot(L, R)
         R = np.dot(R, R)
     return  R,L
+
 

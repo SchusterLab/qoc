@@ -10,6 +10,8 @@ from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
 
 import autograd.numpy as anp
+from qoc.standard.functions import krylov,block_fre
+from scipy.sparse import  bmat
 class ForbidStates(Cost):
     """
     This cost penalizes the occupation of a set of forbidden states.
@@ -112,21 +114,24 @@ class ForbidStates(Cost):
             for j in range(len(self.inner_products[i])):
                 self.back_states[i] = self.forbidden_states[i][j] * self.inner_products[i][j]
 
-    def update_state_back(self, propagator):
+    def update_state_back(self, A):
         self.inner_products = np.zeros_like(self.inner_products)
         for i in range(len(self.inner_products)):
             for j in range(len(self.inner_products[i])):
                 self.inner_products[i][j]=np.matmul(self.forbidden_states_dagger[j], self.final_states[i])
-                self.back_states[i][j]=np.matmul(propagator, self.back_states[i][j])+self.inner_products[i][j]*self.forbidden_states[i][j]
+                self.back_states[i][j]=krylov(A, self.back_states[i][j])+self.inner_products[i][j]*self.forbidden_states[i][j]
 
-    def update_state_forw(self, propagator):
-        self.final_states = np.matmul(propagator, self.final_states)
+    def update_state_forw(self, A):
+        self.final_states = krylov(A, self.final_states)
 
-    def gradient(self, dt, Hk):
+    def gradient(self, A,E):
         grads = 0
         for i in range(len(self.inner_products)):
             for j in range(len(self.inner_products[i])):
-                grads = grads + self.cost_multiplier * (2 * dt * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i][j]), np.matmul(Hk, self.final_states[i])))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
+                grads = grads + self.cost_multiplier * (2  * np.real(
+                    np.matmul(conjugate_transpose(self.back_states[i][j]), block_fre(A,E,self.final_states[i])))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
 
         return grads
+
+
+

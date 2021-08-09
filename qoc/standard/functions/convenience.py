@@ -10,7 +10,8 @@ from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
 import numpy as np
 import scipy.linalg as la
-
+from scipy.sparse.linalg import expm_multiply
+from scipy.sparse import bmat,isspmatrix
 ### COMPUTATIONS ###
 
 def commutator(a, b):
@@ -102,3 +103,29 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
+def krylov(A,states):
+    if len(states.shape)<=2:
+        states=states.flatten()
+        box=expm_multiply(A,states)
+    else:
+        states=states.reshape((states.shape[0]),states.shape[1])
+        box=[]
+        for i in range(states.shape[0]):
+            box.append(expm_multiply(A,states[i]))
+        box=np.array(box)
+        box=box.reshape((states.shape[0]),states.shape[1],1)
+    return box
+def block_fre(A,E,state):
+    HILBERT_SIZE = state.shape[0]
+    if isspmatrix(A) is False:
+        c = np.block([[A, E], [np.zeros_like(A), A]])
+    else:
+        c = bmat([[A, E], [None, A]])
+    state=state.flatten()
+    state0 = np.zeros_like(state)
+    state = np.block([state0, state])
+    state = expm_multiply(c, state)
+    state=state[0:HILBERT_SIZE]
+
+
+    return state.reshape((HILBERT_SIZE,1))

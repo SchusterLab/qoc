@@ -10,6 +10,8 @@ import numpy as np
 from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
 import autograd.numpy as anp
+from qoc.standard.functions import krylov,block_fre
+from scipy.sparse import bmat
 class TargetStateInfidelityTime(Cost):
     """
     This cost penalizes the infidelity of evolved states
@@ -98,32 +100,32 @@ class TargetStateInfidelityTime(Cost):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
 
-    def update_state_back(self, propagator):
+    def update_state_back(self, A):
         if self.neglect_relative_phase == False:
-            self.back_states=np.matmul(propagator, self.back_states)
+            self.back_states=krylov(A, self.back_states)
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i]+self.inner_products_sum[self.i]*self.target_states[i]
             self.i=self.i-1
         else:
             self.inner_products = np.matmul(self.target_states_dagger, self.final_states)[:, 0, 0]
-            self.back_states = np.matmul(propagator, self.back_states)
+            self.back_states = krylov(A, self.back_states)
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
-    def update_state_forw(self, propagator):
+    def update_state_forw(self, A):
         if self.neglect_relative_phase == False:
-            self.final_states = np.matmul(propagator, self.final_states)
+            self.final_states = krylov(A, self.final_states)
         else:
-            self.final_states = np.matmul(propagator, self.final_states)
+            self.final_states =krylov(A, self.final_states)
 
-    def gradient(self, dt, Hk):
+    def gradient(self, A, E):
         grads = 0
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
-                grads = grads + self.cost_multiplier * (-2 * dt * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), np.matmul(Hk, self.final_states[i])))) /(( self.state_count**2)*self.cost_eval_count)
+                grads = grads + self.cost_multiplier * (-2  * np.real(
+                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i])))) /(( self.state_count**2)*self.cost_eval_count)
         else:
             for i in range(self.state_count):
-                grads = grads + self.cost_multiplier * (-2 * dt * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), np.matmul(Hk, self.final_states[i])))) / (
+                grads = grads + self.cost_multiplier * (-2  * np.real(
+                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i])))) / (
                                     self.state_count * self.cost_eval_count)
         return grads

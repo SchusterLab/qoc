@@ -8,7 +8,7 @@ import numpy as np
 
 from qoc.core.common import (initialize_controls,expm_frechet,
                              slap_controls, strip_controls,
-                             clip_control_norms,gradient_trans, interpolate_tran ,get_magnus)
+                             clip_control_norms,gradient_trans, interpolate_tran ,get_magnus,)
 from qoc.core.mathmethods import (interpolate_linear_set,
                                   magnus_m2,
                                   magnus_m4,
@@ -21,7 +21,7 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         MagnusPolicy,
                         ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
-                          expm, matmuls)
+                          expm, matmuls,krylov)
 from qoc.standard.functions import conjugate_transpose_m
 
 ### MAIN METHODS ###
@@ -460,33 +460,24 @@ def manual_gradient(controls,pstate, reporter):
         if costs[l].type == "non-control":
             costs[l].gradient_initialize(reporter)
     for i in range(system_eval_count):
-        propagator,dUdt = expm_frechet(get_magnus(dt, hamiltonian,
+
+        total_H=get_magnus(dt, hamiltonian,
                                        (system_eval_count - 1 - i) * dt,
                                        control_eval_times=control_eval_times,
                                        controls=controls,
                                        interpolation_policy=interpolation_policy,
-                                       magnus_policy=magnus_policy, if_magnus=True),
-                            -1j * dt * control_hamiltonian[0], compute_expm=True, check_finite=False)
-        propagator=conjugate_transpose_m(propagator)
+                                       magnus_policy=magnus_policy, if_magnus=True)
+        total_H=-total_H
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_forw(propagator)
+                costs[l].update_state_forw(total_H)
         for k in range(len((control_hamiltonian))):
-            if k is not 0:
-                dUdt = expm_frechet(get_magnus(dt, hamiltonian,
-                                               (system_eval_count - 1 - i) * dt,
-                                               control_eval_times=control_eval_times,
-                                               controls=controls,
-                                               interpolation_policy=interpolation_policy,
-                                               magnus_policy=magnus_policy, if_magnus=True),
-                                    -1j * dt * control_hamiltonian[k], compute_expm=False, check_finite=False)
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(dt,dUdt)
-
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,-1j * dt * control_hamiltonian[k])
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_back(propagator)
+                costs[l].update_state_back(total_H)
     grads=gradient_trans(grads,control_eval_times,dt)
     for i in range(len(grads)):
         for k in range(len((control_hamiltonian))):
@@ -560,12 +551,12 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         # Evolve the states to the next time step.
         if not is_final_system_eval_step:
             if pstate.manual_gradient_mode==True:
-                states = np.matmul(get_magnus(dt, hamiltonian,
+                states = krylov(get_magnus(dt, hamiltonian,
                                      time,
                                     control_eval_times=control_eval_times,
                                     controls=controls,
                                     interpolation_policy=interpolation_policy,
-                                    magnus_policy=magnus_policy,),states)
+                                    magnus_policy=magnus_policy,if_magnus=True),states)
             else:
                 states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
                                                             states, time,
