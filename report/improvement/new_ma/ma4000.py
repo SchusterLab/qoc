@@ -57,7 +57,7 @@ def get_memory_manually(N,l):
     # Define the optimization.
     COMPLEX_CONTROLS = False
     CONTROL_COUNT = 1
-    EVOLUTION_TIME = 10  # nanoseconds
+    EVOLUTION_TIME = N  # nanoseconds
     CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = N + 1
     ITERATION_COUNT = 1
 
