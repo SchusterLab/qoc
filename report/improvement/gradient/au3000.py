@@ -35,7 +35,8 @@ data = [low_diagnol, diagnol, up_diagnol]
 offsets = [-1, 0, 1]
 A = -1j*dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
 B = -1j*dia_matrix(([low_diagnol, up_diagnol], [-1, 1]), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
-A=A+B
+A=A+0.1*B
+print(A)
 state = np.zeros(HILBERT_SIZE)
 state[HILBERT_SIZE-1]=1
 block_fre(A=A,E=B,state=state)
