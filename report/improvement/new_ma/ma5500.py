@@ -26,9 +26,9 @@ def get_memory_manually(N,l):
     HILBERT_SIZE = l
     # E.q. 19 (p. 6) of https://arxiv.org/abs/1904.06560.
     # E.q. 19 (p. 6) of https://arxiv.org/abs/1904.06560.
-    diagnol=np.arange(HILBERT_SIZE)
+    diagnol=np.ones(HILBERT_SIZE)
     up_diagnol = np.sqrt(diagnol)
-    low_diagnol = np.sqrt(np.arange(1, HILBERT_SIZE + 1))
+    low_diagnol = np.sqrt(np.ones(1, HILBERT_SIZE + 1))
     state = (1 / np.sqrt(HILBERT_SIZE)) * np.ones(HILBERT_SIZE)
     data = [low_diagnol, diagnol, up_diagnol]
     offsets = [-1, 0, 1]
