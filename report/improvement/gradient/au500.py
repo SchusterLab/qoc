@@ -9,20 +9,34 @@ from qoc.standard.functions.expm_manual import expm_pade
 from scipy.sparse.linalg import expm_multiply,expm
 from scipy.sparse import dia_matrix,bsr_matrix
 from qoc.core.common import expm_frechet
+from qoc.standard.functions.convenience import block_fre
 def derivative_Expansion(HILBERT_SIZE):
     diagnol = np.arange(HILBERT_SIZE)
     up_diagnol = np.sqrt(diagnol)
     low_diagnol = np.sqrt(np.arange(1, HILBERT_SIZE + 1))
     state = np.zeros(HILBERT_SIZE)
-    state[100]=1
+    state[HILBERT_SIZE-1]=1
     data = [low_diagnol, diagnol, up_diagnol]
     offsets = [-1, 0, 1]
-    A = dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).todense()
-    B = dia_matrix(([low_diagnol, up_diagnol], [-1, 1]), shape=(HILBERT_SIZE, HILBERT_SIZE)).todense()
+    A = -1j*dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).todense()
+    B = -1j*dia_matrix(([low_diagnol, up_diagnol], [-1, 1]), shape=(HILBERT_SIZE, HILBERT_SIZE)).todense()
+    A=A+B
     c = np.block([[A, B], [np.zeros_like(A), A]])
     c=bsr_matrix(c).tocsc()
     state0=np.zeros_like(state)
     state=np.block([state0,state])
     state=expm_multiply(c,state)
     return
-derivative_Expansion(500)
+HILBERT_SIZE=500
+diagnol = np.arange(HILBERT_SIZE)
+up_diagnol = np.sqrt(diagnol)
+low_diagnol = np.sqrt(np.arange(1, HILBERT_SIZE + 1))
+data = [low_diagnol, diagnol, up_diagnol]
+offsets = [-1, 0, 1]
+A = -1j*dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
+B = -1j*dia_matrix(([low_diagnol, up_diagnol], [-1, 1]), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
+A=A+B
+state = np.zeros(HILBERT_SIZE)
+state[HILBERT_SIZE-1]=1
+block_fre(A=A,E=B,state=state)
+
