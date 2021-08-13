@@ -26,13 +26,14 @@ def get_memory_manually(N,l):
     HILBERT_SIZE = l
     # E.q. 19 (p. 6) of https://arxiv.org/abs/1904.06560.
     # E.q. 19 (p. 6) of https://arxiv.org/abs/1904.06560.
-    diagnol=np.ones(HILBERT_SIZE)
+    diagnol = np.arange(HILBERT_SIZE)
     up_diagnol = np.sqrt(diagnol)
-    low_diagnol = np.sqrt(np.ones( HILBERT_SIZE ))
+    low_diagnol = np.sqrt(np.arange(1, HILBERT_SIZE + 1))
     state = (1 / np.sqrt(HILBERT_SIZE)) * np.ones(HILBERT_SIZE)
     data = [low_diagnol, diagnol, up_diagnol]
     offsets = [-1, 0, 1]
     H_SYSTEM_0= dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
+    H_SYSTEM_0=H_SYSTEM_0.dot(H_SYSTEM_0)
     sigmax = dia_matrix(([low_diagnol, up_diagnol], [-1, 1]), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
     # Only real control amplitutdes are supported!
     hamiltonian = lambda controls, time: (H_SYSTEM_0
@@ -82,4 +83,4 @@ def get_memory_manually(N,l):
                                              )
     if __name__ == "__main__":
         main()
-get_memory_manually(1,4500)
+get_memory_manually(1,100)
