@@ -11,9 +11,9 @@ from scipy.sparse import dia_matrix,bsr_matrix
 from qoc.core.common import expm_frechet
 def krylov_sparse(HILBERT_SIZE):
     state = np.sqrt(1 / HILBERT_SIZE) * np.ones(HILBERT_SIZE)
-    diagnol=np.arange(HILBERT_SIZE)
+    diagnol=100*np.ones(HILBERT_SIZE)
     up_diagnol=np.sqrt(diagnol)
-    low_diagnol=np.sqrt(np.arange(1,HILBERT_SIZE+1))
+    low_diagnol=np.sqrt(np.arange(HILBERT_SIZE))
     data=[low_diagnol,diagnol,up_diagnol]
     offsets=[-1,0,1]
     A = -1j * dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
@@ -21,5 +21,5 @@ def krylov_sparse(HILBERT_SIZE):
     A = A +0.1* B
     state=expm_multiply(A,state)
     return state
-for i in range(1000):
+for i in range(10000):
     krylov_sparse(2000)
