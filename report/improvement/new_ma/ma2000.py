@@ -30,6 +30,7 @@ def get_memory_manually(N,l):
     up_diagnol = np.sqrt(diagnol)
     low_diagnol = np.sqrt(np.arange(1, HILBERT_SIZE + 1))
     state = (1 / np.sqrt(HILBERT_SIZE)) * np.ones(HILBERT_SIZE)
+    state=state.reshape(1,HILBERT_SIZE,1)
     data = [low_diagnol, diagnol, up_diagnol]
     offsets = [-1, 0, 1]
     H_SYSTEM_0= dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
@@ -53,7 +54,7 @@ def get_memory_manually(N,l):
     TARGET_STATE_0[1,0]=1
     INITIAL_STATES = anp.stack((INITIAL_STATE_0,), axis=0)
     TARGET_STATES = anp.stack((TARGET_STATE_0,), axis=0)
-    COSTS = [TargetStateInfidelity(TARGET_STATES)]
+    COSTS = [TargetStateInfidelity(state)]
 
     # Define the optimization.
     COMPLEX_CONTROLS = False
@@ -83,4 +84,4 @@ def get_memory_manually(N,l):
                                              )
     if __name__ == "__main__":
         main()
-get_memory_manually(1,1500)
+get_memory_manually(1,1100)
