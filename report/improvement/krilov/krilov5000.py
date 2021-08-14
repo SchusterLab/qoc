@@ -17,4 +17,4 @@ def krylov(HILBERT_SIZE):
     A = -1j * 0.1 * H0
     state=expm_multiply(A,state)
     return state
-krylov(100000)
+krylov(50000)

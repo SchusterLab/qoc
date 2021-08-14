@@ -18,4 +18,4 @@ def pade(HILBERT_SIZE):
     propagator=expm_pade(A)
 
     return np.matmul(propagator,state)
-pade(100000)
+pade(50000)
