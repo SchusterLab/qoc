@@ -34,7 +34,7 @@ def get_memory_manually(N,l):
     data = [low_diagnol, diagnol, up_diagnol]
     offsets = [-1, 0, 1]
     H_SYSTEM_0= dia_matrix((data, offsets), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
-    H_SYSTEM_0=1/200*H_SYSTEM_0.dot(H_SYSTEM_0)
+    H_SYSTEM_0=1/10*H_SYSTEM_0.dot(H_SYSTEM_0)
     sigmax = dia_matrix(([low_diagnol, up_diagnol], [-1, 1]), shape=(HILBERT_SIZE, HILBERT_SIZE)).tocsc()
     # Only real control amplitutdes are supported!
     hamiltonian = lambda controls, time: (H_SYSTEM_0
