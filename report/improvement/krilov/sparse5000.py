@@ -22,4 +22,4 @@ def krylov_sparse(HILBERT_SIZE):
     state=expm_multiply(A,state)
     return state
 for i in range(100000):
-    krylov_sparse(100000)
+    krylov_sparse(5000)
