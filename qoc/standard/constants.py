@@ -3,7 +3,7 @@ constants.py - This module defines constants.
 """
 
 import numpy as np
-
+from scipy.sparse import dia_matrix
 ### CONSTANTS ###
 
 SIGMA_X = np.array(((0, 1), (1, 0)))
@@ -63,3 +63,22 @@ def get_eij(i, j, size):
     eij = np.zeros((size, size))
     eij[i, j] = 1
     return eij
+
+def harmonic(H_size):
+    diagnol = np.arange(H_size)
+    up_diagnol = np.sqrt(diagnol)
+    low_diagnol = np.sqrt(np.arange(1, H_size + 1))
+    a= dia_matrix(([ up_diagnol], [ 1]), shape=(H_size, H_size)).tocsc()
+    a_dag=dia_matrix(([ low_diagnol], [ -1]), shape=(H_size, H_size)).tocsc()
+    return a_dag,a
+
+def transmon(w_01,anharmonicity,H_size):
+    from scipy.sparse.linalg import expm_multiply
+    b_dag,b=harmonic(H_size=H_size)
+    H0=b_dag.dot(b)
+    diagnol=np.ones(H_size)
+    I= dia_matrix(([ diagnol], [ 0]), shape=(H_size, H_size)).tocsc()
+    H0=w_01*H0+anharmonicity*H0*(H0-I)
+    state=np.ones(H_size)
+    expm_multiply(H0,state)
+    return H0,b_dag,b
