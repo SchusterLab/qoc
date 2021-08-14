@@ -556,7 +556,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
                                     control_eval_times=control_eval_times,
                                     controls=controls,
                                     interpolation_policy=interpolation_policy,
-                                    magnus_policy=magnus_policy,if_magnus=True),states)
+                                    magnus_policy=magnus_policy,if_magnus=True),states,if_AB=True)
             else:
                 states = _evolve_step_schroedinger_discrete(dt, hamiltonian,
                                                             states, time,

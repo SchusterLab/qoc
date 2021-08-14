@@ -11,6 +11,7 @@ from qoc.standard.functions import conjugate_transpose
 from qoc.standard.functions import conjugate_transpose_m
 from qoc.standard.functions import krylov,block_fre
 
+
 class TargetStateInfidelity(Cost):
     """
     This cost penalizes the infidelity of an evolved state
@@ -93,12 +94,12 @@ class TargetStateInfidelity(Cost):
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E, self.final_states[i])))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E, self.final_states[i],if_AB=True)))) / (
                                     self.state_count ** 2)
         else:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E,self.final_states[i])))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E,self.final_states[i],if_AB=True)))) / (
                                     self.state_count )
         return grads
 

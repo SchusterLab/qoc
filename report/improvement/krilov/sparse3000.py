@@ -21,4 +21,5 @@ def krylov_sparse(HILBERT_SIZE):
     A = A +0.1* B
     state=expm_multiply(A,state)
     return state
-krylov_sparse(3000)
+for i in range(1000):
+    krylov_sparse(3000)

@@ -31,7 +31,6 @@ from .plot import (plot_controls, plot_density_population,
                    plot_state_population,)
 
 from .utils import (ans_jacobian, generate_save_file_path, CustomJSONEncoder,)
-
 __all__ = [
     "get_annihilation_operator", "get_creation_operator",
     "get_eij", "SIGMA_X", "SIGMA_Y", "SIGMA_Z", "SIGMA_MINUS",

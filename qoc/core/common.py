@@ -14,7 +14,7 @@ from qoc.standard import conjugate_transpose
 from qoc.standard.functions.expm_manual import expm_pade
 import numpy as np
 import scipy.linalg
-
+from scipy.sparse import isspmatrix, linalg as sla
 def clip_control_norms(controls, max_control_norms):
     """
     Me: I need the entry-wise norms of the column entries of my
@@ -565,19 +565,16 @@ def expm_frechet_algo_64(A,E ):
         del W  # 11
         Lv = np.dot(A6, Lz1) + np.dot(M6, Z1) + Lz2
         del A6,M6,Z1,Lz2,Lz1
-        lu_piv = scipy.linalg.lu_factor(-U + V)
-        R = scipy.linalg.lu_solve(lu_piv, U + V)
-        L = scipy.linalg.lu_solve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
-        del lu_piv,Lu,Lv,U,V
-        # squaring
-        for k in range(s):
-            L = np.dot(R, L) + np.dot(L, R)
-            R = np.dot(R, R)
-        return  R,L
+
     # factor once and solve twice
+    if isspmatrix(U):
+        lu_piv = sla.splu(-U + V)
+        R = sla.spsolve(lu_piv, U + V)
+        L = sla.spsolve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
     lu_piv = scipy.linalg.lu_factor(-U + V)
     R = scipy.linalg.lu_solve(lu_piv, U + V)
     L = scipy.linalg.lu_solve(lu_piv, Lu + Lv + np.dot((Lu - Lv), R))
+    del lu_piv, Lu, Lv, U, V
     # squaring
     for k in range(s):
         L = np.dot(R, L) + np.dot(L, R)
