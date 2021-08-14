@@ -84,4 +84,4 @@ def get_memory_manually(N,l):
     if __name__ == "__main__":
         main()
 for i in range(10):
-    get_memory_manually(1,25000)
+    get_memory_manually(1,500)
