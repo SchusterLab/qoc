@@ -4,6 +4,7 @@ constants.py - This module defines constants.
 
 import numpy as np
 from scipy.sparse import dia_matrix
+from qutip import coherent
 ### CONSTANTS ###
 
 SIGMA_X = np.array(((0, 1), (1, 0)))
@@ -82,3 +83,7 @@ def transmon(w_01,anharmonicity,H_size):
     state=np.ones(H_size)
     expm_multiply(H0,state)
     return H0,b_dag,b
+
+def coherent_state(N,alpha):
+    state=np.array(coherent(N,alpha))
+    return state.reshape((1,state.shape[0],1))
