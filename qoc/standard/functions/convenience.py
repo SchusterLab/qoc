@@ -545,7 +545,7 @@ def _expm_multiply_simple(A, B, t=1.0, balance=False):
         m_star, s = _fragment_3_1(norm_info, n0, tol, ell=ell)
     return _expm_multiply_simple_core(A, B, t, mu, m_star, s, tol, balance)
 
-@profile
+
 def _expm_multiply_simple_core(A, B, t, mu, m_star, s, tol=None, balance=False):
     """
     A helper function.
