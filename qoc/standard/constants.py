@@ -3,8 +3,7 @@ constants.py - This module defines constants.
 """
 
 import numpy as np
-from scipy.sparse import dia_matrix
-from qutip import coherent
+from scipy.sparse import dia_matrix,identity
 ### CONSTANTS ###
 
 SIGMA_X = np.array(((0, 1), (1, 0)))
@@ -79,11 +78,21 @@ def transmon(w_01,anharmonicity,H_size):
     H0=b_dag.dot(b)
     diagnol=np.ones(H_size)
     I= dia_matrix(([ diagnol], [ 0]), shape=(H_size, H_size)).tocsc()
-    H0=w_01*H0+anharmonicity*H0*(H0-I)
+    H0=w_01*H0+anharmonicity/2*H0*(H0-I)
     state=np.ones(H_size)
-    expm_multiply(H0,state)
     return H0,b_dag,b
 
 def coherent_state(N,alpha):
-    state=np.array(coherent(N,alpha))
-    return state.reshape((1,state.shape[0],1))
+    offset=0
+    sqrtn = np.sqrt(np.arange(offset, offset + N, dtype=complex))
+    sqrtn[0] = 1  # Get rid of divide by zero warning
+    data = alpha / sqrtn
+    if offset == 0:
+        data[0] = np.exp(-abs(alpha) ** 2 / 2.0)
+    else:
+        s = np.prod(np.sqrt(np.arange(1, offset + 1)))  # sqrt factorial
+        data[0] = np.exp(-abs(alpha) ** 2 / 2.0) * alpha ** (offset) / s
+    np.cumprod(data, out=sqrtn)  # Reuse sqrtn array
+    return sqrtn.reshape((1,sqrtn.shape[0],1))
+def Identity(H_size):
+    return identity(H_size)

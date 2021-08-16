@@ -40,7 +40,7 @@ class TargetStateInfidelity(Cost):
         self.target_states = target_states
         self.type = "non-control"
         self.neglect_relative_phase = neglect_relative_phase
-    def cost(self, controls, states, system_eval_step,manual_mode=None):
+    def cost(self, controls, states, system_eval_step,manual_mode):
         """
         Compute the penalty.
 
@@ -89,17 +89,17 @@ class TargetStateInfidelity(Cost):
     def update_state_back(self, A):
         self.back_states = krylov(A, self.back_states)
 
-    def gradient(self, A,E):
+    def gradient(self, A,E,MAM):
         grads = 0
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E, self.final_states[i],if_AB=True)))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E, self.final_states[i],MAM)))) / (
                                     self.state_count ** 2)
         else:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E,self.final_states[i],if_AB=True)))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E,self.final_states[i],MAM)))) / (
                                     self.state_count )
         return grads
 
