@@ -327,18 +327,23 @@ def _expm_multiply_simple(A, B, t=1.0, balance=False):
         n0 = B.shape[1]
     else:
         raise ValueError('expected B to be like a matrix or a vector')
-    u_d = 2**-53
+    u_d = 2 ** -53
     tol = u_d
     mu = _trace(A) / float(n)
-    A = A - mu * ident
-    A_1_norm = _exact_1_norm(A)
-    if t*A_1_norm == 0:
-        m_star, s = 0, 1
+    if 'm_star' in globals():
+        pass
     else:
-        ell = 2
-        norm_info = LazyOperatorNormInfo(t*A, A_1_norm=t*A_1_norm, ell=ell)
-        m_star, s = _fragment_3_1(norm_info, n0, tol, ell=ell)
-    return _expm_multiply_simple_core(A, B, t, mu, m_star, s, tol, balance)
+
+        A = A - mu * ident
+        A_1_norm = _exact_1_norm(A)
+        global m_star,s_star
+        if t * A_1_norm == 0:
+            m_star, s_star = 0, 1
+        else:
+            ell = 2
+            norm_info = LazyOperatorNormInfo(t * A, A_1_norm=t * A_1_norm, ell=ell)
+            m_star, s_star = _fragment_3_1(norm_info, n0, tol, ell=ell)
+    return _expm_multiply_simple_core(A, B, t, mu, m_star, s_star, tol, balance)
 
 
 def _expm_multiply_simple_core(A, B, t, mu, m_star, s, tol=None, balance=False):
