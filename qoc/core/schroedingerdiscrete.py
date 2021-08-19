@@ -541,7 +541,6 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
             # Compute step costs every `cost_step`.
             if is_cost_step and not is_first_system_eval_step:
                 for i, step_cost in enumerate(step_costs):
-                    if not step_cost.type == 'control':
                         cost_error = step_cost.cost(controls, states, system_eval_step, pstate.manual_gradient_mode)
                         error = error + cost_error
             # ENDFOR
