@@ -59,42 +59,25 @@ class ControlNorm(Cost):
         cost
         """
         # Normalize the controls.
-        if manual_mode==True:
-            if self.max_control_norms is not None:
-                controls = controls / self.max_control_norms
-            
-            # Weight the controls.
-            if self.control_weights is not None:
-                controls = controls[:,] * self.control_weights
-
-            # The cost is the sum of the square of the modulus of the normalized,
-            # weighted, controls.
-            cost = np.sum(np.real(controls * np.conjugate(controls)))
-            cost_normalized = cost / self.controls_size
-        else:
-            if self.max_control_norms is not None:
-                controls = controls / self.max_control_norms
-
-            # Weight the controls.
+        cost_normalized=0
+        if self.max_control_norms==None:
+        # Weight the controls.
             if self.control_weights is not None:
                 controls = controls[:, ] * self.control_weights
-
-            # The cost is the sum of the square of the modulus of the normalized,
-            # weighted, controls.
+        # The cost is the sum of the square of the modulus of the normalized,
+        # weighted, controls.
             cost = anp.sum(anp.real(controls * anp.conjugate(controls)))
             cost_normalized = cost / self.controls_size
+        else:
+            for i, max_norm in enumerate(self.max_control_norms):
+                control = controls[:, i]
+                control_sq = anp.abs(control)
+                penalty_indices = anp.nonzero(control_sq >= max_norm)[0]
+                penalized_control = control_sq[penalty_indices]
+                penalty = (penalized_control-max_norm)/penalized_control
+                if self.control_weights is not None:
+                    penalty_normalized=penalty*self.control_weights[penalty_indices]
+                else:
+                    penalty_normalized = penalty / (penalty_indices.shape[0]* len(self.max_control_norms))
+                cost_normalized = cost_normalized + anp.sum(penalty_normalized)
         return cost_normalized * self.cost_multiplier
-
-    def gradient_initialize(self, reporter):
-        return
-    def update_state(self, propagator):
-        return
-
-    def gradient(self,controls,j,k):
-        grads=(2*controls[j][k]*self.cost_multiplier)/(self.controls_size)
-        if self.max_control_norms is not None:
-            grads=grads/(self.max_control_norms)**2
-        # Weight the controls.
-        if self.control_weights is not None:
-            grads = grads * (self.control_weights[j][k]**2)
-        return grads

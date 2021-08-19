@@ -4,6 +4,7 @@ constants.py - This module defines constants.
 
 import numpy as np
 from scipy.sparse import dia_matrix,identity
+from scipy.sparse.linalg import expm_multiply
 ### CONSTANTS ###
 
 SIGMA_X = np.array(((0, 1), (1, 0)))
@@ -82,17 +83,26 @@ def transmon(w_01,anharmonicity,H_size):
     state=np.ones(H_size)
     return H0,b_dag,b
 
-def coherent_state(N,alpha):
-    offset=0
-    sqrtn = np.sqrt(np.arange(offset, offset + N, dtype=complex))
-    sqrtn[0] = 1  # Get rid of divide by zero warning
-    data = alpha / sqrtn
-    if offset == 0:
-        data[0] = np.exp(-abs(alpha) ** 2 / 2.0)
+
+def coherent_state(H_size,alpha,method='analytic'):
+    if method=='operator':
+        diagnol = np.arange(H_size)
+        up_diagnol = np.sqrt(diagnol)
+        low_diagnol = np.sqrt(np.arange(1, H_size + 1))
+        a = dia_matrix(([up_diagnol], [1]), shape=(H_size, H_size)).tocsc()
+        a_dag = dia_matrix(([low_diagnol], [-1]), shape=(H_size, H_size)).tocsc()
+        state=np.zeros(H_size)
+        state[0]=1
+        A=alpha*a_dag-np.complex(alpha)*a
+        state=expm_multiply(A,state)
+        state=state.reshape((1,state.shape[0],1))
+        return state
     else:
-        s = np.prod(np.sqrt(np.arange(1, offset + 1)))  # sqrt factorial
-        data[0] = np.exp(-abs(alpha) ** 2 / 2.0) * alpha ** (offset) / s
-    np.cumprod(data, out=sqrtn)  # Reuse sqrtn array
-    return sqrtn.reshape((1,sqrtn.shape[0],1))
+        sqrtn = np.sqrt(np.arange(0, H_size, dtype=complex))
+        sqrtn[0] = 1  # Get rid of divide by zero warning
+        data = alpha / sqrtn
+        data[0] = np.exp(-abs(alpha) ** 2 / 2.0)
+        np.cumprod(data, out=sqrtn)  # Reuse sqrtn array
+        return sqrtn
 def Identity(H_size):
     return identity(H_size)

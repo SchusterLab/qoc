@@ -57,16 +57,13 @@ class ControlVariation(Cost):
         Returns:
         cost
         """
-        if manual_mode==True:
-            if self.max_control_norms is not None:
-                normalized_controls = controls / self.max_control_norms
-            else:
-                normalized_controls = controls
+        if self.max_control_norms is None:
+            normalized_controls = controls
 
         # Penalize the square of the absolute value of the difference
         # in value of the control parameters from one step to the next.
-            diffs = np.diff(normalized_controls, axis=0, n=self.order)
-            cost = np.sum(np.real(diffs * np.conjugate(diffs)))
+            diffs = anp.diff(normalized_controls, axis=0, n=self.order)
+            cost = anp.sum(anp.real(diffs * anp.conjugate(diffs)))
         # You can prove that the square of the complex modulus of the difference
         # between two complex values is l.t.e. 2 if the complex modulus
         # of the two complex values is l.t.e. 1 respectively using the
@@ -74,52 +71,18 @@ class ControlVariation(Cost):
         # Therefore, a factor of 2 should be used to normalize the diffs.
             cost_normalized = cost / self.cost_normalization_constant
         else:
-            if self.max_control_norms is not None:
-                normalized_controls = controls / self.max_control_norms
-            else:
-                normalized_controls = controls
+            cost_normalized=0
+            diffs = anp.diff(controls, axis=0, n=self.order)
+            for i, max_norm in enumerate(self.max_control_norms):
+                diff = diffs[:, i]
+                diff_sq = anp.abs(diff)
+                penalty_indices = anp.nonzero(diff_sq > max_norm)[0]
+                penalized_control = diff_sq[penalty_indices]
+                penalty = (penalized_control-max_norm)/penalized_control
 
-            # Penalize the square of the absolute value of the difference
-            # in value of the control parameters from one step to the next.
-            diffs = anp.diff(normalized_controls, axis=0, n=self.order)
-            cost = anp.sum(anp.real(diffs * anp.conjugate(diffs)))
-            # You can prove that the square of the complex modulus of the difference
-            # between two complex values is l.t.e. 2 if the complex modulus
-            # of the two complex values is l.t.e. 1 respectively using the
-            # triangle inequality. This fact generalizes for higher order differences.
-            # Therefore, a factor of 2 should be used to normalize the diffs.
-            cost_normalized = cost / self.cost_normalization_constant
+                penalty_normalized = penalty / (penalty_indices.shape[0]* len(self.max_control_norms))
+                cost_normalized = cost_normalized + anp.sum(penalty_normalized)
+
+
         return cost_normalized * self.cost_multiplier
 
-    def gradient_initialize(self, reporter):
-        return
-    def update_state(self, propagator):
-        return
-
-    def gradient(self, controls,j,k):
-        grads=self.cost_multiplier/self.cost_normalization_constant
-        if self.max_control_norms is not None:
-            grads = grads / (self.max_control_norms) ** 2
-        if self.order==1:
-                if j==0 :
-                    grads=-grads*2*(controls[j+1][k]-controls[j][k])
-                elif j == self.control_eval_account-1:
-                    grads = grads * 2 * (controls[j ][k] - controls[j-1][k])
-                else:
-                    grads = grads * 2 *( (controls[j][k] - controls[j - 1][k])-(controls[j+1][k]-controls[j][k]))
-        if self.order==2:
-                if j==0 :
-                    grads=grads*2*(controls[j+2][k]-2*controls[j+1][k]+controls[j][k])
-                elif j==1:
-                    grads = grads *(-4*(controls[j+1][k]-2*controls[j][k]+controls[j-1][k])
-                                        +2*(controls[j+2][k]-2*controls[j+1][k]+controls[j][k]))
-                elif j==self.control_eval_account-2:
-                    grads=grads*(2*(controls[j][k]-2*controls[j-1][k]+controls[j-2][k])
-                                    -4*(controls[j+1][k]-2*controls[j][k]+controls[j-1][k]))
-                elif j == self.control_eval_account-1:
-                    grads = grads * 2*(controls[j][k]-2*controls[j-1][k]+controls[j-2][k])
-                else:
-                    grads = grads *(2*(controls[j][k]-2*controls[j-1][k]+controls[j-2][k])
-                                    -4*(controls[j+1][k]-2*controls[j][k]+controls[j-1][k])
-                                        +2*(controls[j+2][k]-2*controls[j+1][k]+controls[j][k]))
-        return grads

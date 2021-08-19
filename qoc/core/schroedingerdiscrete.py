@@ -338,7 +338,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
     if pstate.manual_gradient_mode is True:
         error=_evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=False)
         grads=manual_gradient(controls, pstate, reporter)
-        erro_pu=0
+        error_pu=0
         grads_pu=0
         for i in range(len(pstate.costs)):
             if pstate.costs[i].type=='control':
