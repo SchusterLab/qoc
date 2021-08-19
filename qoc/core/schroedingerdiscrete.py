@@ -235,6 +235,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_intermediate_states,
                                             save_iteration_step,
                                             system_eval_count,  )
+
     else:
         pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
                                             control_eval_count, cost_eval_step,
@@ -335,8 +336,16 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Evaluate the jacobian.
     if pstate.manual_gradient_mode is True:
-        error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
-        grads = manual_gradient(controls, pstate, reporter)
+        error=_evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=False)
+        grads=manual_gradient(controls, pstate, reporter)
+        erro_pu=0
+        grads_pu=0
+        for i in range(len(pstate.costs)):
+            if pstate.costs[i].type=='control':
+                error_pu, grads_pu = (ans_jacobian(_evaluate_schroedinger_discrete, 0)(controls, pstate, reporter))
+                break
+        error=pstate.error=error+error_pu
+        grads=grads+grads_pu
     else :
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)(controls, pstate, reporter))
     # Autograd defines the derivative of a function of complex inputs as
@@ -482,7 +491,7 @@ def manual_gradient(controls,pstate, reporter):
 
     return grads
 
-def _evaluate_schroedinger_discrete(controls, pstate, reporter):
+def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
     """
     Compute the value of the total cost function for one evolution.
 
@@ -520,46 +529,67 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
     if pstate.manual_gradient_mode == True:
-        for system_eval_step in range(system_eval_count):
-            # If applicable, save the current states.
-            if save_intermediate_states:
-                if isinstance(states, Box):
-                    intermediate_states = states._value
-                else:
-                    intermediate_states = states
-                pstate.save_intermediate_states(iteration,
-                                                intermediate_states,
-                                                system_eval_step, )
+        if pulse==None:
 
-            # Determine where we are in the mesh.
-            cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
-            is_cost_step = cost_step_remainder == 0
-            is_first_system_eval_step = system_eval_step == 0
-            is_final_system_eval_step = system_eval_step == final_system_eval_step
-            time = system_eval_step * dt
-
-            # Compute step costs every `cost_step`.
-            if is_cost_step and not is_first_system_eval_step:
-                for i, step_cost in enumerate(step_costs):
-                        cost_error = step_cost.cost(controls, states, system_eval_step, pstate.manual_gradient_mode)
+            for i, cost in enumerate(costs):
+                if cost.type=='control':
+                    if not cost.requires_step_evaluation:
+                        cost_error = cost.cost(controls, states, final_system_eval_step,None)
                         error = error + cost_error
-            # ENDFOR
 
-            # Evolve the states to the next time step.
-            if not is_final_system_eval_step:
-                states = krylov(get_magnus(dt, hamiltonian,
+            # Report reults.
+            # Report reults.
+            return error
+
+        else:
+            for system_eval_step in range(system_eval_count):
+                # If applicable, save the current states.
+                if save_intermediate_states:
+                    if isinstance(states, Box):
+                        intermediate_states = states._value
+                    else:
+                        intermediate_states = states
+                    pstate.save_intermediate_states(iteration,
+                                                    intermediate_states,
+                                                    system_eval_step, )
+
+                # Determine where we are in the mesh.
+                cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
+                is_cost_step = cost_step_remainder == 0
+                is_first_system_eval_step = system_eval_step == 0
+                is_final_system_eval_step = system_eval_step == final_system_eval_step
+                time = system_eval_step * dt
+
+                # Compute step costs every `cost_step`.
+                if is_cost_step and not is_first_system_eval_step:
+                    for i, step_cost in enumerate(step_costs):
+                        if not step_cost.type == 'control':
+                            cost_error = step_cost.cost(controls, states, system_eval_step, pstate.manual_gradient_mode)
+                            error = error + cost_error
+                # ENDFOR
+
+                # Evolve the states to the next time step.
+                if not is_final_system_eval_step:
+                    states = krylov(get_magnus(dt, hamiltonian,
                                                time,
                                                control_eval_times=control_eval_times,
                                                controls=controls,
                                                interpolation_policy=interpolation_policy,
                                                magnus_policy=magnus_policy, if_magnus=True), states, if_AB=pstate.MAM)
-        # ENDFOR
+            # ENDFOR
 
-        # Compute non-step-costs.
-        for i, cost in enumerate(costs):
-            if not cost.requires_step_evaluation:
-                cost_error = cost.cost(controls, states, final_system_eval_step, pstate.manual_gradient_mode)
-                error = error + cost_error
+            # Compute non-step-costs.
+            for i, cost in enumerate(costs):
+                if not cost.type == 'control':
+                    if not cost.requires_step_evaluation:
+                        cost_error = cost.cost(controls, states, final_system_eval_step, pstate.manual_gradient_mode)
+                        error = error + cost_error
+            reporter.error = error
+            reporter.final_states = states
+
+            return error
+
+
     else:
         for system_eval_step in range(system_eval_count):
             # If applicable, save the current states.
@@ -598,14 +628,12 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
 
         # Compute non-step-costs.
         for i, cost in enumerate(costs):
-
                 if not cost.requires_step_evaluation:
                     cost_error = cost.cost(controls, states, final_system_eval_step, pstate.manual_gradient_mode)
                     error = error + cost_error
 
         # Report reults.
     # Report reults.
-    reporter.error = error
-    reporter.final_states = states
-
-    return error
+        reporter.error = error
+        reporter.final_states = states
+        return error
