@@ -251,7 +251,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_intermediate_states,
                                             save_iteration_step,
                                             system_eval_count, manual_parameter['control_hamiltonian'],
-                                            manual_parameter['manual_gradient_mode'],manual_parameter['MAM'])
+                                            manual_parameter['manual_gradient_mode'],manual_parameter['tol'])
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -483,7 +483,7 @@ def manual_gradient(controls,pstate, reporter):
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,-1j * dt * control_hamiltonian[k],pstate.MAM)
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,-1j * dt * control_hamiltonian[k],pstate.tol)
         for l in range(len((costs))):
             if costs[l].type == "non-control":
                 costs[l].update_state_back(total_H)
@@ -575,7 +575,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
                                                control_eval_times=control_eval_times,
                                                controls=controls,
                                                interpolation_policy=interpolation_policy,
-                                               magnus_policy=magnus_policy, if_magnus=True), states, if_AB=pstate.MAM)
+                                               magnus_policy=magnus_policy, if_magnus=True), states, tol=pstate.tol)
             # ENDFOR
 
             # Compute non-step-costs.

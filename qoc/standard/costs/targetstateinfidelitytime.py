@@ -117,15 +117,15 @@ class TargetStateInfidelityTime(Cost):
         else:
             self.final_states =krylov(A, self.final_states)
 
-    def gradient(self, A, E):
+    def gradient(self, A, E,tol):
         grads = 0
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i])))) /(( self.state_count**2)*self.cost_eval_count)
+                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) /(( self.state_count**2)*self.cost_eval_count)
         else:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i])))) / (
+                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) / (
                                     self.state_count * self.cost_eval_count)
         return grads

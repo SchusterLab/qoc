@@ -48,7 +48,7 @@ SAVE_FILE_NAME = "transmon_pi"
 SAVE_FILE_PATH = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
 
-manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"MAM":True}
+manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"tol":1e-8}
 
 
 def main():

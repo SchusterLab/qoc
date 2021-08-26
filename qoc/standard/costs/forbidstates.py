@@ -124,12 +124,12 @@ class ForbidStates(Cost):
     def update_state_forw(self, A):
         self.final_states = krylov(A, self.final_states)
 
-    def gradient(self, A,E):
+    def gradient(self, A,E,tol):
         grads = 0
         for i in range(len(self.inner_products)):
             for j in range(len(self.inner_products[i])):
                 grads = grads + self.cost_multiplier * (2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i][j]), block_fre(A,E,self.final_states[i])))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
+                    np.matmul(conjugate_transpose(self.back_states[i][j]), block_fre(A,E,self.final_states[i],tol=tol)))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
 
         return grads
 
