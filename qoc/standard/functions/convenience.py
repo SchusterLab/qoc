@@ -218,15 +218,13 @@ def _expm_multiply_simple_core(A, B,mu, m_star, s, tol=None,):
     F = B
     eta = np.exp(mu / float(s))
     for i in range(s):
-        c1 = _exact_inf_norm(B)
         for j in range(m_star):
             coeff = 1 / float(s*(j+1))
             B = coeff * A.dot(B)
             c2 = _exact_inf_norm(B)
             F = F + B
-            if c1 + c2 <= tol * _exact_inf_norm(F):
+            if c2 <= tol * _exact_inf_norm(F):
                 break
-            c1 = c2
         F = eta * F
         B = F
     return F
