@@ -135,7 +135,7 @@ def block_fre(A,E,state,tol):
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
 
-    state = expm_multiply(c, state,u_d=tol)
+    state = expmv(1., c, state, tol)
     state = state[0:HILBERT_SIZE]
     return state.reshape((HILBERT_SIZE, 1))
 """Compute the action of the matrix exponential.
