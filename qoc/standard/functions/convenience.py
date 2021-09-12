@@ -13,6 +13,8 @@ import numpy as np
 import scipy.linalg as la
 from scipy.sparse import bmat,isspmatrix,identity
 
+from pyexpokit import expmv
+
 
 ### COMPUTATIONS ###
 
@@ -110,12 +112,12 @@ def krylov(A,states,tol=2**-53):
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        box=expm_multiply(A,states,u_d=tol)
+        box= expmv(1., A, states, tol)
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
         for i in range(states.shape[0]):
-            box.append(expm_multiply(A,states[i],u_d=tol))
+            box.append(expmv(1., A, states[i], tol))
         box=np.array(box)
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
