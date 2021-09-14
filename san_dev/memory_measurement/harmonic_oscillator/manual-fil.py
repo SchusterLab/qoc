@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse import dia_matrix
 
 from filprofiler.api import profile
-
+import os
 
 # Define the system.
 def get_memory_manually(N, l):
@@ -81,9 +81,14 @@ def get_memory_manually(N, l):
 N_ = 1
 
 mem_ma_Nfixed = []
-h_dims = [int(10**i) for i in range(1, 5, 1)]
+h_dims = [int(10**i) for i in range(1, 7, 1)]
+
+# get current directory
+current_dir = os.getcwd()
 
 # using fil
 for dim in h_dims:
-    fil_result = profile(lambda: get_memory_manually(N_, dim),
-                         f"/fil-result/manual_mem/dim_{dim}")
+    final_dir = os.path.join(current_dir, f'fil-result/manual_mem/dim_{dim}')
+    if not os.path.exists(final_dir):
+        os.makedirs(final_dir)
+    fil_result = profile(lambda: get_memory_manually(N_, dim), final_dir)
