@@ -83,23 +83,23 @@ class TargetStateInfidelity(Cost):
             for i in range(self.state_count):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
-    def update_state_forw(self, A):
-        self.final_states = krylov(A, self.final_states)
+    def update_state_forw(self, dt, A):
+        self.final_states = krylov(dt, A, self.final_states)
 
-    def update_state_back(self, A):
-        self.back_states = krylov(A, self.back_states)
+    def update_state_back(self, dt, A):
+        self.back_states = krylov(dt, A, self.back_states)
 
-    def gradient(self, A,E,tol):
+    def gradient(self, dt, A, E, tol):
         grads = 0
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E, self.final_states[i],tol)))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(dt,A,E,self.final_states[i],tol)))) / (
                                     self.state_count ** 2)
         else:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) / (
+                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(dt,A,E,self.final_states[i],tol)))) / (
                                     self.state_count )
         return grads
 

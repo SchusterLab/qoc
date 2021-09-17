@@ -8,7 +8,8 @@ import numpy as np
 
 from qoc.core.common import (initialize_controls,expm_frechet,
                              slap_controls, strip_controls,
-                             clip_control_norms,gradient_trans, interpolate_tran ,get_magnus,)
+                             clip_control_norms,gradient_trans, interpolate_tran ,
+                             get_magnus, get_immediate_hamiltonian,)
 from qoc.core.mathmethods import (interpolate_linear_set,
                                   magnus_m2,
                                   magnus_m4,
@@ -336,8 +337,8 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Evaluate the jacobian.
     if pstate.manual_gradient_mode is True:
-        error=_evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=False)
-        grads=manual_gradient(controls, pstate, reporter)
+        error= _evaluate_schroedinger_discrete(controls, pstate, reporter, pulse=False)
+        grads = manual_gradient(controls, pstate, reporter)
         error_pu=0
         grads_pu=0
         for i in range(len(pstate.costs)):
@@ -454,7 +455,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     return states
 
 
-def manual_gradient(controls,pstate, reporter):
+def manual_gradient(controls, pstate, reporter):
     control_eval_times = pstate.control_eval_times
     costs = pstate.costs
     system_eval_count = pstate.system_eval_count-1
@@ -470,24 +471,25 @@ def manual_gradient(controls,pstate, reporter):
             costs[l].gradient_initialize(reporter)
     for i in range(system_eval_count):
 
-        total_H=get_magnus(dt, hamiltonian,
-                                       (system_eval_count - 1 - i) * dt,
-                                       control_eval_times=control_eval_times,
-                                       controls=controls,
-                                       interpolation_policy=interpolation_policy,
-                                       magnus_policy=magnus_policy, if_magnus=True)
-        total_H=-total_H
+        total_H = get_immediate_hamiltonian(hamiltonian,
+                                            (system_eval_count - 1 - i) * dt,
+                                            control_eval_times=control_eval_times,
+                                            controls=controls,
+                                            interpolation_policy=interpolation_policy,)
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_forw(total_H)
+                costs[l].update_state_forw(dt, total_H)
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
-                if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,-1j * dt * control_hamiltonian[k],pstate.tol)
+                if costs[m].type == "non-control":
+                    grads[system_eval_count - 1 - i][k] = grads[system_eval_count - 1 - i][k] + \
+                                                          costs[m].gradient(dt, total_H,
+                                                                            -1j * dt * control_hamiltonian[k],
+                                                                            pstate.tol)
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_back(total_H)
-    grads=gradient_trans(grads,control_eval_times,dt)
+                costs[l].update_state_back(dt, total_H)
+    grads = gradient_trans(grads,control_eval_times,dt)
 
     return grads
 
@@ -570,12 +572,12 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
 
                 # Evolve the states to the next time step.
                 if not is_final_system_eval_step:
-                    states = krylov(get_magnus(dt, hamiltonian,
-                                               time,
-                                               control_eval_times=control_eval_times,
-                                               controls=controls,
-                                               interpolation_policy=interpolation_policy,
-                                               magnus_policy=magnus_policy, if_magnus=True), states, tol=pstate.tol)
+                    total_H = get_immediate_hamiltonian(hamiltonian, time,
+                                                        control_eval_times=control_eval_times,
+                                                        controls=controls,
+                                                        interpolation_policy=interpolation_policy,)
+                    states = krylov(dt, total_H,
+                                    states, tol=pstate.tol)
             # ENDFOR
 
             # Compute non-step-costs.

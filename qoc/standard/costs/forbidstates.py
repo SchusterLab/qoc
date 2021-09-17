@@ -114,22 +114,24 @@ class ForbidStates(Cost):
             for j in range(len(self.inner_products[i])):
                 self.back_states[i] = self.forbidden_states[i][j] * self.inner_products[i][j]
 
-    def update_state_back(self, A):
+    def update_state_back(self, dt, A):
         self.inner_products = np.zeros_like(self.inner_products)
         for i in range(len(self.inner_products)):
             for j in range(len(self.inner_products[i])):
-                self.inner_products[i][j]=np.matmul(self.forbidden_states_dagger[j], self.final_states[i])
-                self.back_states[i][j]=krylov(A, self.back_states[i][j])+self.inner_products[i][j]*self.forbidden_states[i][j]
+                self.inner_products[i][j] = np.matmul(self.forbidden_states_dagger[j],
+                                                      self.final_states[i])
+                self.back_states[i][j] = krylov(dt, A, self.back_states[i][j]) + \
+                                         self.inner_products[i][j]*self.forbidden_states[i][j]
 
-    def update_state_forw(self, A):
-        self.final_states = krylov(A, self.final_states)
+    def update_state_forw(self, dt, A):
+        self.final_states = krylov(dt, A, self.final_states)
 
-    def gradient(self, A,E,tol):
+    def gradient(self,dt,A,E,tol):
         grads = 0
         for i in range(len(self.inner_products)):
             for j in range(len(self.inner_products[i])):
                 grads = grads + self.cost_multiplier * (2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i][j]), block_fre(A,E,self.final_states[i],tol=tol)))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
+                    np.matmul(conjugate_transpose(self.back_states[i][j]), block_fre(dt,A,E,self.final_states[i],tol=tol)))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])
 
         return grads
 

@@ -352,12 +352,53 @@ def get_magnus(dt, hamiltonian,
             propagator = step_unitary
         return propagator
 
+
+def get_immediate_hamiltonian(hamiltonian, time,
+                              control_eval_times=None,
+                              controls=None,
+                              interpolation_policy=InterpolationPolicy.LINEAR,):
+    """
+    Get the Hamiltonian at a specific time step
+
+    Arguments:
+    dt
+    hamiltonian
+    states
+    time
+
+    control_eval_times
+    controls
+    interpolation_policy
+    magnus_policy
+
+    Returns:
+    states
+    """
+    # Choose an interpolator.
+    if interpolation_policy == InterpolationPolicy.LINEAR:
+        interpolate = interpolate_linear_set
+    else:
+        raise NotImplementedError("The interpolation policy {} "
+                                  "is not yet supported for this method."
+                                  "".format(interpolation_policy))
+
+    # Choose a control interpolator.
+    if controls is not None and control_eval_times is not None:
+        interpolate_controls = interpolate
+    else:
+        interpolate_controls = lambda x, xs, ys: None
+
+    # Construct a function to interpolate the hamiltonian
+    # for all time.
+    controls_ = interpolate_controls(time, control_eval_times, controls)
+    hamiltonian_ = hamiltonian(controls_, time)
+
+    return -1j * hamiltonian_
+
+
+
 def get_Hkbar(dt,Hk,H_total,propagator):
     return np.matmul(1j*expm_frechet(H_total, -1j*dt*Hk,compute_expm = False,check_finite=False),propagator)/dt
-
-
-
-
 
 
 def expm_frechet(A, E, method=None, compute_expm=True, check_finite=True):

@@ -73,7 +73,7 @@ _M2_C1 = 0.5
 
 def magnus_m2(a, dt, time):
     """
-    Construct a magnus expasion of `a` of order two.
+    Construct a magnus expansion of `a` of order two.
     
     References:
     [1] https://arxiv.org/abs/1709.06483
@@ -99,7 +99,7 @@ _M4_F0 = np.divide(np.sqrt(3), 12)
 
 def magnus_m4(a, dt, time):
     """
-    Construct a magnus expasion of `a` of order four.
+    Construct a magnus expansion of `a` of order four.
     
     References:
     [1] https://arxiv.org/abs/1709.06483

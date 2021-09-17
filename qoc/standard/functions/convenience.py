@@ -107,23 +107,23 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
-def krylov(A,states,tol=2**-53):
+def krylov(dt, A,states,tol=2**-53):
     if tol==None:
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        box= expmv(1., A, states, tol)
+        box= expmv(dt, A, states, tol)
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
         for i in range(states.shape[0]):
-            box.append(expmv(1., A, states[i], tol))
+            box.append(expmv(dt, A, states[i], tol))
         box=np.array(box)
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
 
 
-def block_fre(A,E,state,tol):
+def block_fre(dt, A, E, state, tol):
     if tol==None:
         tol=2**-53
     HILBERT_SIZE = state.shape[0]
@@ -135,7 +135,7 @@ def block_fre(A,E,state,tol):
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
 
-    state = expmv(1., c, state, tol)
+    state = expmv(dt, c, state, tol)
     state = state[0:HILBERT_SIZE]
     return state.reshape((HILBERT_SIZE, 1))
 """Compute the action of the matrix exponential.

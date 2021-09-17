@@ -79,8 +79,6 @@ def get_memory_manually(N, l):
 
 # total number of time step
 N_ = 1
-
-mem_ma_Nfixed = []
 h_dims = [int(10**i) for i in range(1, 7, 1)]
 
 # get current directory

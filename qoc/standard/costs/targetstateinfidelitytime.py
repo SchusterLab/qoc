@@ -100,32 +100,32 @@ class TargetStateInfidelityTime(Cost):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
 
-    def update_state_back(self, A):
+    def update_state_back(self, dt, A):
         if self.neglect_relative_phase == False:
-            self.back_states=krylov(A, self.back_states)
+            self.back_states = krylov(dt, A, self.back_states)
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i]+self.inner_products_sum[self.i]*self.target_states[i]
             self.i=self.i-1
         else:
             self.inner_products = np.matmul(self.target_states_dagger, self.final_states)[:, 0, 0]
-            self.back_states = krylov(A, self.back_states)
+            self.back_states = krylov(dt, A, self.back_states)
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
-    def update_state_forw(self, A):
+    def update_state_forw(self, dt, A):
         if self.neglect_relative_phase == False:
-            self.final_states = krylov(A, self.final_states)
+            self.final_states = krylov(dt, A, self.final_states)
         else:
-            self.final_states =krylov(A, self.final_states)
+            self.final_states = krylov(dt, A, self.final_states)
 
-    def gradient(self, A, E,tol):
+    def gradient(self, dt, A, E,tol):
         grads = 0
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) /(( self.state_count**2)*self.cost_eval_count)
+                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(dt,A,E,self.final_states[i],tol)))) /(( self.state_count**2)*self.cost_eval_count)
         else:
             for i in range(self.state_count):
                 grads = grads + self.cost_multiplier * (-2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) / (
+                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(dt,A,E,self.final_states[i],tol)))) / (
                                     self.state_count * self.cost_eval_count)
         return grads
