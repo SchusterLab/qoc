@@ -235,7 +235,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count,  )
+                                            system_eval_count, )
 
     else:
         pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
@@ -337,7 +337,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Evaluate the jacobian.
     if pstate.manual_gradient_mode is True:
-        error= _evaluate_schroedinger_discrete(controls, pstate, reporter, pulse=False)
+        error = _evaluate_schroedinger_discrete(controls, pstate, reporter, pulse=False)
         grads = manual_gradient(controls, pstate, reporter)
         error_pu=0
         grads_pu=0
@@ -345,9 +345,9 @@ def _esdj_wrap(controls, pstate, reporter, result):
             if pstate.costs[i].type=='control':
                 error_pu, grads_pu = (ans_jacobian(_evaluate_schroedinger_discrete, 0)(controls, pstate, reporter))
                 break
-        error=pstate.error=error+error_pu
-        grads=grads+grads_pu
-    else :
+        error = pstate.error = error + error_pu
+        grads = grads + grads_pu
+    else:
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)(controls, pstate, reporter))
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
@@ -383,9 +383,6 @@ def _esdj_wrap(controls, pstate, reporter, result):
         terminate = False
 
     return grads, terminate
-
-
-
 
 
 def _evolve_step_schroedinger_discrete(dt, hamiltonian,
@@ -484,7 +481,7 @@ def manual_gradient(controls, pstate, reporter):
                 if costs[m].type == "non-control":
                     grads[system_eval_count - 1 - i][k] = grads[system_eval_count - 1 - i][k] + \
                                                           costs[m].gradient(dt, total_H,
-                                                                            -1j * dt * control_hamiltonian[k],
+                                                                            -1j * control_hamiltonian[k],
                                                                             pstate.tol)
         for l in range(len((costs))):
             if costs[l].type == "non-control":

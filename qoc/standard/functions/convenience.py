@@ -124,8 +124,8 @@ def krylov(dt, A,states,tol=2**-53):
 
 
 def block_fre(dt, A, E, state, tol):
-    if tol==None:
-        tol=2**-53
+    if tol is None:
+        tol = 2**-53
     HILBERT_SIZE = state.shape[0]
     if isspmatrix(A) is False:
         c = np.block([[A, E], [np.zeros_like(A), A]])
@@ -138,7 +138,9 @@ def block_fre(dt, A, E, state, tol):
     state = expmv(dt, c, state, tol)
     state = state[0:HILBERT_SIZE]
     return state.reshape((HILBERT_SIZE, 1))
-"""Compute the action of the matrix exponential.
+
+"""
+Compute the action of the matrix exponential.
 """
 import numpy as np
 
