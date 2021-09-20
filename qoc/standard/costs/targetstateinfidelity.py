@@ -87,19 +87,26 @@ class TargetStateInfidelity(Cost):
         self.final_states = krylov(A, self.final_states)
 
     def update_state_back(self, A):
-        self.back_states = krylov(A, self.back_states)
+        self.back_states = self.new_state
 
     def gradient(self, A,E,tol):
         grads = 0
+        self.new_state = []
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
+                b_state,new_state=block_fre(A, E, self.back_states[i], tol)
+                self.new_state.append(new_state)
+                a=conjugate_transpose_m(b_state)
+                b= self.final_states[i]
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E, self.final_states[i],tol)))) / (
+                    np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
                                     self.state_count ** 2)
         else:
             for i in range(self.state_count):
+                b_state, new_state = block_fre(A, E, self.back_states[i], tol)
+                self.new_state.append(new_state)
                 grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) / (
+                    np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
                                     self.state_count )
         return grads
 

@@ -476,17 +476,17 @@ def manual_gradient(controls,pstate, reporter):
                                        controls=controls,
                                        interpolation_policy=interpolation_policy,
                                        magnus_policy=magnus_policy, if_magnus=True)
-        total_H=-total_H
+
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_forw(total_H)
+                costs[l].update_state_forw(-total_H)
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,-1j * dt * control_hamiltonian[k],pstate.tol)
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,1j * dt * control_hamiltonian[k],pstate.tol)
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_back(total_H)
+                costs[l].update_state_back(-total_H)
     grads=gradient_trans(grads,control_eval_times,dt)
 
     return grads

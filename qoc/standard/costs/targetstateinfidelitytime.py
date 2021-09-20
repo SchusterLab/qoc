@@ -9,6 +9,7 @@ import numpy as np
 
 from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
+from qoc.standard.functions import conjugate_transpose_m
 import autograd.numpy as anp
 from qoc.standard.functions import krylov,block_fre
 from scipy.sparse import bmat
@@ -101,14 +102,13 @@ class TargetStateInfidelityTime(Cost):
 
 
     def update_state_back(self, A):
+        self.back_states = self.new_state
         if self.neglect_relative_phase == False:
-            self.back_states=krylov(A, self.back_states)
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i]+self.inner_products_sum[self.i]*self.target_states[i]
             self.i=self.i-1
         else:
             self.inner_products = np.matmul(self.target_states_dagger, self.final_states)[:, 0, 0]
-            self.back_states = krylov(A, self.back_states)
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
     def update_state_forw(self, A):
@@ -119,13 +119,21 @@ class TargetStateInfidelityTime(Cost):
 
     def gradient(self, A, E,tol):
         grads = 0
+        self.new_state=[]
         if self.neglect_relative_phase == False:
             for i in range(self.state_count):
+                b_state, new_state = block_fre(A, E, self.back_states[i], tol)
+                self.new_state.append(new_state)
+                a=conjugate_transpose_m(b_state)
+                b=self.final_states[i]
+                c=np.matmul(a,b)
                 grads = grads + self.cost_multiplier * (-2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) /(( self.state_count**2)*self.cost_eval_count)
+                    np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) /(( self.state_count**2)*self.cost_eval_count)
         else:
             for i in range(self.state_count):
+                b_state, new_state = block_fre(A, E, self.back_states[i], tol)
+                self.new_state.append(new_state)
                 grads = grads + self.cost_multiplier * (-2  * np.real(
-                    np.matmul(conjugate_transpose(self.back_states[i]), block_fre(A,E,self.final_states[i],tol)))) / (
+                    np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
                                     self.state_count * self.cost_eval_count)
         return grads
