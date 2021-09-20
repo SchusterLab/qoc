@@ -185,99 +185,52 @@ def _ident_like(A):
     else:
         return np.eye(A.shape[0], A.shape[1], dtype=A.dtype)
 
-
-def expm_multiply(A, B,u_d=1e-8):
-    X = _expm_multiply_simple(A, B,tol=u_d)
-    return X
-
-
-def _expm_multiply_simple(A, B,tol= 1e-8):
-    if len(A.shape) != 2 or A.shape[0] != A.shape[1]:
-        raise ValueError('expected A to be like a square matrix')
-    if A.shape[1] != B.shape[0]:
-        raise ValueError('the matrices A and B have incompatible shapes')
+def get_s(A,b,tol):
+    s=1
+    if A.dtype==np.complex256:
+        s=np.ceil(_exact_inf_norm(A))
+    else:
+        while(1):
+            tol_power = np.ceil(np.log10(tol))
+            norm_A = _exact_inf_norm(A)/s
+            norm_b= _exact_inf_norm(b)
+            max_term_notation=np.floor(norm_A)
+            max_term=1
+            for i in range(1,np.int(max_term_notation)):
+                max_term=max_term*norm_A*norm_b/i
+                max_power = np.ceil(np.log10(max_term))
+                if max_power>30:
+                    break
+            max_power = np.ceil(np.log10(max_term))
+            if max_power-16<=tol_power:
+                break
+            s=s+1
+    return s
+def expm_multiply(A, B, u_d=None):
+    """
+    A helper function.
+    """
+    tol=u_d
     ident = _ident_like(A)
     n = A.shape[0]
     mu = _trace(A) / float(n)
     A = A - mu * ident
-    A_1_norm = _exact_1_norm(A)
-    if  A_1_norm == 0:
-        m_star, s_star = 0, 1
-    else:
-        m_star,s_star=determ_s(A_1_norm,tol)
-    return _expm_multiply_simple_core(A, B, mu, m_star, s_star, tol)
-
-
-def _expm_multiply_simple_core(A, B,mu, m_star, s, tol=None,):
-    """
-    A helper function.
-    """
     if tol is None:
-        u_d = 2 ** -53
-        tol = u_d
+        tol =1e-16
+    s=get_s(A,B,tol)
     F = B
-    eta = np.exp(mu / float(s))
-    for i in range(s):
-        for j in range(m_star):
-            coeff = 1 / float(s*(j+1))
-            B = coeff * A.dot(B)
+    for i in range(int(s)):
+        j=0
+        eta = np.exp(mu / float(s))
+        while(1):
+            coeff = s*(j+1)
+            B =  A.dot(B)/coeff
             c2 = _exact_inf_norm(B)
             F = F + B
-            if c2 <= tol * _exact_inf_norm(F):
+            total_norm=_exact_inf_norm(F)
+            if c2/total_norm<tol:
                 break
+            j=j+1
         F = eta * F
         B = F
     return F
-theta_m=[
-31.54144013,
-29.35699609,
-26.61684407,
-24.44814683,
-22.57093824,
-20.70558923,
-17.45584544,
-14.23680405,
-12.44158958,
-9.86414502,
-7.62996736,
-4.75069937,
-2.21018887,
-]
-max_m=[
-    115,
-    109,
-    101,
-    95,
-    90,
-    85,
-    75,
-    65,
-    60,
-    52,
-    45,
-    35,
-    25
-]
-tol_table=[
-    1e-4,
-    1e-5,
-    1e-6,
-    1e-7,
-    1e-8,
-1e-9,
-1e-10,
-1e-11,
-1e-12,
-1e-13,
-1e-14,
-1e-15,
-1e-16,
-]
-def determ_s(norm,tol):
-    for i in range(len(tol_table)):
-        if tol>=tol_table[i]:
-            m_max=max_m[i]
-            theta=theta_m[i]
-            break
-    s = int(np.ceil(norm/ theta))
-    return m_max,s
