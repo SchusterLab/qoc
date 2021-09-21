@@ -115,7 +115,7 @@ class TargetStateInfidelityTime(Cost):
         if self.neglect_relative_phase == False:
             self.final_states = krylov(A, self.final_states)
         else:
-            self.final_states =krylov(A, self.final_states)
+            self.final_states = krylov(A, self.final_states)
 
     def gradient(self, A, E,tol):
         grads = 0

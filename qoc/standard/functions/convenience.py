@@ -13,7 +13,7 @@ import numpy as np
 import scipy.linalg as la
 from scipy.sparse import bmat,isspmatrix,identity
 
-from pyexpokit import expmv
+from quimb.linalg.base_linalg import expm_multiply as qbexpmv
 
 
 ### COMPUTATIONS ###
@@ -117,7 +117,7 @@ def krylov(A,states,tol=2**-53):
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
         for i in range(states.shape[0]):
-            box.append(expmv(1., A, states[i], tol))
+            box.append(qbexpmv(A, states[i], backend='SLEPC-KRYLOV'))
         box=np.array(box)
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
@@ -135,7 +135,7 @@ def block_fre(A,E,state,tol):
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
 
-    state = expmv(1., c, state, tol)
+    state = qbexpmv(c, state, backend='SLEPC')
     state = state[0:HILBERT_SIZE]
     return state.reshape((HILBERT_SIZE, 1))
 """Compute the action of the matrix exponential.
