@@ -83,8 +83,8 @@ class TargetStateInfidelity(Cost):
             for i in range(self.state_count):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
-    def update_state_forw(self, A):
-        self.final_states = krylov(A, self.final_states)
+    def update_state_forw(self, A,tol):
+        self.final_states = krylov(A,tol, self.final_states)
 
     def update_state_back(self, A):
         self.back_states = self.new_state

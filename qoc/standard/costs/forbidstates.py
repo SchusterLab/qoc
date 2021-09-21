@@ -121,8 +121,8 @@ class ForbidStates(Cost):
                 self.inner_products[i][j]=np.matmul(self.forbidden_states_dagger[j], self.final_states[i])
                 self.back_states[i][j]=self.new_state[i][j]+self.inner_products[i][j]*self.forbidden_states[i][j]
 
-    def update_state_forw(self, A):
-        self.final_states = krylov(A, self.final_states)
+    def update_state_forw(self, A,tol):
+        self.final_states = krylov(A,tol, self.final_states)
 
     def gradient(self, A,E,tol):
         grads = 0

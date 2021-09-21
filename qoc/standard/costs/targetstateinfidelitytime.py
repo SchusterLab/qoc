@@ -111,11 +111,11 @@ class TargetStateInfidelityTime(Cost):
             self.inner_products = np.matmul(self.target_states_dagger, self.final_states)[:, 0, 0]
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
-    def update_state_forw(self, A):
+    def update_state_forw(self, A,tol):
         if self.neglect_relative_phase == False:
-            self.final_states = krylov(A, self.final_states)
+            self.final_states = krylov(A,tol,self.final_states)
         else:
-            self.final_states =krylov(A, self.final_states)
+            self.final_states =krylov(A,tol, self.final_states)
 
     def gradient(self, A, E,tol):
         grads = 0

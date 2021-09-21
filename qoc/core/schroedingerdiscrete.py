@@ -479,7 +479,7 @@ def manual_gradient(controls,pstate, reporter):
 
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_forw(-total_H)
+                costs[l].update_state_forw(-total_H,pstate.tol)
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
@@ -575,7 +575,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
                                                control_eval_times=control_eval_times,
                                                controls=controls,
                                                interpolation_policy=interpolation_policy,
-                                               magnus_policy=magnus_policy, if_magnus=True), states, tol=pstate.tol)
+                                               magnus_policy=magnus_policy, if_magnus=True),pstate.tol, states )
             # ENDFOR
 
             # Compute non-step-costs.
