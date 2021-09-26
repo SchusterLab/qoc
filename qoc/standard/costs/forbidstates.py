@@ -10,7 +10,7 @@ from qoc.models import Cost
 from qoc.standard.functions import conjugate_transpose
 from qoc.standard.functions import conjugate_transpose_m
 import autograd.numpy as anp
-from qoc.standard.functions import krylov,block_fre
+from qoc.standard.functions import s_a_s_multi,block_fre
 from scipy.sparse import  bmat
 class ForbidStates(Cost):
     """
@@ -122,7 +122,7 @@ class ForbidStates(Cost):
                 self.back_states[i][j]=self.new_state[i][j]+self.inner_products[i][j]*self.forbidden_states[i][j]
 
     def update_state_forw(self, A,tol):
-        self.final_states = krylov(A,tol, self.final_states)
+        self.final_states = s_a_s_multi(A,tol, self.final_states)
 
     def gradient(self, A,E,tol):
         grads = 0
@@ -130,7 +130,7 @@ class ForbidStates(Cost):
         for i in range(len(self.inner_products)):
             self.new_state.append([])
             for j in range(len(self.inner_products[i])):
-                b_state, new_state = block_fre(A, E, self.back_states[i][j], tol)
+                b_state, new_state = block_fre(A, E, tol, self.back_states[i][j])
                 self.new_state[i].append(new_state)
                 grads = grads + self.cost_multiplier * (2  * np.real(
                     np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) /( self.state_count*self.cost_evaluation_count*self.forbidden_states_count[i])

@@ -5,12 +5,14 @@ penalizes the infidelity of an evolved state and a target state.
 
 import autograd.numpy as anp
 import numpy as np
-
+from functools import partial
 from qoc.models import Cost
+from scqubits.utils.cpu_switch import get_map_method
+import multiprocessing
 from qoc.standard.functions import conjugate_transpose
 from qoc.standard.functions import conjugate_transpose_m
-from qoc.standard.functions import krylov,block_fre
-
+from qoc.standard.functions import s_a_s_multi,block_fre,krylov
+import scqubits.settings as settings
 
 class TargetStateInfidelity(Cost):
     """
@@ -84,30 +86,66 @@ class TargetStateInfidelity(Cost):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
     def update_state_forw(self, A,tol):
-        self.final_states = krylov(A,tol, self.final_states)
-
+        if len(self.final_states) >= 2:
+            n = multiprocessing.cpu_count()
+            func = partial(s_a_s_multi, A, tol)
+            settings.MULTIPROC = "pathos"
+            map = get_map_method(n)
+            states_mul = []
+            for i in range(len(self.final_states)):
+                states_mul.append(self.final_states[i])
+            self.final_states = np.array(map(func, states_mul))
+        else:
+            self.final_states = krylov(A, tol, self.final_states)
     def update_state_back(self, A):
         self.back_states = self.new_state
 
     def gradient(self, A,E,tol):
-        grads = 0
-        self.new_state = []
-        if self.neglect_relative_phase == False:
-            for i in range(self.state_count):
-                b_state,new_state=block_fre(A, E, self.back_states[i], tol)
-                self.new_state.append(new_state)
-                a=conjugate_transpose_m(b_state)
-                b= self.final_states[i]
-                grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
+        if len(self.final_states) >= 2:
+            n = multiprocessing.cpu_count()
+            func = partial(block_fre, A, E, tol)
+            settings.MULTIPROC = "pathos"
+            map = get_map_method(n)
+            states_mul = []
+            for i in range(len(self.back_states)):
+                states_mul.append(self.back_states[i])
+            states = map(func, states_mul)
+            b_state = np.zeros_like(self.back_states)
+            self.new_state = np.zeros_like(self.back_states)
+            for i in range(len(states)):
+                b_state[i] = states[i][0]
+                self.new_state[i] = states[i][1]
+            grads = 0
+            self.new_state = []
+            if self.neglect_relative_phase == False:
+                for i in range(self.state_count):
+                    grads = grads + self.cost_multiplier * (-2 * np.real(
+                        np.matmul(conjugate_transpose_m(b_state[i]), self.final_states[i]))) / (
                                     self.state_count ** 2)
+            else:
+                for i in range(self.state_count):
+                    grads = grads + self.cost_multiplier * (-2 * np.real(
+                        np.matmul(conjugate_transpose_m(b_state[i]), self.final_states[i]))) / (
+                                self.state_count)
         else:
-            for i in range(self.state_count):
-                b_state, new_state = block_fre(A, E, self.back_states[i], tol)
-                self.new_state.append(new_state)
-                grads = grads + self.cost_multiplier * (-2 * np.real(
-                    np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
-                                    self.state_count )
+            grads = 0
+            self.new_state = []
+            if self.neglect_relative_phase == False:
+                for i in range(self.state_count):
+                    b_state, new_state = block_fre(A, E, tol, self.back_states[i])
+                    self.new_state.append(new_state)
+                    a = conjugate_transpose_m(b_state)
+                    b = self.final_states[i]
+                    grads = grads + self.cost_multiplier * (-2 * np.real(
+                        np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
+                                    self.state_count ** 2)
+            else:
+                for i in range(self.state_count):
+                    b_state, new_state = block_fre(A, E, tol, self.back_states[i])
+                    self.new_state.append(new_state)
+                    grads = grads + self.cost_multiplier * (-2 * np.real(
+                        np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
+                                self.state_count)
         return grads
 
 

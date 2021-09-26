@@ -23,7 +23,7 @@ from .functions import (commutator, conjugate_transpose,
                         expm,expm_manual, krons, matmuls,
                         rms_norm,
                         column_vector_list_to_matrix,
-                        matrix_to_column_vector_list,krylov)
+                        matrix_to_column_vector_list,s_a_s_multi,krylov)
 
 from .optimizers import (Adam, LBFGSB, SGD,)
 
@@ -45,6 +45,6 @@ __all__ = [
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",
     "Adam", "LBFGSB", "SGD",
     "plot_controls", "plot_density_population", "plot_state_population",
-    "ans_jacobian", "generate_save_file_path", "CustomJSONEncoder",'krylov'
+    "ans_jacobian", "generate_save_file_path", "CustomJSONEncoder",'s_a_s_multi','krylov'
 
 ]

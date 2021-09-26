@@ -105,6 +105,9 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
+def s_a_s_multi(A,tol=2**-53,states=None):
+    return expm_multiply(A,states,u_d=tol)
+
 def krylov(A,tol=2**-53,states=None):
     if tol==None:
         tol=2**-53
@@ -120,8 +123,7 @@ def krylov(A,tol=2**-53,states=None):
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
 
-
-def block_fre(A,E,state,tol):
+def block_fre(A,E,tol,state):
     if tol==None:
         tol=2**-53
     a=state.shape

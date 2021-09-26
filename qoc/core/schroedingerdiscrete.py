@@ -2,6 +2,10 @@
 schroedingerdiscrete.py - a module to expose the grape schroedinger discrete
 optimization algorithm
 """
+import scqubits.settings as settings
+from scqubits.utils.cpu_switch import get_map_method
+import multiprocessing
+from functools import partial
 import scipy as sci
 from autograd.extend import Box
 import numpy as np
@@ -21,7 +25,8 @@ from qoc.models import (Dummy, EvolveSchroedingerDiscreteState,
                         MagnusPolicy,
                         ProgramType,)
 from qoc.standard import (Adam, ans_jacobian,
-                          expm, matmuls,krylov)
+                          expm, matmuls,s_a_s_multi,krylov)
+
 from qoc.standard.functions import conjugate_transpose_m
 
 ### MAIN METHODS ###
@@ -570,14 +575,27 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
 
                 # Evolve the states to the next time step.
                 if not is_final_system_eval_step:
-                    states = krylov(get_magnus(dt, hamiltonian,
-                                               time,
-                                               control_eval_times=control_eval_times,
-                                               controls=controls,
-                                               interpolation_policy=interpolation_policy,
-                                               magnus_policy=magnus_policy, if_magnus=True),pstate.tol, states )
-            # ENDFOR
-
+                    if len(states)>=2:
+                        n = multiprocessing.cpu_count()
+                        func = partial(s_a_s_multi, get_magnus(dt, hamiltonian,
+                                                               time,
+                                                               control_eval_times=control_eval_times,
+                                                               controls=controls,
+                                                               interpolation_policy=interpolation_policy,
+                                                               magnus_policy=magnus_policy, if_magnus=True), pstate.tol)
+                        settings.MULTIPROC = "pathos"
+                        map = get_map_method(n)
+                        states_mul = []
+                        for i in range(len(states)):
+                            states_mul.append(states[i])
+                        states = np.array(map(func, states_mul))
+                    else:
+                        states = krylov(get_magnus(dt, hamiltonian,
+                                                   time,
+                                                   control_eval_times=control_eval_times,
+                                                   controls=controls,
+                                                   interpolation_policy=interpolation_policy,
+                                                   magnus_policy=magnus_policy, if_magnus=True), pstate.tol, states)
             # Compute non-step-costs.
             for i, cost in enumerate(costs):
                 if not cost.type == 'control':
