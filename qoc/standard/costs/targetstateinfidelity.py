@@ -101,7 +101,7 @@ class TargetStateInfidelity(Cost):
         self.back_states = self.new_state
 
     def gradient(self, A,E,tol):
-        if len(self.final_states) >= 2:
+        if len(self.final_states) >= 100:
             n = multiprocessing.cpu_count()
             func = partial(block_fre, A, E, tol)
             settings.MULTIPROC = "pathos"
@@ -116,11 +116,11 @@ class TargetStateInfidelity(Cost):
                 b_state[i] = states[i][0]
                 self.new_state[i] = states[i][1]
             grads = 0
-            self.new_state = []
             if self.neglect_relative_phase == False:
                 for i in range(self.state_count):
+                    a=np.matmul(conjugate_transpose_m(b_state[i]), self.final_states[i])
                     grads = grads + self.cost_multiplier * (-2 * np.real(
-                        np.matmul(conjugate_transpose_m(b_state[i]), self.final_states[i]))) / (
+                        a)) / (
                                     self.state_count ** 2)
             else:
                 for i in range(self.state_count):
@@ -134,8 +134,6 @@ class TargetStateInfidelity(Cost):
                 for i in range(self.state_count):
                     b_state, new_state = block_fre(A, E, tol, self.back_states[i])
                     self.new_state.append(new_state)
-                    a = conjugate_transpose_m(b_state)
-                    b = self.final_states[i]
                     grads = grads + self.cost_multiplier * (-2 * np.real(
                         np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
                                     self.state_count ** 2)
