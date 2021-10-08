@@ -4,14 +4,13 @@ All functions in this module that are exported,
 i.e. those that don't begin with '_', are autograd compatible.
 """
 from scipy.sparse import isspmatrix, linalg as sla
-import scipy as scipy
 from functools import reduce
 from scipy.sparse.linalg import expm
 from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
-import numpy as np
-import scipy.linalg as la
-from scipy.sparse import bmat,isspmatrix,identity
+import scipy as sci
+from scipy.sparse import bmat,isspmatrix,identity,csr_matrix
+from scipy.sparse.linalg import eigs
 
 
 ### COMPUTATIONS ###
@@ -193,17 +192,16 @@ def _ident_like(A):
 def get_s(A,b,tol):
     s=1
     if A.dtype==np.complex256:
-        s=np.ceil(_exact_inf_norm(A))
+        s=np.ceil(overnorm(A))
     else:
         while(1):
-            a=np.log10(tol)
             tol_power = np.ceil(np.log10(tol))
-            norm_A = _exact_inf_norm(A)/s
-            norm_b= _exact_inf_norm(b)
+            norm_A = overnorm(A)/s
+            norm_b= norm_state(b)
             max_term_notation=np.floor(norm_A)
             max_term=1
             for i in range(1,np.int(max_term_notation)):
-                max_term=max_term*norm_A*norm_b/i
+                max_term=max_term*norm_A/i
                 max_power = np.ceil(np.log10(max_term))
                 if max_power>30:
                     break
@@ -225,18 +223,49 @@ def expm_multiply(A, B, u_d=None):
         tol =1e-16
     s=get_s(A,B,tol)
     F = B
-    for i in range(int(s)):
-        j=0
+    c1 = overnorm(B)
+    j=0
+    while(1):
         eta = np.exp(mu / float(s))
-        while(1):
+        coeff = s*(j+1)
+        B =  A.dot(B)/coeff
+        c2 = overnorm(B)
+        F = F + B
+        total_norm=norm_state(F)
+        if c2/total_norm<tol:
+            m=j+1
+            break
+        c1 = c2
+        j=j+1
+    F = eta * F
+    B = F
+    for i in range(1,int(s)):
+        eta = np.exp(mu / float(s))
+        c1 = norm_state(B)
+        for j in range(m):
             coeff = s*(j+1)
             B =  A.dot(B)/coeff
-            c2 = _exact_inf_norm(B)
+            c2 =norm_state(B)
             F = F + B
-            total_norm=_exact_inf_norm(F)
+            total_norm=norm_state(F)
             if c2/total_norm<tol:
+                m=j+1
                 break
+            c1 = c2
             j=j+1
-        F = eta * F
+        F =  F
         B = F
     return F
+def overnorm(A):
+    if A.dtype==np.complex256:
+        return _exact_inf_norm(A)
+    else:
+        return norm_two(A)
+def norm_two(A):
+    if sci.sparse.isspmatrix(A):
+        A=csr_matrix(A).conjugate().transpose()
+        return np.sqrt(abs(eigs(A=A.dot(A),k=1,which='LM',return_eigenvectors=False)[0]))
+    else:
+        return np.linalg.norm(A)
+def norm_state(A):
+    return np.linalg.norm(A)
