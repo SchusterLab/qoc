@@ -13,6 +13,8 @@ import numpy as np
 import scipy.linalg as la
 from scipy.sparse import bmat,isspmatrix,identity
 
+from quspin.tools.evolution import expm_multiply_parallel
+
 
 ### COMPUTATIONS ###
 
@@ -110,12 +112,12 @@ def krylov(A,states,tol=2**-53):
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        box=expm_multiply(A,states,u_d=tol)
+        box=expm_multiply_parallel(A.tocsr(), a=1.0).dot(states)
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
         for i in range(states.shape[0]):
-            box.append(expm_multiply(A,states[i],u_d=tol))
+            box.append(expm_multiply_parallel(A.tocsr(), a=1.0).dot(states[i]))
         box=np.array(box)
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
@@ -134,8 +136,8 @@ def block_fre(A,E,state,tol):
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
 
-    state = expm_multiply(c, state,u_d=tol)
-    new =state[HILBERT_SIZE:2*HILBERT_SIZE]
+    state = expm_multiply_parallel(c.tocsr(), a=1.0).dot(state)
+    new = state[HILBERT_SIZE:2*HILBERT_SIZE]
     state = state[0:HILBERT_SIZE]
 
     return state.reshape((HILBERT_SIZE, 1)),new.reshape((HILBERT_SIZE, 1))
