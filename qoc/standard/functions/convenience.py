@@ -258,14 +258,14 @@ def expm_multiply(A, B, u_d=None):
     return F
 def overnorm(A):
     if A.dtype==np.complex256:
-        return _exact_inf_norm(A)
+        return _exact_1_norm(A)
     else:
-        return norm_two(A)
+        return _exact_1_norm(A)
 def norm_two(A):
     if sci.sparse.isspmatrix(A):
         A=csr_matrix(A).conjugate().transpose()
-        return np.sqrt(abs(eigs(A=A.dot(A),k=1,which='LM',return_eigenvectors=False)[0]))
+        return _exact_1_norm(A)
     else:
-        return np.linalg.norm(A)
+        return _exact_1_norm(A)
 def norm_state(A):
-    return np.linalg.norm(A)
+    return _exact_1_norm(A)
