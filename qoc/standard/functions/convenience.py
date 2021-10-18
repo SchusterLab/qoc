@@ -112,7 +112,7 @@ def krylov(A,states,tol=2**-53):
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        box= expmv(1., A, states, tol)
+        box= qbexpmv(A, states, backend='SLEPC-KRYLOV')
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
