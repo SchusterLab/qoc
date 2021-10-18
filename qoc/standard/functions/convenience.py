@@ -13,7 +13,7 @@ import numpy as np
 import scipy.linalg as la
 from scipy.sparse import bmat,isspmatrix,identity
 
-from quspin.tools.evolution import expm_multiply_parallel
+from quspin.tools.lanczos import lanczos_iter, expm_lanczos
 
 
 ### COMPUTATIONS ###
@@ -107,17 +107,23 @@ column_vector_list_to_matrix = (lambda column_vector_list:
 matrix_to_column_vector_list = (lambda matrix:
                                 anp.stack([anp.vstack(matrix[:, i])
                                            for i in range(matrix.shape[1])]))
+
+
+# Krylov subspace dimension
+krylov_dim = 10
 def krylov(A,states,tol=2**-53):
     if tol==None:
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        box=expm_multiply_parallel(A.tocsr(), a=1.0).dot(states)
+        E, V, Q_T = lanczos_iter(A, states, krylov_dim)
+        box=expm_lanczos(E, V, Q_T, a=1.0)
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
         for i in range(states.shape[0]):
-            box.append(expm_multiply_parallel(A.tocsr(), a=1.0).dot(states[i]))
+            E, V, Q_T = lanczos_iter(A, states[i], krylov_dim)
+            box.append(expm_lanczos(E, V, Q_T, a=1.0))
         box=np.array(box)
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
@@ -136,11 +142,13 @@ def block_fre(A,E,state,tol):
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
 
-    state = expm_multiply_parallel(c.tocsr(), a=1.0).dot(state)
+    Eig, V, Q_T = lanczos_iter(c, state, krylov_dim)
+    state = expm_lanczos(Eig, V, Q_T, a=1.0)
     new = state[HILBERT_SIZE:2*HILBERT_SIZE]
     state = state[0:HILBERT_SIZE]
 
     return state.reshape((HILBERT_SIZE, 1)),new.reshape((HILBERT_SIZE, 1))
+
 """Compute the action of the matrix exponential.
 """
 import numpy as np

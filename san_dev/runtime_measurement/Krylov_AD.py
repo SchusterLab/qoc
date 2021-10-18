@@ -18,10 +18,7 @@ from scipy.sparse import dia_matrix
 import time
 
 
-# In[15]:
-
-
-def scipy_expv(N, l):
+def krylov_expv(N, l):
     """
     This function contains a simple example of grape
     on the schroedinger equation using time discrete
@@ -86,9 +83,6 @@ def scipy_expv(N, l):
                                          iteration_count=ITERATION_COUNT,
                                          log_iteration_step=LOG_ITERATION_STEP,
                                          manual_parameter=MANUAL_PARAMETER)
-
-
-# In[16]:
 
 
 def AD(N, l):
@@ -157,61 +151,19 @@ def AD(N, l):
                                          log_iteration_step=LOG_ITERATION_STEP,)
 
 
-# In[21]:
-
-
 # naive Krylov output
-h_dims = range(10, 1000, 100)
-ktimes_scipy_openmp = []
+h_dims = range(50, 1000, 100)
+times_krylov_quspin = []
 for dim in h_dims:
     kstart = time.time()
-    scipy_expv(5, dim)
+    krylov_expv(5, dim)
     kend = time.time()
 
     ktime = kend-kstart
-    ktimes_scipy_openmp.append(ktime)
+    times_krylov_quspin.append(ktime)
 
 
-# In[22]:
-
-
-print(ktimes_scipy_openmp)
-
-
-# In[1]:
-
-
-# # AD output
-# adtimes = []
-# for dim in h_dims:
-#     adstart = time.time()
-#     AD(5, dim)
-#     adend = time.time()
-#
-#     adtime = adend-adstart
-#     adtimes.append(adtime)
-
-
-# In[34]:
-
-
-# plt.scatter(h_dims, adtimes, color='C0', label="AD")
-# plt.plot(h_dims, adtimes, color='C0', alpha = 0.5)
-#
-# plt.scatter(h_dims, ktimes, color='r', label="Krylov")
-# plt.plot(h_dims, ktimes, color='r', alpha = 0.5)
-#
-# plt.xlabel("l")
-# plt.ylabel("runtime [s]")
-#
-# plt.title("AD vs Krylov runtime")
-# plt.grid()
-# plt.legend()
-#
-# plt.show()
-
-
-# In[23]:
+print(times_krylov_quspin)
 
 
 times_ad = [0.12549805641174316, 0.3137378692626953, 1.0548009872436523, 2.440361976623535, 5.16273307800293, 8.718554973602295, 13.897977113723755, 18.615697145462036, 27.014513731002808, 42.077934980392456]
@@ -220,14 +172,12 @@ times_krylov_pyexpokit = [0.2308180332183838, 0.5363681316375732, 0.658136129379
 times_scipy = [0.13176989555358887, 0.13581418991088867, 0.12553811073303223, 0.1103360652923584, 0.11827301979064941, 0.1321089267730713, 0.12587904930114746, 0.16336393356323242, 0.16615009307861328, 0.12619781494140625]
 times_scipy_openmp = [0.06510305404663086, 0.06872701644897461, 0.07702183723449707, 0.08277130126953125, 0.09222221374511719, 0.1024770736694336, 0.11039090156555176, 0.11770391464233398, 0.11394405364990234, 0.10953211784362793]
 
-# In[28]:
-
 
 plt.scatter(h_dims, times_scipy, color='C0', label="scipy")
 plt.plot(h_dims, times_scipy, color='C0', alpha = 0.5)
 
-plt.scatter(h_dims, ktimes_scipy_openmp, color='r', label="scipy-parallel")
-plt.plot(h_dims, ktimes_scipy_openmp, color='r', alpha = 0.5)
+plt.scatter(h_dims, times_krylov_quspin, color='r', label="krylov-quspin: 9 vectors")
+plt.plot(h_dims, times_krylov_quspin, color='r', alpha = 0.5)
 
 plt.xlabel("l")
 plt.ylabel("runtime [s]")
@@ -237,9 +187,6 @@ plt.grid()
 plt.legend()
 
 plt.show()
-
-
-# In[ ]:
 
 
 
