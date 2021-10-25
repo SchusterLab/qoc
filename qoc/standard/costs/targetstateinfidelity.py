@@ -13,6 +13,7 @@ from qoc.standard.functions import conjugate_transpose
 from qoc.standard.functions import conjugate_transpose_m
 from qoc.standard.functions import s_a_s_multi,block_fre,krylov
 import scqubits.settings as settings
+
 class TargetStateInfidelity(Cost):
     """
     This cost penalizes the infidelity of an evolved state
@@ -67,20 +68,11 @@ class TargetStateInfidelity(Cost):
                 fidelity_normalized = np.sum(fidelities) / self.state_count
                 infidelity = 1 - fidelity_normalized
         else:
-            if len(self.target_states) is not 1:
-                target_states=conjugate_transpose(anp.matrix(self.target_states))
-                mat=anp.matmul(target_states, states)
-                inner_products=anp.trace(mat)
-                fidelity_normalized = anp.real(
-                    inner_products * anp.conjugate(inner_products)) / self.state_count ** 2
-                infidelity = 1 - fidelity_normalized
-            else:
-                inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-                inner_products_sum = anp.sum(inner_products)
-                fidelity_normalized = anp.real(
-                    inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
-                infidelity = 1 - fidelity_normalized
-
+            inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
+            inner_products_sum = anp.sum(inner_products)
+            fidelity_normalized = anp.real(
+                inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
+            infidelity = 1 - fidelity_normalized
         return infidelity * self.cost_multiplier
 
     def gradient_initialize(self, reporter):
@@ -93,7 +85,7 @@ class TargetStateInfidelity(Cost):
             for i in range(self.state_count):
                 self.back_states[i] = self.target_states[i] * self.inner_products[i]
 
-    def update_state_forw(self, A,tol,multhread):
+    def update_state_forw(self, A,tol):
         if len(self.final_states) >= 2:
             n = multiprocessing.cpu_count()
             func = partial(s_a_s_multi, A, tol)
@@ -104,11 +96,11 @@ class TargetStateInfidelity(Cost):
                 states_mul.append(self.final_states[i])
             self.final_states = np.array(map(func, states_mul))
         else:
-            self.final_states = krylov(A, tol, self.final_states,multhread)
+            self.final_states = krylov(A, tol, self.final_states)
     def update_state_back(self, A):
         self.back_states = self.new_state
 
-    def gradient(self, A,E,tol,multhread):
+    def gradient(self, A,E,tol):
         if len(self.final_states) >= 100:
             n = multiprocessing.cpu_count()
             func = partial(block_fre, A, E, tol)
@@ -140,14 +132,14 @@ class TargetStateInfidelity(Cost):
             self.new_state = []
             if self.neglect_relative_phase == False:
                 for i in range(self.state_count):
-                    b_state, new_state = block_fre(A, E, tol, self.back_states[i],multhread)
+                    b_state, new_state = block_fre(A, E, tol, self.back_states[i])
                     self.new_state.append(new_state)
                     grads = grads + self.cost_multiplier * (-2 * np.real(
                         np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (
                                     self.state_count ** 2)
             else:
                 for i in range(self.state_count):
-                    b_state, new_state = block_fre(A, E, tol, self.back_states[i],multhread)
+                    b_state, new_state = block_fre(A, E, tol, self.back_states[i])
                     self.new_state.append(new_state)
                     grads = grads + self.cost_multiplier * (-2 * np.real(
                         np.matmul(conjugate_transpose_m(b_state), self.final_states[i]))) / (

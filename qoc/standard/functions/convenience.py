@@ -106,15 +106,12 @@ matrix_to_column_vector_list = (lambda matrix:
 def s_a_s_multi(A,tol=2**-53,states=None):
     return expm_multiply(A,states,u_d=tol)
 
-def krylov(A,tol=2**-53,states=None,multhread=False):
+def krylov(A,tol=2**-53,states=None):
     if tol==None:
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        if multhread==False:
-            box=expm_multiply(A,states,u_d=tol)
-        else:
-            box=expm_multiply_multhread(A,states,u_d=tol)
+        box=expm_multiply(A,states,u_d=tol)
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
@@ -124,7 +121,7 @@ def krylov(A,tol=2**-53,states=None,multhread=False):
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
 
-def block_fre(A,E,tol,state,multhread=False):
+def block_fre(A,E,tol,state):
     if tol==None:
         tol=2**-53
     a=state.shape
@@ -136,10 +133,7 @@ def block_fre(A,E,tol,state,multhread=False):
     state = state.flatten()
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
-    if multhread is False:
-        state = expm_multiply(c, state,u_d=tol)
-    else:
-        state=expm_multiply_multhread(c, state,u_d=tol)
+    state = expm_multiply(c, state,u_d=tol)
     new =state[HILBERT_SIZE:2*HILBERT_SIZE]
     state = state[0:HILBERT_SIZE]
 
@@ -214,47 +208,6 @@ def get_s(A,b,tol):
                 break
             s=s+1
     return s
-def expm_multiply(A, B, u_d=None):
-    """
-    A helper function.
-    """
-    tol=u_d
-    ident = _ident_like(A)
-    n = A.shape[0]
-    mu = _trace(A) / float(n)
-    A = A - mu * ident
-    if tol is None:
-        tol =1e-16
-    s=get_s(A,B,tol)
-    F = B
-    j=0
-    while(1):
-        eta = np.exp(mu / float(s))
-        coeff = s*(j+1)
-        B =  A.dot(B)/coeff
-        c2 = overnorm(B)
-        F = F + B
-        total_norm=norm_state(F)
-        if c2/total_norm<tol:
-            m=j+1
-            break
-        j=j+1
-    F = eta * F
-    B = F
-    for i in range(1,int(s)):
-        eta = np.exp(mu / float(s))
-        for j in range(m):
-            coeff = s*(j+1)
-            B =  A.dot(B)/coeff
-            c2 =norm_state(B)
-            F = F + B
-            total_norm=norm_state(F)
-            if c2/total_norm<tol:
-                m=j+1
-                break
-        F = eta*F
-        B = F
-    return F
 def overnorm(A):
     if A.dtype==np.complex256:
         return _exact_inf_norm(A)
@@ -269,7 +222,7 @@ def norm_two(A):
 def norm_state(A):
     return np.linalg.norm(A)
 
-def expm_multiply_multhread(A, B, u_d=None):
+def expm_multiply(A, B, u_d=None):
     """
     A helper function.
     """
