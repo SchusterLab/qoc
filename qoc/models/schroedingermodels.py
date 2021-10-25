@@ -185,7 +185,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                  magnus_policy, min_error, optimizer,
                  save_file_path, save_intermediate_states_,
                  save_iteration_step,
-                 system_eval_count, control_hamiltonian=None, manual_gradient_mode=None,tol=None):
+                 system_eval_count, control_hamiltonian=None, manual_gradient_mode=None,tol=None,multhread_state=False):
         """
         See class fields for arguments not listed here.
         """
@@ -205,6 +205,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         self.save_intermediate_states_ = (self.should_save
                                           and save_intermediate_states_)
         self.tol=tol
+        self.multhread=multhread_state
 
 
 

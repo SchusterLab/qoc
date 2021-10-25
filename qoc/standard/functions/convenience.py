@@ -11,8 +11,7 @@ import autograd.numpy as anp
 import scipy as sci
 from scipy.sparse import bmat,isspmatrix,identity,csr_matrix
 from scipy.sparse.linalg import eigs
-
-
+from quspin.tools.misc import get_matvec_function
 ### COMPUTATIONS ###
 
 def commutator(a, b):
@@ -107,12 +106,15 @@ matrix_to_column_vector_list = (lambda matrix:
 def s_a_s_multi(A,tol=2**-53,states=None):
     return expm_multiply(A,states,u_d=tol)
 
-def krylov(A,tol=2**-53,states=None):
+def krylov(A,tol=2**-53,states=None,multhread=False):
     if tol==None:
         tol=2**-53
     if len(states.shape)<=2:
         states=states.flatten()
-        box=expm_multiply(A,states,u_d=tol)
+        if multhread==False:
+            box=expm_multiply(A,states,u_d=tol)
+        else:
+            box=expm_multiply_multhread(A,states,u_d=tol)
     else:
         states=states.reshape((states.shape[0]),states.shape[1])
         box=[]
@@ -122,7 +124,7 @@ def krylov(A,tol=2**-53,states=None):
         box=box.reshape((states.shape[0]),states.shape[1],1)
     return box
 
-def block_fre(A,E,tol,state):
+def block_fre(A,E,tol,state,multhread=False):
     if tol==None:
         tol=2**-53
     a=state.shape
@@ -134,8 +136,10 @@ def block_fre(A,E,tol,state):
     state = state.flatten()
     state0 = np.zeros_like(state)
     state = np.block([state0, state])
-
-    state = expm_multiply(c, state,u_d=tol)
+    if multhread is False:
+        state = expm_multiply(c, state,u_d=tol)
+    else:
+        state=expm_multiply_multhread(c, state,u_d=tol)
     new =state[HILBERT_SIZE:2*HILBERT_SIZE]
     state = state[0:HILBERT_SIZE]
 
@@ -223,7 +227,6 @@ def expm_multiply(A, B, u_d=None):
         tol =1e-16
     s=get_s(A,B,tol)
     F = B
-    c1 = overnorm(B)
     j=0
     while(1):
         eta = np.exp(mu / float(s))
@@ -235,13 +238,11 @@ def expm_multiply(A, B, u_d=None):
         if c2/total_norm<tol:
             m=j+1
             break
-        c1 = c2
         j=j+1
     F = eta * F
     B = F
     for i in range(1,int(s)):
         eta = np.exp(mu / float(s))
-        c1 = norm_state(B)
         for j in range(m):
             coeff = s*(j+1)
             B =  A.dot(B)/coeff
@@ -251,9 +252,7 @@ def expm_multiply(A, B, u_d=None):
             if c2/total_norm<tol:
                 m=j+1
                 break
-            c1 = c2
-            j=j+1
-        F =  F
+        F = eta*F
         B = F
     return F
 def overnorm(A):
@@ -269,3 +268,46 @@ def norm_two(A):
         return np.linalg.norm(A)
 def norm_state(A):
     return np.linalg.norm(A)
+
+def expm_multiply_multhread(A, B, u_d=None):
+    """
+    A helper function.
+    """
+    matvec=get_matvec_function(A)
+    tol=u_d
+    ident = _ident_like(A)
+    n = A.shape[0]
+    mu = _trace(A) / float(n)
+    A = A - mu * ident
+    if tol is None:
+        tol =1e-16
+    s=get_s(A,B,tol)
+    F = B
+    j=0
+    while(1):
+        eta = np.exp(mu / float(s))
+        coeff = s*(j+1)
+        B =  matvec(A,B)/coeff
+        c2 = overnorm(B)
+        F = F + B
+        total_norm=norm_state(F)
+        if c2/total_norm<tol:
+            m=j+1
+            break
+        j=j+1
+    F = eta * F
+    B = F
+    for i in range(1,int(s)):
+        eta = np.exp(mu / float(s))
+        for j in range(m):
+            coeff = s*(j+1)
+            B =  matvec(A,B)/coeff
+            c2 =norm_state(B)
+            F = F + B
+            total_norm=norm_state(F)
+            if c2/total_norm<tol:
+                m=j+1
+                break
+        F = eta*F
+        B = F
+    return F

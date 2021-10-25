@@ -9,7 +9,7 @@ from functools import partial
 import scipy as sci
 from autograd.extend import Box
 import numpy as np
-
+import autograd as anp
 from qoc.core.common import (initialize_controls,expm_frechet,
                              slap_controls, strip_controls,
                              clip_control_norms,gradient_trans, interpolate_tran ,get_magnus,)
@@ -256,7 +256,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_intermediate_states,
                                             save_iteration_step,
                                             system_eval_count, manual_parameter['control_hamiltonian'],
-                                            manual_parameter['manual_gradient_mode'],manual_parameter['tol'])
+                                            manual_parameter['manual_gradient_mode'],manual_parameter['tol'],manual_parameter['multhread_state'])
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -484,11 +484,11 @@ def manual_gradient(controls,pstate, reporter):
 
         for l in range(len((costs))):
             if costs[l].type == "non-control":
-                costs[l].update_state_forw(-total_H,pstate.tol)
+                costs[l].update_state_forw(-total_H,pstate.tol,pstate.multhread)
         for k in range(len((control_hamiltonian))):
             for m in range(len(costs)):
                 if costs[m].type=="non-control" :
-                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,1j * dt * control_hamiltonian[k],pstate.tol)
+                    grads[system_eval_count - 1 - i][k] =grads[system_eval_count - 1 - i][k]+costs[m].gradient(-total_H,1j * dt * control_hamiltonian[k],pstate.tol,pstate.multhread)
         for l in range(len((costs))):
             if costs[l].type == "non-control":
                 costs[l].update_state_back(-total_H)
@@ -530,6 +530,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
     error = 0
+    if len(pstate.initial_states) is not 1:
+        states=np.identity(len(pstate.initial_states))
 
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
@@ -595,7 +597,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
                                                    control_eval_times=control_eval_times,
                                                    controls=controls,
                                                    interpolation_policy=interpolation_policy,
-                                                   magnus_policy=magnus_policy, if_magnus=True), pstate.tol, states)
+                                                   magnus_policy=magnus_policy, if_magnus=True), pstate.tol, states,pstate.multhread)
             # Compute non-step-costs.
             for i, cost in enumerate(costs):
                 if not cost.type == 'control':
