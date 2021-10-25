@@ -1,8 +1,7 @@
 from qoc.standard.constants import harmonic, transmon, coherent_state, Identity
 from scipy.sparse import kron
-import numpy as np
-import sys
-from qoc import grape_schroedinger_discrete
+import os
+os.environ['OMP_NUM_THREADS'] = '1' # set number of OpenMP threads to run in parallel
 from qoc.standard import (TargetStateInfidelity, ControlNorm, ControlVariation, generate_save_file_path,
                           ForbidStates)
 from qoc.standard import Adam
@@ -120,5 +119,5 @@ def simulation(fock, dim_c, dim_trans, w_c, w_t, anharmonicity, g, evolution_tim
                                              )
     return result
 pre=2*np.pi
-dim=10
-simulation(3,dim,6,3.9*pre,3.5*pre,-0.225*pre,0.1*pre,1000,4000,None,5)
+dim=300
+simulation(3,dim,6,3.9*pre,3.5*pre,-0.225*pre,0.1*pre,10,40,None,5)
