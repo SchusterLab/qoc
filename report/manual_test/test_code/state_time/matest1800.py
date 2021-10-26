@@ -149,3 +149,4 @@ sci_pa=[]
 N=3000
 H,vec=get_H(N,np.float64)
 vec=np.complex128(vec)
+expm_multiply(H,vec)
