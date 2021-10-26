@@ -24,6 +24,7 @@ def get_H(dim,tp):
     H=H=csr_matrix(-1j*(H0+0.5*2*np.pi*(A+A_dag+B+B_dag+1j*(B-B_dag+A-A_dag))))
     vec=1j*1/np.sqrt(HILBERT_SIZE*Q_dim)*np.ones(HILBERT_SIZE*Q_dim)
     return H,vec
+@profile
 def para(H,vec):
     for i in range(10000):
         matvec(H,vec)
@@ -31,10 +32,9 @@ def sci(H,vec):
     for i in range(10000):
         H.dot(vec)
 
-@profile
+
 def test():
-    scip=[]
-    sci_pa=[]
+
     N_=3000
     H,vec=get_H(N_,np.float64)
     vec=np.complex128(vec)
