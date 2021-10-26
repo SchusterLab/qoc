@@ -5,7 +5,6 @@ i.e. those that don't begin with '_', are autograd compatible.
 """
 from scipy.sparse import isspmatrix, linalg as sla
 from functools import reduce
-from scipy.sparse.linalg import expm
 from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
 import scipy as sci
@@ -107,6 +106,7 @@ def s_a_s_multi(A,tol=2**-53,states=None):
     return expm_multiply(A,states,u_d=tol)
 
 def krylov(A,tol=2**-53,states=None):
+    states=np.complex128(states)
     if tol==None:
         tol=2**-53
     if len(states.shape)<=2:
@@ -122,6 +122,7 @@ def krylov(A,tol=2**-53,states=None):
     return box
 
 def block_fre(A,E,tol,state):
+    state=np.complex128(state)
     if tol==None:
         tol=2**-53
     a=state.shape
