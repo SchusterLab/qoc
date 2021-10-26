@@ -31,7 +31,7 @@ def sci(H,vec):
         H.dot(vec)
 scip=[]
 sci_pa=[]
-N_=1500
+N_=3000
 H,vec=get_H(N_,np.float64)
 vec=np.complex128(vec)
 para(H,vec)
