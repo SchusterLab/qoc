@@ -24,10 +24,10 @@ def get_H(dim,tp):
     vec=1j*1/np.sqrt(HILBERT_SIZE*Q_dim)*np.ones(HILBERT_SIZE*Q_dim)
     return H,vec
 def para(H,vec):
-    for i in range(100):
+    for i in range(10000):
         matvec(H,vec)
 def sci(H,vec):
-    for i in range(100):
+    for i in range(10000):
         H.dot(vec)
 scip=[]
 sci_pa=[]
