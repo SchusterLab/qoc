@@ -118,5 +118,5 @@ def simulation(fock, dim_c, dim_trans, w_c, w_t, anharmonicity, g, evolution_tim
                                              )
     return result
 pre=2*np.pi
-dim=1500
-simulation(3,dim,6,3.9*pre,3.5*pre,-0.225*pre,0.1*pre,10,40,None,5)
+dim=5000
+simulation(3,dim,6,3.9*pre,3.5*pre,-0.225*pre,0.1*pre,100,400,None,5)
