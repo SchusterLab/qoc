@@ -3,7 +3,7 @@ os.environ['OMP_NUM_THREADS'] = '8' # set number of OpenMP threads to run in par
 from scipy.sparse import *
 from quspin.tools.misc import get_matvec_function,matvec
 import numpy as np
-@profile
+
 def get_creation_operator(size,tp):
     return np.diag(np.sqrt(np.arange(1, size),dtype=tp), k=-1)
 def get_annihilation_operator(size,tp):
@@ -30,6 +30,8 @@ def para(H,vec):
 def sci(H,vec):
     for i in range(10000):
         H.dot(vec)
+
+@profile
 scip=[]
 sci_pa=[]
 N_=3000

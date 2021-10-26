@@ -30,6 +30,8 @@ def para(H,vec):
 def sci(H,vec):
     for i in range(10000):
         H.dot(vec)
+
+@profile
 scip=[]
 sci_pa=[]
 N_=3000
