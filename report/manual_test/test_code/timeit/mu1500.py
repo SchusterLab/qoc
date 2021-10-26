@@ -3,6 +3,7 @@ os.environ['OMP_NUM_THREADS'] = '16' # set number of OpenMP threads to run in pa
 from scipy.sparse import *
 from quspin.tools.misc import get_matvec_function,matvec
 import numpy as np
+@profile
 def get_creation_operator(size,tp):
     return np.diag(np.sqrt(np.arange(1, size),dtype=tp), k=-1)
 def get_annihilation_operator(size,tp):
