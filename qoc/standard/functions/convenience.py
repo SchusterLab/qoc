@@ -10,7 +10,6 @@ import autograd.numpy as anp
 import scipy as sci
 from scipy.sparse import bmat,isspmatrix,identity,csr_matrix
 from scipy.sparse.linalg import eigs
-from quspin.tools.misc import get_matvec_function
 ### COMPUTATIONS ###
 
 def commutator(a, b):
@@ -227,7 +226,6 @@ def expm_multiply(A, B, u_d=None):
     """
     A helper function.
     """
-    matvec=get_matvec_function(A)
     tol=u_d
     ident = _ident_like(A)
     n = A.shape[0]
@@ -241,7 +239,7 @@ def expm_multiply(A, B, u_d=None):
     while(1):
         eta = np.exp(mu / float(s))
         coeff = s*(j+1)
-        B =  matvec(A,B)/coeff
+        B =  np.dot(A,B)/coeff
         c2 = overnorm(B)
         F = F + B
         total_norm=norm_state(F)
@@ -255,7 +253,7 @@ def expm_multiply(A, B, u_d=None):
         eta = np.exp(mu / float(s))
         for j in range(m):
             coeff = s*(j+1)
-            B =  matvec(A,B)/coeff
+            B =  np.dot(A,B)/coeff
             c2 =norm_state(B)
             F = F + B
             total_norm=norm_state(F)

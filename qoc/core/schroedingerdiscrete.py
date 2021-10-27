@@ -530,8 +530,6 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
     error = 0
-    if len(pstate.initial_states) is not 1:
-        states=np.identity(len(pstate.initial_states))
 
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
@@ -611,6 +609,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
 
 
     else:
+        if len(pstate.initial_states) is not 1:
+            states = np.identity(len(pstate.initial_states))
         for system_eval_step in range(system_eval_count):
             # If applicable, save the current states.
             if save_intermediate_states:

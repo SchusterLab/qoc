@@ -13,7 +13,7 @@ from qoc.standard.functions import conjugate_transpose
 from qoc.standard.functions import conjugate_transpose_m
 from qoc.standard.functions import s_a_s_multi,block_fre,krylov
 import scqubits.settings as settings
-
+from qoc.standard.functions import column_vector_list_to_matrix
 class TargetStateInfidelity(Cost):
     """
     This cost penalizes the infidelity of an evolved state
@@ -38,8 +38,9 @@ class TargetStateInfidelity(Cost):
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.state_count = target_states.shape[0]
-        self.target_states_dagger = conjugate_transpose(target_states)
+
         self.target_states = target_states
+        self.target_states_dagger = conjugate_transpose(self.target_states)
         self.type = "non-control"
         self.neglect_relative_phase = neglect_relative_phase
     def cost(self, controls, states, system_eval_step,manual_mode):
@@ -68,11 +69,17 @@ class TargetStateInfidelity(Cost):
                 fidelity_normalized = np.sum(fidelities) / self.state_count
                 infidelity = 1 - fidelity_normalized
         else:
-            inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-            inner_products_sum = anp.sum(inner_products)
-            fidelity_normalized = anp.real(
-                inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
-            infidelity = 1 - fidelity_normalized
+            target_states = column_vector_list_to_matrix(self.target_states)
+            target_states_dagger = conjugate_transpose(target_states)
+            inner_products=anp.matmul(target_states_dagger,states)
+            inner_products_sum=anp.trace(inner_products)
+            fidelity=anp.real(inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
+            infidelity = 1 - fidelity
+            #inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
+            #inner_products_sum = anp.sum(inner_products)
+            #fidelity_normalized = anp.real(
+                #inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
+            #infidelity = 1 - fidelity_normalized
         return infidelity * self.cost_multiplier
 
     def gradient_initialize(self, reporter):
