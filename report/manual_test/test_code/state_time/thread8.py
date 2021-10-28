@@ -114,7 +114,7 @@ def expm_multiply(A, B, u_d=None):
         B = F
     return F
 import os
-os.environ['OMP_NUM_THREADS'] = '16' # set number of OpenMP threads to run in parallel
+os.environ['OMP_NUM_THREADS'] = '8' # set number of OpenMP threads to run in parallel
 from scipy.sparse import *
 from quspin.tools.misc import get_matvec_function,matvec
 import numpy as np

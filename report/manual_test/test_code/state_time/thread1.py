@@ -3,7 +3,6 @@ import scipy.linalg
 import scipy.sparse.linalg
 from scipy.sparse.linalg import aslinearoperator
 from scipy.sparse.sputils import is_pydata_spmatrix
-from scipy.sparse import *
 def _exact_inf_norm(A):
     # A compatibility function which should eventually disappear.
     if scipy.sparse.isspmatrix(A):
@@ -77,6 +76,7 @@ def expm_multiply(A, B, u_d=None):
     """
     A helper function.
     """
+    matvec=get_matvec_function(A)
     tol=u_d
     ident = _ident_like(A)
     n = A.shape[0]
@@ -90,7 +90,7 @@ def expm_multiply(A, B, u_d=None):
     while(1):
         eta = np.exp(mu / float(s))
         coeff = s*(j+1)
-        B =  np.dot(A,B)/coeff
+        B =  matvec(A,B)/coeff
         c2 = overnorm(B)
         F = F + B
         total_norm=norm_state(F)
@@ -104,7 +104,7 @@ def expm_multiply(A, B, u_d=None):
         eta = np.exp(mu / float(s))
         for j in range(50):
             coeff = s*(j+1)
-            B =  np.dot(A,B)/coeff
+            B =  matvec(A,B)/coeff
             c2 =norm_state(B)
             F = F + B
             total_norm=norm_state(F)
@@ -113,6 +113,10 @@ def expm_multiply(A, B, u_d=None):
         F = eta*F
         B = F
     return F
+import os
+os.environ['OMP_NUM_THREADS'] = '1' # set number of OpenMP threads to run in parallel
+from scipy.sparse import *
+from quspin.tools.misc import get_matvec_function,matvec
 import numpy as np
 def get_creation_operator(size,tp):
     return np.diag(np.sqrt(np.arange(1, size),dtype=tp), k=-1)
@@ -134,6 +138,9 @@ def get_H(dim,tp):
     H=H=csr_matrix(-1j*(H0+0.5*2*np.pi*(A+A_dag+B+B_dag+1j*(B-B_dag+A-A_dag))))
     vec=1j*1/np.sqrt(HILBERT_SIZE*Q_dim)*np.ones(HILBERT_SIZE*Q_dim)
     return H,vec
+def para(H,vec):
+    for i in range(100):
+        matvec(H,vec)
 def sci(H,vec):
     for i in range(100):
         H.dot(vec)
