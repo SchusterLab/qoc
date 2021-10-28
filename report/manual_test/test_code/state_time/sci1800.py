@@ -72,7 +72,7 @@ def norm_two(A):
         return np.linalg.norm(A)
 def norm_state(A):
     return np.linalg.norm(A)
-@profile
+
 def expm_multiply(A, B, u_d=None):
     """
     A helper function.
@@ -90,7 +90,7 @@ def expm_multiply(A, B, u_d=None):
     while(1):
         eta = np.exp(mu / float(s))
         coeff = s*(j+1)
-        B =  np.dot(A,B)/coeff
+        B =  A.dot(B)/coeff
         c2 = overnorm(B)
         F = F + B
         total_norm=norm_state(F)
@@ -104,7 +104,7 @@ def expm_multiply(A, B, u_d=None):
         eta = np.exp(mu / float(s))
         for j in range(50):
             coeff = s*(j+1)
-            B =  np.dot(A,B)/coeff
+            B =  A.dot(B)/coeff
             c2 =norm_state(B)
             F = F + B
             total_norm=norm_state(F)
