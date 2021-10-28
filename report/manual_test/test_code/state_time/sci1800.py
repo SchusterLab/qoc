@@ -72,7 +72,7 @@ def norm_two(A):
         return np.linalg.norm(A)
 def norm_state(A):
     return np.linalg.norm(A)
-
+@profile
 def expm_multiply(A, B, u_d=None):
     """
     A helper function.
