@@ -115,10 +115,10 @@ def simulation(fock, dim_c, dim_trans, w_c, w_t, anharmonicity, g, evolution_tim
                                              iteration_count=ITERATION_COUNT,
                                              log_iteration_step=LOG_ITERATION_STEP, min_error=0.05,
                                              max_control_norms=max_control_norms,
-                                             manual_parameter=manual_parameter, impose_control_conditions=Impose,
+                                            impose_control_conditions=Impose,
                                              save_iteration_step=1,
                                              )
     return result
 pre=2*np.pi
-dim=50
+dim=30
 simulation(1,dim,6,3.9*pre,3.5*pre,-0.225*pre,0.1*pre,10,4000,None,5)
