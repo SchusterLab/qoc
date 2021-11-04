@@ -9,7 +9,7 @@ from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
 import scipy as sci
 from scipy.sparse import bmat,isspmatrix,identity,csr_matrix
-from scipy.sparse.linalg import eigs
+from scipy.sparse.linalg import eigs,expm_multiply
 ### COMPUTATIONS ###
 
 def commutator(a, b):
@@ -239,7 +239,7 @@ def expm_multiply(A, B, u_d=None):
     while(1):
         eta = np.exp(mu / float(s))
         coeff = s*(j+1)
-        B =  np.dot(A,B)/coeff
+        B =  A.dot(B)/coeff
         c2 = overnorm(B)
         F = F + B
         total_norm=norm_state(F)
@@ -253,7 +253,7 @@ def expm_multiply(A, B, u_d=None):
         eta = np.exp(mu / float(s))
         for j in range(m):
             coeff = s*(j+1)
-            B =  np.dot(A,B)/coeff
+            B =  A.dot(B)/coeff
             c2 =norm_state(B)
             F = F + B
             total_norm=norm_state(F)
