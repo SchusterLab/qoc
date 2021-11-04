@@ -69,9 +69,7 @@ class TargetStateInfidelity(Cost):
                 fidelity_normalized = np.sum(fidelities) / self.state_count
                 infidelity = 1 - fidelity_normalized
         else:
-            target_states = column_vector_list_to_matrix(self.target_states)
-            target_states_dagger = conjugate_transpose(target_states)
-            inner_products=anp.matmul(target_states_dagger,states)
+            inner_products=anp.matmul(self.target_states_dagger,states)
             inner_products_sum=anp.trace(inner_products)
             fidelity=anp.real(inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
             infidelity = 1 - fidelity
