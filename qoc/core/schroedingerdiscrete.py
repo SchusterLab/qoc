@@ -609,8 +609,6 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
 
 
     else:
-        if len(pstate.initial_states) != 1:
-            states = np.identity(len(pstate.initial_states))
         for system_eval_step in range(system_eval_count):
             # If applicable, save the current states.
             if save_intermediate_states:
