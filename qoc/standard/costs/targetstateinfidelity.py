@@ -70,7 +70,7 @@ class TargetStateInfidelity(Cost):
                 infidelity = 1 - fidelity_normalized
         else:
             inner_products=anp.matmul(self.target_states_dagger,states)
-            inner_products_sum=anp.trace(inner_products)
+            inner_products_sum=anp.sum(anp.trace(inner_products))
             fidelity=anp.real(inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
             infidelity = 1 - fidelity
             #inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
@@ -78,7 +78,7 @@ class TargetStateInfidelity(Cost):
             #fidelity_normalized = anp.real(
                 #inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
             #infidelity = 1 - fidelity_normalized
-        return infidelity[0] * self.cost_multiplier
+        return infidelity* self.cost_multiplier
 
     def gradient_initialize(self, reporter):
         if self.neglect_relative_phase == False:
