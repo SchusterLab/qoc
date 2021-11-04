@@ -78,7 +78,7 @@ class TargetStateInfidelity(Cost):
             #fidelity_normalized = anp.real(
                 #inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
             #infidelity = 1 - fidelity_normalized
-        return infidelity * self.cost_multiplier
+        return infidelity[0] * self.cost_multiplier
 
     def gradient_initialize(self, reporter):
         if self.neglect_relative_phase == False:
