@@ -51,7 +51,8 @@ from qoc.models.operationpolicy import OperationPolicy
 from scipy import signal
 import numpy as np
 import matplotlib.pyplot as plt
-
+import os
+os.environ['NUMEXPR_MAX_THREADS']='32'
 def get_control(N):
     sigmap, sigmam = harmonic(2)
     sigmap=sigmap

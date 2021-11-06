@@ -29,6 +29,8 @@ from scipy.sparse import dia_matrix
 
 
 import numpy as np
+import os
+os.environ['NUMEXPR_MAX_THREADS']='32'
 from scipy.sparse import kron,identity,csc_matrix
 from qoc.standard.constants import harmonic,transmon,coherent_state,Identity
 from qoc.standard import (TargetStateInfidelity,

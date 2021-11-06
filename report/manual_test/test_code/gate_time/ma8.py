@@ -27,7 +27,8 @@ from qutip import (qsave, qload)
 import matplotlib.pyplot as plt
 from scipy.sparse import dia_matrix
 
-
+import os
+os.environ['NUMEXPR_MAX_THREADS']='32'
 import numpy as np
 from scipy.sparse import kron,identity,csc_matrix
 from qoc.standard.constants import harmonic,transmon,coherent_state,Identity
