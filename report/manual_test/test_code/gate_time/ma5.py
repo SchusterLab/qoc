@@ -115,7 +115,7 @@ def simulation(q_number,max_con,initial):
     Target=Had(2,q_number)
     CONTROL_COUNT = 2*q_number
     evolution_time=2*q_number
-    CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 10*q_number + 1
+    CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 1+ 1
     ITERATION_COUNT = 1
 
     max_control_norms=max_con*np.ones(CONTROL_COUNT)

@@ -114,7 +114,7 @@ def simulation(q_number,max_con,initial):
     Initial_state=get_initial(q_number)
     Target=Had(2,q_number)
     CONTROL_COUNT = 2*q_number
-    evolution_time=2*q_number
+    evolution_time=1
     CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 10*q_number + 1
     ITERATION_COUNT = 1
 
@@ -155,7 +155,6 @@ def simulation(q_number,max_con,initial):
                                              max_control_norms=max_control_norms,
                                              impose_control_conditions=Impose,
                                             manual_parameter=manual_parameter,
-
                                              save_iteration_step=1,
                                              )
     return result
