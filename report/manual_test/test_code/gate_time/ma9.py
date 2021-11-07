@@ -27,8 +27,7 @@ from qutip import (qsave, qload)
 import matplotlib.pyplot as plt
 from scipy.sparse import dia_matrix
 
-import os
-os.environ['NUMEXPR_MAX_THREADS']='32'
+
 import numpy as np
 from scipy.sparse import kron,identity,csc_matrix
 from qoc.standard.constants import harmonic,transmon,coherent_state,Identity
@@ -52,7 +51,8 @@ from qoc.models.operationpolicy import OperationPolicy
 from scipy import signal
 import numpy as np
 import matplotlib.pyplot as plt
-
+import os
+os.environ['NUMEXPR_MAX_THREADS']='32'
 def get_control(N):
     sigmap, sigmam = harmonic(2)
     sigmap=sigmap
@@ -115,8 +115,8 @@ def simulation(q_number,max_con,initial):
     Initial_state=get_initial(q_number)
     Target=Had(2,q_number)
     CONTROL_COUNT = 2*q_number
-    evolution_time=0.2
-    CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 1 + 1
+    evolution_time=2*q_number
+    CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 10*q_number+ 1
     ITERATION_COUNT = 1
 
     max_control_norms=max_con*np.ones(CONTROL_COUNT)
