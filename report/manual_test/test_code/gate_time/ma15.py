@@ -160,5 +160,5 @@ def simulation(q_number,max_con,initial):
                                              )
     return result
 
-result=simulation(13,0.5,None)
+result=simulation(15,0.5,None)
 
