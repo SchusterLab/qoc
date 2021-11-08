@@ -3,9 +3,8 @@ convenience.py - definitions of common computations
 All functions in this module that are exported, 
 i.e. those that don't begin with '_', are autograd compatible.
 """
-from scipy.sparse import isspmatrix, linalg as sla
+from scipy.sparse import isspmatrix
 from functools import reduce
-from autograd.extend import defvjp, primitive
 import autograd.numpy as anp
 import scipy as sci
 from scipy.sparse import bmat,isspmatrix,identity,csr_matrix
@@ -190,11 +189,11 @@ def _ident_like(A):
 def get_s(A,b,tol):
     s=1
     if A.dtype==np.complex256:
-        s=np.ceil(overnorm(A))
+        s=np.ceil(_exact_inf_norm(A))
     else:
         while(1):
             tol_power = np.ceil(np.log10(tol))
-            norm_A = overnorm(A)/s
+            norm_A = _exact_inf_norm(A)/s
             norm_b= norm_state(b)
             max_term_notation=np.floor(norm_A)
             max_term=1
@@ -240,7 +239,7 @@ def expm_multiply(A, B, u_d=None):
         eta = np.exp(mu / float(s))
         coeff = s*(j+1)
         B =  A.dot(B)/coeff
-        c2 = overnorm(B)
+        c2 = _exact_inf_norm(B)
         F = F + B
         total_norm=norm_state(F)
         if c2/total_norm<tol:
