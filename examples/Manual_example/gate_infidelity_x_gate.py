@@ -55,7 +55,7 @@ target_states = matrix_to_column_vector_list(target_unitary)
 # target_states = np.stack((target_state0, target_state1))
 COSTS = [TargetStateInfidelity(target_states)]
 CONTROL_HAMILTONIAN=[sigmax,sigmay]
-manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True}
+manual_parameter={"control_hamiltonian":CONTROL_HAMILTONIAN,"manual_gradient_mode":True,"tol":1e-16}
 
 def main():
     result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
