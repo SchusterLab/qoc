@@ -15,6 +15,8 @@ DEPENDENCIES = [
     "numba",
     "numpy",
     "scipy",
+    "scqubits",
+    "pathos"
 ]
 DESCRIPTION = "a package for performing quantum optimal control"
 AUTHOR = "Thomas Propson"
