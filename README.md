@@ -5,17 +5,23 @@ QOC performs quantum optimal control. It uses automatic differentiation to do ba
 
 [Tutorial](https://github.com/SchusterLab/qoc/tree/master/examples)
 
-Pros and cons:
+This branch implements auto-grad for control directly related cost functions such as penalization of
+variance, total power and bandwidth. Analytical gradient is implemented for state transfer, gates optimization, etc.
 
-Manual_gradient can lower the memory usage. Maximum Hilbert space dimension for 128G RAM is around 24000(without disk). But it costs more time(twice as much as auto-grad). But when hilbert space dimension is small(smaller than around 200), manual is faster than auto-grad because it does not need establish nodes stuff and matmul function does not dominate the runtime.
 
-Manual Tutorial:[Tutorial](https://github.com/SchusterLab/qoc/tree/manual_gradient/examples/Manual_example)
+Tutorial for this branch:[Tutorial](https://github.com/SchusterLab/qoc/tree/manual_gradient/Example/Analytical_example)
+
 
 Tips for manual_gradient:
 1. Set COMPLEX_CONTROLS to False, only real control amplitudes are supported.
-2. The sequence of CONTROL_HAMILTONIAN should be consistent with the one in hamiltonia
-3. Manual mode only supports cost_eval_step=1
-4. Remember set cost funtion to manual like target_stateinfidelity_manual.
+2. Analytical gradients only supports cost_eval_step=1
+3. Parameter "tol" means expectation error of the total cost. Sometime actual error might not match "tol".
+The scheme is that we can choose "tol" to be a small value like 10^(-3) first. If cost value does not converge to the target one,
+we take "tol"=10^(-16)(limitation of np.float64 type) to check if divergence is from accuracy. If it is, we change "tol" to be 10^(-6) or even smaller to make sure
+convergence. The point is that we just keep the accuracy in a level that we need to speed up the optimization. In master branch, the "tol" is always set to be
+10^(-16) which sometimes overkills the problem.   
+
+
 
 ### Installation ###
 You can install QOC locally via pip.
