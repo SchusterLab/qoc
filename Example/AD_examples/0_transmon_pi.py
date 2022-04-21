@@ -56,7 +56,7 @@ def main():
                                          complex_controls=COMPLEX_CONTROLS,
                                          iteration_count=ITERATION_COUNT,
                                          log_iteration_step=LOG_ITERATION_STEP,
-                                         save_file_path=SAVE_FILE_PATH,
+
                                          save_iteration_step=SAVE_ITERATION_STEP,)
 
 
