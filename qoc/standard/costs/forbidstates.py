@@ -92,7 +92,7 @@ class ForbidStates(Cost):
                 state = states[i]
                 state_cost = 0
                 for forbidden_state_dagger in forbidden_states_dagger_:
-                    inner_product = anp.matmul(forbidden_state_dagger, state)[0, 0]
+                    inner_product = anp.matmul(forbidden_state_dagger, state)[0][0]
                     fidelity = anp.real(inner_product * anp.conjugate(inner_product))
                     state_cost = state_cost + fidelity
                 # ENDFOR

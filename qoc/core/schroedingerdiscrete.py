@@ -9,7 +9,7 @@ from functools import partial
 import scipy as sci
 from autograd.extend import Box
 import numpy as np
-import autograd as anp
+from qoc.standard.functions import conjugate_transpose
 from qoc.core.common import (initialize_controls,expm_frechet,
                              slap_controls, strip_controls,
                              clip_control_norms,gradient_trans, interpolate_tran ,get_magnus,)
@@ -39,7 +39,7 @@ def evolve_schroedinger_discrete(evolution_time, hamiltonian,
                                  interpolation_policy=InterpolationPolicy.LINEAR,
                                  magnus_policy=MagnusPolicy.M2,
                                  save_file_path=None,
-                                 save_intermediate_states=False,):
+                                 save_intermediate_states=False):
     """
     Evolve a set of state vectors under the schroedinger equation
     and compute the optimization error.
@@ -126,7 +126,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                 optimizer=Adam(),
                                 save_file_path=None,
                                 save_intermediate_states=False,
-                                save_iteration_step=0, manual_parameter=None,):
+                                save_iteration_step=0, manual_parameter=None,states_plot=None):
     """
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
@@ -239,7 +239,7 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count,  )
+                                            system_eval_count, None  )
 
     else:
         pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
@@ -255,8 +255,8 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step,
-                                            system_eval_count, manual_parameter['control_hamiltonian'],
-                                            manual_parameter['manual_gradient_mode'],manual_parameter['tol'])
+                                            system_eval_count,states_plot, manual_parameter['control_hamiltonian'],
+                                            manual_parameter['manual_gradient_mode'],manual_parameter['tol'],)
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -521,6 +521,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
     interpolation_policy = pstate.interpolation_policy
     magnus_policy = pstate.magnus_policy
     program_type = pstate.program_type
+    states_plot=pstate.states_plot
     if program_type == ProgramType.GRAPE:
         iteration = reporter.iteration
     else:
@@ -530,7 +531,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
     error = 0
-
+    if states_plot != None:
+        states_probability=np.zeros(((len(states_plot[0])),system_eval_count))
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
     if pstate.manual_gradient_mode == True:
@@ -596,6 +598,14 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
                                                    controls=controls,
                                                    interpolation_policy=interpolation_policy,
                                                    magnus_policy=magnus_policy, if_magnus=True), pstate.tol, states)
+                if states_plot != None:
+                    for i in range(len(states_plot[0])):
+                        a=np.matmul(states_plot[1][i],np.ravel(states))
+                        b=conjugate_transpose_m(np.ravel(states))
+                        states_probability[i][system_eval_step]=np.real(np.matmul(b,a))
+            if states_plot != None:
+                time_list = dt*np.arange(system_eval_count)
+                plot_probability(states_plot[0],states_probability,time_list)
             # Compute non-step-costs.
             for i, cost in enumerate(costs):
                 if not cost.type == 'control':
@@ -655,3 +665,12 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
         reporter.error = error
         reporter.final_states = states
         return error
+
+def plot_probability(states_plot_name,probability,time):
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    ax.set_ylim([0,1])
+    for i in range(len(states_plot_name)):
+        ax.plot(time,probability[i],label=states_plot_name[i])
+        ax.legend()
+    plt.show()

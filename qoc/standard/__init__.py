@@ -17,6 +17,7 @@ from .costs import (ControlArea,
                     TargetDensityInfidelityTime,
                     TargetStateInfidelity,
                     TargetStateInfidelityTime,
+                    ForbidStatesprojector
                     )
 
 from .functions import (commutator, conjugate_transpose,
@@ -39,7 +40,7 @@ __all__ = [
     "ControlNorm", "ControlVariation", "ForbidDensities",
     "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
-    "TargetStateInfidelity", "TargetStateInfidelityTime",
+    "TargetStateInfidelity", "TargetStateInfidelityTime","ForbidStatesprojector",
     "commutator", "conjugate_transpose", "expm", "expm_manual","krons",
     "rms_norm",
     "matmuls", "column_vector_list_to_matrix", "matrix_to_column_vector_list",

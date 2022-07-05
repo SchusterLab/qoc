@@ -12,12 +12,12 @@ from .targetdensityinfidelity import TargetDensityInfidelity
 from .targetdensityinfidelitytime import TargetDensityInfidelityTime
 from .targetstateinfidelity import TargetStateInfidelity
 from .targetstateinfidelitytime import TargetStateInfidelityTime
-
+from .forbidstatesprojector import ForbidStatesprojector
 __all__ = [
     "ControlArea", "ControlBandwidthMax",
     "ControlNorm", "ControlVariation",
     "ForbidDensities", "ForbidStates",
     "TargetDensityInfidelity", "TargetDensityInfidelityTime",
-    "TargetStateInfidelity", "TargetStateInfidelityTime",
+    "TargetStateInfidelity", "TargetStateInfidelityTime","ForbidStatesprojector"
 
 ]
