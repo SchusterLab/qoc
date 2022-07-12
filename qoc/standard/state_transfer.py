@@ -1,25 +1,13 @@
 from qoc.standard.constants import harmonic, transmon,  Identity
 from scipy.sparse import kron
-from scipy.sparse import csr_matrix
 import os
 os.environ['OMP_NUM_THREADS'] = '1' # set number of OpenMP threads to run in parallel
 from scipy import signal
-from qoc import grape_schroedinger_discrete
-from qoc.standard import (TargetStateInfidelity,ForbidStatesprojector)
+from qoc.core.schroedingerdiscrete import grape_schroedinger_discrete
+from qoc.standard import (TargetStateInfidelity,)
 import numpy as np
-def projector_tran(dim_trans,dim_c,i):
-    I_c=np.identity(dim_c)
-    tran0 = np.zeros((dim_trans,dim_trans))
-    tran0[i][i]=1
-    tran0=np.kron(tran0,I_c)
-    return tran0
-def projector_tran_set(dim_trans,dim_c):
-    a=[]
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-6))
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-5))
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-4))
-    return np.array(a)
-def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
+
+def simulation(fock, dim_c, dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
     asd, b_dag, b = transmon(w_01=w_t, anharmonicity=anharmonicity, H_size=dim_trans)
     delta = w_t-w_c
     a_dag, a = harmonic(dim_c)
@@ -47,9 +35,7 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     CONTROL_COUNT = 2
     CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = step + 1
     ITERATION_COUNT = 1000
-
-    COSTS = [TargetStateInfidelity(target_states=Target,cost_multiplier=0.99),
-             ForbidStatesprojector(projector_tran_set(dim_trans,dim_c),system_eval_count=SYSTEM_EVAL_COUNT,cost_multiplier=0.01),]
+    COSTS = [TargetStateInfidelity(Target, cost_multiplier=1)]
     max_control_norms=np.array([6., 6.])
     # Define output.
     LOG_ITERATION_STEP = 1
@@ -64,16 +50,16 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     else:
 
         manual_parameter = {"control_hamiltonian": H_control, "manual_gradient_mode": True, "tol": 1e-8}
-    name=["transmon0","transmon1","transmon2"]
-    states_plot=[name,projector_tran_set(dim_trans,dim_c)]
     result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
                                              COSTS, evolution_time, hamiltonian,
                                              Initial_state, SYSTEM_EVAL_COUNT,
                                              complex_controls=False,
+
                                              iteration_count=ITERATION_COUNT,
                                              log_iteration_step=LOG_ITERATION_STEP, min_error=0.001,
                                               max_control_norms= max_control_norms,
                                              manual_parameter=manual_parameter, impose_control_conditions=Impose,
+                                             save_iteration_step=1,
                                              )
     return result
 def initial_pulse():
@@ -85,3 +71,5 @@ def initial_pulse():
         controls[j][0]=i[j]
         controls[j][1]=i[j]
     return controls
+pre=2*np.pi
+result = simulation(3, 4, 6, 6 * pre, 3 * pre, -0.225 * pre, 0.1 * pre, 10, 40,"AG")
