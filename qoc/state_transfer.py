@@ -46,7 +46,7 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     Target = Target.reshape((1, Target.shape[0], 1))
     CONTROL_COUNT = 2
     CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = step + 1
-    ITERATION_COUNT = 1000
+    ITERATION_COUNT = 1
 
     COSTS = [TargetStateInfidelity(target_states=Target,cost_multiplier=0.99),
              ForbidStatesprojector(projector_tran_set(dim_trans,dim_c),system_eval_count=SYSTEM_EVAL_COUNT,cost_multiplier=0.01),]
