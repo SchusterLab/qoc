@@ -221,44 +221,136 @@ def norm_two(A):
 def norm_state(A):
     return np.linalg.norm(A)
 
+def _exact_1_norm(A):
+    # A compatibility function which should eventually disappear.
+    if sci.sparse.isspmatrix(A):
+        return max(abs(A).sum(axis=0).flat)
+    else:
+        return np.linalg.norm(A, 1)
+
+def gamma_fa(n):
+    u = 1.11e-16
+    return n*u/(1-n*u)
+def beta(norm,m,n):
+    beta=gamma_fa(m+1)
+    r = 1
+    for i in range(1,m):
+        r=r*norm/i
+        g = gamma_fa(i*(n+2)+m+2)
+        beta = beta+g*r
+    return beta,r
+
+def taylor_term(i,norm,term):
+    return term*norm/i
+def error(norm_B,m,s,n,R_m):
+    tr = R_m
+    rd=beta(norm_B,m,n)[0]
+    rd=np.power((1+rd+tr),s)-np.power((1+tr),s)
+    tr=tr*s
+    tr=tr*((1-np.power(tr,s))/(1-tr))
+    return tr+rd
+def weaker_error(beta,R_m,s):
+    tr = R_m
+    rd=beta
+    rd = np.power((1 + rd + tr), s) - np.power((1 + tr), s)
+    tr = tr * s
+    tr = tr * ((1 - np.power(tr, s)) / (1 - tr))
+    return tr+rd
+def residue_norm(m,norm_B,term):
+    R_m=term
+    for i in range(m+2,1000):
+        term=term*norm_B/i
+        R_m=R_m+term
+        if term<1e-15:
+            break
+    return R_m
+
+def choose_ms(norm_A,d,tol):
+    no_solution=True
+    for i in range(1,int(np.floor(norm_A))):
+        if no_solution == False:
+            break
+        norm_B = norm_A / i
+        l=int(np.floor(norm_B))
+        beta_factor,last_term=beta(norm_B,l,d)
+        lower_bound = i*(beta_factor)
+        if lower_bound>tol:
+            continue
+        tr_first_term=norm_B
+        m_pass_lowbound=False
+        for j in range(1,100):
+            if j>l:
+                last_term=last_term*norm_B/j
+                if last_term<1e-15:
+                    break
+                beta_factor=beta_factor+gamma_fa(j*(d+2)+2)*last_term
+            if m_pass_lowbound == False:
+                tr_first_term = tr_first_term * (norm_B / (j + 1))
+                if i *tr_first_term + lower_bound > tol:
+                    continue
+                else:
+                    R_m = residue_norm(j, norm_B, tr_first_term)
+                    m_pass_lowbound = True
+            if m_pass_lowbound == True:
+                if weaker_error(beta_factor,R_m,i)>tol:
+                    R_m = R_m - tr_first_term
+                    tr_first_term = tr_first_term * norm_B / (j + 1)
+
+                    continue
+                else:
+                    total_error=error(norm_B,j,i,d,R_m)
+                    R_m = R_m - tr_first_term
+                    tr_first_term = tr_first_term * norm_B / (j + 1)
+                    if total_error<tol:
+                        no_solution = False
+                        s=i
+                        m=j
+                        break
+
+    if no_solution==False:
+        return s,m
+    if no_solution == True:
+        raise ValueError("please lower the error tolerance ")
+def _exact_inf_norm(A):
+    # A compatibility function which should eventually disappear.
+    if sci.sparse.isspmatrix(A):
+        return max(abs(A).sum(axis=1).flat)
+    else:
+        return np.linalg.norm(A, np.inf)
+def max_row_number(sparse_matrix):
+    row_indice=sparse_matrix.nonzero()[0]
+    indice_count=1
+    max_count=1
+    length=len(row_indice)
+    indice = row_indice[0]
+    for i in range(1,length):
+        if indice==row_indice[i]:
+            indice_count=indice_count+1
+        else:
+            if indice_count>max_count:
+                max_count=indice_count
+            indice=row_indice[i]
+            indice_count=1
+    return max_count
 def expm_multiply(A, B, u_d=None):
     """
     A helper function.
     """
+    d=5
     tol=u_d
-    ident = _ident_like(A)
-    n = A.shape[0]
-    mu = _trace(A) / float(n)
-    A = A - mu * ident
     if tol is None:
-        tol =1e-16
-    s=get_s(A,B,tol)
-    F = B
-    j=0
-    while(1):
-        eta = np.exp(mu / float(s))
-        coeff = s*(j+1)
-        B =  A.dot(B)/coeff
-        c2 = _exact_inf_norm(B)
-        F = F + B
-        total_norm=norm_state(F)
-        if c2/total_norm<tol:
-            m=j+1
-            break
-        j=j+1
-    F = eta * F
-    B = F
-    for i in range(1,int(s)):
-        eta = np.exp(mu / float(s))
+        tol =1e-5
+    # if sci.sparse.isspmatrix(A):
+    #     d=max_row_number(A)
+    # else:
+    #     d=len(A)
+    norm_A = _exact_inf_norm(A)
+    s,m=choose_ms(norm_A,d,tol)
+    F=B
+    for i in range(int(s)):
         for j in range(m):
             coeff = s*(j+1)
             B =  A.dot(B)/coeff
-            c2 =norm_state(B)
             F = F + B
-            total_norm=norm_state(F)
-            if c2/total_norm<tol:
-                m=j+1
-                break
-        F = eta*F
         B = F
     return F

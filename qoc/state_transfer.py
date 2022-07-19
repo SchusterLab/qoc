@@ -15,9 +15,9 @@ def projector_tran(dim_trans,dim_c,i):
     return tran0
 def projector_tran_set(dim_trans,dim_c):
     a=[]
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-6))
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-5))
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-4))
+    a.append(projector_tran(dim_trans,dim_c,dim_trans-1))
+    a.append(projector_tran(dim_trans,dim_c,dim_trans-2))
+    a.append(projector_tran(dim_trans,dim_c,dim_trans-3))
     return np.array(a)
 def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
     asd, b_dag, b = transmon(w_01=w_t, anharmonicity=anharmonicity, H_size=dim_trans)
