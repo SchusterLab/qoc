@@ -2,4 +2,4 @@ from qoc.state_transfer import simulation
 import numpy as np
 pre=2*np.pi
 dim=700
-result = simulation(1, dim, 6, 6 * pre, 3 * pre, -0.225 * pre, 0.1 * pre, 10, 40,"AG")
+result = simulation(1, dim, 6, 6 * pre, 3 * pre, -0.225 * pre, 0.1 * pre, 1, 4,"AG")

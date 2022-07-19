@@ -62,7 +62,6 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
             H_control[i] = H_control[i].toarray()
         manual_parameter = {"control_hamiltonian": H_control, "manual_gradient_mode": False, "tol": 1e-8}
     else:
-
         manual_parameter = {"control_hamiltonian": H_control, "manual_gradient_mode": True, "tol": 1e-8}
     name=["transmon0","transmon1","transmon2"]
     states_plot=[name,projector_tran_set(dim_trans,dim_c)]

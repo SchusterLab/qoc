@@ -66,7 +66,7 @@ class ForbidStatesprojector(Cost):
             for i, projector in enumerate(self.projectors):
                 state = states[0]
                 state_cost = 0
-                state_dagger = conjugate_transpose(state)
+                state_dagger = conjugate_transpose_m(state)
                 a = projector.dot(state)
                 fidelity = np.real(np.matmul(state_dagger, a)[0][0])
                 state_cost = state_cost + fidelity
