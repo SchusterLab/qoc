@@ -267,7 +267,10 @@ def residue_norm(m,norm_B,term):
 
 def choose_ms(norm_A,d,tol):
     no_solution=True
-    for i in range(1,int(np.floor(norm_A))):
+    max_s=int(np.ceil(norm_A))
+    if max_s==1:
+        max_s=2
+    for i in range(1,max_s):
         if no_solution == False:
             break
         norm_B = norm_A / i

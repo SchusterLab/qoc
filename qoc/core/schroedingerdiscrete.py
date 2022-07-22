@@ -8,6 +8,7 @@ import multiprocessing
 from functools import partial
 import scipy as sci
 from autograd.extend import Box
+import autograd.numpy as anp
 import numpy as np
 from qoc.standard.functions import conjugate_transpose
 from qoc.core.common import (initialize_controls,expm_frechet,
@@ -226,6 +227,8 @@ def grape_schroedinger_discrete(control_count, control_eval_count,
                                                               max_control_norms)
     # Construct the program state.
     if manual_parameter==None:
+        d=len(initial_states[0])
+        initial_states=initial_states.reshape((d,d))
         pstate = GrapeSchroedingerDiscreteState(complex_controls, control_count,
                                             control_eval_count, cost_eval_step,
                                             costs, evolution_time, hamiltonian,
@@ -454,7 +457,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     if if_back is True:
         states = matmuls(conjugate_transpose_m(step_unitary), states)
     else:
-        states = matmuls(step_unitary, states)
+        states = anp.matmul(step_unitary,states)
 
     return states
 
