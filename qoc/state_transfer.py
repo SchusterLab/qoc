@@ -6,12 +6,15 @@ os.environ['OMP_NUM_THREADS'] = '1' # set number of OpenMP threads to run in par
 from scipy import signal
 from qoc import grape_schroedinger_discrete
 from qoc.standard import (TargetStateInfidelity,ForbidStatesprojector)
+from scipy.sparse import dia_matrix
 import numpy as np
 def projector_tran(dim_trans,dim_c,i):
-    I_c=np.identity(dim_c)
-    tran0 = np.zeros((dim_trans,dim_trans))
-    tran0[i][i]=1
-    tran0=np.kron(tran0,I_c)
+    H_size=dim_trans*dim_c
+    I_c=Identity(dim_c)
+    tran0 = np.zeros(dim_trans)
+    tran0[i]=1
+    tran0=dia_matrix(([tran0],[0]),shape=(dim_trans, dim_trans)).tocsc()
+    tran0=kron(tran0,I_c)
     return tran0
 def projector_tran_set(dim_trans,dim_c):
     a=[]
@@ -63,8 +66,6 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
         manual_parameter = {"control_hamiltonian": H_control, "manual_gradient_mode": False, "tol": 1e-8}
     else:
         manual_parameter = {"control_hamiltonian": H_control, "manual_gradient_mode": True, "tol": 1e-8}
-    name=["transmon0","transmon1","transmon2"]
-    states_plot=[name,projector_tran_set(dim_trans,dim_c)]
     result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
                                              COSTS, evolution_time, hamiltonian,
                                              Initial_state, SYSTEM_EVAL_COUNT,
