@@ -8,19 +8,22 @@ from qoc import grape_schroedinger_discrete
 from qoc.standard import (TargetStateInfidelity,ForbidStatesprojector)
 from scipy.sparse import dia_matrix
 import numpy as np
-def projector_tran(dim_trans,dim_c,i):
+def projector_tran(dim_trans,dim_c,i,mode):
     H_size=dim_trans*dim_c
     I_c=Identity(dim_c)
     tran0 = np.zeros(dim_trans)
     tran0[i]=1
     tran0=dia_matrix(([tran0],[0]),shape=(dim_trans, dim_trans)).tocsc()
     tran0=kron(tran0,I_c)
-    return tran0
-def projector_tran_set(dim_trans,dim_c):
+    if mode=="AD":
+        return tran0.toarray()
+    else:
+        return tran0
+def projector_tran_set(dim_trans,dim_c,mode):
     a=[]
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-1))
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-2))
-    a.append(projector_tran(dim_trans,dim_c,dim_trans-3))
+    a.append(projector_tran(dim_trans,dim_c,dim_trans-1,mode))
+    a.append(projector_tran(dim_trans,dim_c,dim_trans-2,mode))
+    a.append(projector_tran(dim_trans,dim_c,dim_trans-3,mode))
     return np.array(a)
 def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
     asd, b_dag, b = transmon(w_01=w_t, anharmonicity=anharmonicity, H_size=dim_trans)
@@ -52,7 +55,7 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     ITERATION_COUNT = 1
 
     COSTS = [TargetStateInfidelity(target_states=Target,cost_multiplier=0.99),
-             ForbidStatesprojector(projector_tran_set(dim_trans,dim_c),system_eval_count=SYSTEM_EVAL_COUNT,cost_multiplier=0.01),]
+             ForbidStatesprojector(projector_tran_set(dim_trans,dim_c,mode),system_eval_count=SYSTEM_EVAL_COUNT,cost_multiplier=0.01),]
     max_control_norms=np.array([6., 6.])
     # Define output.
     LOG_ITERATION_STEP = 1
