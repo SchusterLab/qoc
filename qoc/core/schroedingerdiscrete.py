@@ -459,7 +459,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     else:
         states = anp.matmul(step_unitary,states)
 
-    return anp.array([states])
+    return states
 
 
 def manual_gradient(controls,pstate, reporter):
