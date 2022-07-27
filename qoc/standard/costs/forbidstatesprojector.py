@@ -81,11 +81,11 @@ class ForbidStatesprojector(Cost):
         else:
             cost = 0
             for i, projector in enumerate(self.projectors):
-                state = states[0]
+                state = states
                 state_cost = 0
                 state_dagger=conjugate_transpose(state)
-                a=anp.matmul(projector,state)
-                fidelity = anp.real(anp.matmul(state_dagger, a)[0][0])
+                a=anp.matmul(projector,state[0])
+                fidelity = anp.real(anp.matmul(a, state_dagger )[0])
                 state_cost = state_cost + fidelity
                 # ENDFOR
                 state_cost_normalized = state_cost / self.forbidden_states_count

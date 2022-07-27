@@ -39,7 +39,7 @@ def conjugate_transpose(matrix):
     _conjugate_tranpose :: numpy.ndarray the conjugate transpose
         of matrix
     """
-    conjugate_transpose_ = anp.conjugate(anp.swapaxes(matrix, -1, -2))
+    conjugate_transpose_ = anp.conjugate(anp.transpose(matrix))
     
     return conjugate_transpose_
 
