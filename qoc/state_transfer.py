@@ -47,9 +47,9 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     C_final[fock] = 1
     #    C_final=coherent_state(N,alpha)
     Initial_state = np.kron(T_initial, C_initial)
-    Initial_state = Initial_state.reshape(1, Initial_state.shape[0])
+    Initial_state = Initial_state.reshape(1, Initial_state.shape[0],1)
     Target = np.kron(T_initial, C_final)
-    Target = Target.reshape((1, Target.shape[0]))
+    Target = Target.reshape(1, Target.shape[0],1)
     CONTROL_COUNT = 2
     CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = step + 1
     ITERATION_COUNT = 1

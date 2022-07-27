@@ -457,7 +457,7 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     if if_back is True:
         states = matmuls(conjugate_transpose_m(step_unitary), states)
     else:
-        states = anp.matmul(step_unitary,states[0])
+        states = anp.matmul(step_unitary,states)
 
     return anp.array([states])
 
