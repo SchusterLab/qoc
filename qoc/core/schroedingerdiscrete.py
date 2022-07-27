@@ -457,9 +457,9 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     if if_back is True:
         states = matmuls(conjugate_transpose_m(step_unitary), states)
     else:
-        states = anp.matmul(step_unitary,states)
+        states = anp.matmul(step_unitary,states[0])
 
-    return states
+    return anp.array([states])
 
 
 def manual_gradient(controls,pstate, reporter):
