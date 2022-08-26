@@ -339,17 +339,19 @@ def expm_multiply(A, B, u_d=None):
     """
     A helper function.
     """
-    d=5
-    tol=u_d
-    if tol is None:
-        tol =1e-5
-    # if sci.sparse.isspmatrix(A):
-    #     d=max_row_number(A)
-    # else:
-    #     d=len(A)
-    norm_A = _exact_inf_norm(A)
-    s,m=choose_ms(norm_A,d,tol)
-    F=B
+    # d=5
+    # tol=u_d
+    # if tol is None:
+    #     tol =1e-5
+    # # if sci.sparse.isspmatrix(A):
+    # #     d=max_row_number(A)
+    # # else:
+    # #     d=len(A)
+    # norm_A = _exact_inf_norm(A)
+    # s,m=choose_ms(norm_A,d,tol)
+    # F=B
+    s=5
+    m=10
     for i in range(int(s)):
         for j in range(m):
             coeff = s*(j+1)
