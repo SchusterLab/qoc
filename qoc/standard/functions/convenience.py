@@ -349,9 +349,10 @@ def expm_multiply(A, B, u_d=None):
     # #     d=len(A)
     # norm_A = _exact_inf_norm(A)
     # s,m=choose_ms(norm_A,d,tol)
-    # F=B
-    s=5
-    m=10
+    s = 5
+    m = 10
+    F=B
+
     for i in range(int(s)):
         for j in range(m):
             coeff = s*(j+1)
