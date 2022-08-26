@@ -109,7 +109,7 @@ def get_initial(N):
 
 def simulation(q_number,max_con,initial):
     H_0=csc_matrix(get_int(q_number))
-    H_control=get_control(q_number)
+    H_control=get_control(6)
     hamiltonian = lambda controls, time: (H_0
                                           + control_H(controls,H_control))
     Initial_state=get_initial(q_number)
