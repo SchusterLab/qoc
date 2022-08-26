@@ -580,7 +580,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
 
                 # Evolve the states to the next time step.
                 if not is_final_system_eval_step:
-                    if len(states)>=2:
+                    if len(states)<=0:
                         n = 1
                         func = partial(s_a_s_multi, get_magnus(dt, hamiltonian,
                                                                time,
