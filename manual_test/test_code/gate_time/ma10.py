@@ -68,7 +68,7 @@ def get_control(N):
         a=identity(2**(N-1))
         control.append(kron(sigmax,a,format="csc"))
         control.append(kron(sigmay, identity(2 ** (N - 1)),format="csc"))
-        for i in range(1,N-1):
+        for i in range(1,5):
             control.append(kron(kron(identity(2**i),sigmax), identity(2 ** (N - 1-i)),format="csc"))
             control.append(kron(kron(identity(2 ** i), sigmay), identity(2 ** (N - 1 - i)),format="csc"))
         control.append(kron(identity(2**(N-1)),sigmax,format="csc"))
@@ -109,7 +109,7 @@ def get_initial(N):
 
 def simulation(q_number,max_con,initial):
     H_0=csc_matrix(get_int(q_number))
-    H_control=get_control(6)
+    H_control=get_control(q_number)
     hamiltonian = lambda controls, time: (H_0
                                           + control_H(controls,H_control))
     Initial_state=get_initial(q_number)
