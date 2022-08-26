@@ -581,7 +581,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter,pulse=None):
                 # Evolve the states to the next time step.
                 if not is_final_system_eval_step:
                     if len(states)>=2:
-                        n = multiprocessing.cpu_count()
+                        n = 1
                         func = partial(s_a_s_multi, get_magnus(dt, hamiltonian,
                                                                time,
                                                                control_eval_times=control_eval_times,

@@ -118,7 +118,7 @@ class TargetStateInfidelityTime(Cost):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
     def update_state_forw(self, A,tol):
         if len(self.final_states) >= 2:
-            n = multiprocessing.cpu_count()
+            n = 1
             func = partial(s_a_s_multi, A, tol)
             settings.MULTIPROC = "pathos"
             map = get_map_method(n)
@@ -131,7 +131,7 @@ class TargetStateInfidelityTime(Cost):
 
     def gradient(self, A, E,tol):
         if len(self.final_states) >= 2:
-            n = multiprocessing.cpu_count()
+            n = 1
             func = partial(block_fre, A, E, tol)
             settings.MULTIPROC = "pathos"
             map = get_map_method(n)
