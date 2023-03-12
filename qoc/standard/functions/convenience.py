@@ -107,7 +107,7 @@ def krylov(A,tol=2**-53,states=None):
     states=np.complex128(states)
     if tol==None:
         tol=2**-53
-    if len(states.shape)<=2:
+    if len(states.shape)<1:
         states=states.flatten()
         box=expm_multiply(A,states,u_d=tol)
     else:
@@ -349,10 +349,9 @@ def expm_multiply(A, B, u_d=None):
     # #     d=len(A)
     # norm_A = _exact_inf_norm(A)
     # s,m=choose_ms(norm_A,d,tol)
-    s = 5
-    m = 10
+    s = 1
+    m = 8
     F=B
-
     for i in range(int(s)):
         for j in range(m):
             coeff = s*(j+1)
@@ -360,3 +359,22 @@ def expm_multiply(A, B, u_d=None):
             F = F + B
         B = F
     return F
+def propagator_der(E,A,b,tol):
+    norm_A = _exact_inf_norm(A)
+    s,m=choose_ms(norm_A,5,tol)
+    M=[]
+    number_E=len(E)
+    for k in range(number_E):
+        M.append(E[k].dot(b))
+    eAb=b
+    b=A.dot(b)
+    eAb += b
+    for i in range(int(s)):
+        for j in range(1,m):
+            coeff = s*(j+1)
+            b =  A.dot(b)/coeff
+            for k in range(number_E):
+                M[k]=E[k].dot(b)+A.dot(M[k])
+            eAb = eAb + b
+        b = eAb
+    return eAb,M
