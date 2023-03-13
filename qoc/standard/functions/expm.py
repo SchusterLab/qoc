@@ -2,10 +2,11 @@
 expm.py - a module for all things e^M
 """
 
-from autograd.extend import (defvjp as autograd_defvjp,
-                             primitive as autograd_primitive)
+
 import autograd.numpy as anp
-import numpy as np
+# from autograd.extend import (defvjp as autograd_defvjp,
+#                              primitive as autograd_primitive)
+# import numpy as np
 # import scipy.linalg as la
 # from numba import jit
 #
