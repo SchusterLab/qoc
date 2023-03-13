@@ -20,11 +20,12 @@ class TargetStateInfidelity(Cost):
     requires_step_evaluation
     state_count
     target_states_dagger
+    neglect_relative_phase
     """
     name = "target_state_infidelity"
     requires_step_evaluation = False
 
-    def __init__(self, target_states,neglect_relative_pahse=False, cost_multiplier=1.,):
+    def __init__(self, target_states,neglect_relative_phase=False, cost_multiplier=1.,):
         """
         See class fields for arguments not listed here.
         
@@ -33,8 +34,8 @@ class TargetStateInfidelity(Cost):
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.state_count = target_states.shape[0]
-        self.target_states_dagger = conjugate_transpose(target_states)
-        self.neglect_relative_pahse=neglect_relative_pahse
+        self.target_states_dagger = np.conjugate(target_states)
+        self.neglect_relative_phase = neglect_relative_phase
 
     def cost(self, controls, states, system_eval_step):
         """
@@ -49,15 +50,11 @@ class TargetStateInfidelity(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
-        if self.neglect_relative_pahse==False:
-            inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-            inner_products_sum = anp.sum(inner_products)
-            fidelity_normalized = anp.real(inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
-            infidelity = 1 - fidelity_normalized
+        inner_products = anp.matmul(self.target_states_dagger, states)
+        if self.neglect_relative_phase==False:
+            inner_products_sum = anp.sum(anp.trace(inner_products))
         else:
-            self.inner_products = anp.matmul(self.target_states_dagger, states)[:, 0, 0]
-            fidelities = anp.real(self.inner_products * anp.conjugate(self.inner_products))
-            fidelity_normalized = anp.sum(fidelities) / self.state_count
-            infidelity = 1 - fidelity_normalized
-        
+            inner_products_sum = anp.sum(anp.trace(anp.abs(inner_products)))
+        fidelity = anp.real(inner_products_sum * anp.conjugate(inner_products_sum)) / self.state_count ** 2
+        infidelity = 1 - fidelity
         return infidelity * self.cost_multiplier

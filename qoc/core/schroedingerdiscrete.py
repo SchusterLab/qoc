@@ -383,7 +383,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     else:
         iteration = 0
     save_intermediate_states = pstate.save_intermediate_states_
-    states = pstate.initial_states
+    states = np.transpose(pstate.initial_states)
     step_costs = pstate.step_costs
     system_eval_count = pstate.system_eval_count
     error = 0
@@ -497,6 +497,6 @@ def _evolve_step_schroedinger_discrete(dt, hamiltonian,
     #ENDIF
 
     step_unitary = expm(magnus)
-    states = matmuls(step_unitary, states)
+    states = np.matmul(step_unitary, states)
 
     return states
