@@ -4,7 +4,6 @@ constants.py - This module defines constants.
 
 import numpy as np
 from scipy.sparse import dia_matrix,identity
-from scipy.sparse.linalg import expm_multiply
 ### CONSTANTS ###
 
 SIGMA_X = np.array(((0, 1), (1, 0)))

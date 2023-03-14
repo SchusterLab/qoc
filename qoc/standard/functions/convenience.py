@@ -8,7 +8,7 @@ from functools import reduce
 import autograd.numpy as anp
 import scipy as sci
 from scipy.sparse import bmat,isspmatrix,identity,csr_matrix
-from scipy.sparse.linalg import eigs,expm_multiply
+
 ### COMPUTATIONS ###
 
 def commutator(a, b):
@@ -141,8 +141,6 @@ def block_fre(A,E,tol,state):
 """
 import numpy as np
 
-import scipy.linalg
-import scipy.sparse.linalg
 from scipy.sparse.linalg import aslinearoperator
 from scipy.sparse.sputils import is_pydata_spmatrix
 def _exact_inf_norm(A):

@@ -117,7 +117,7 @@ class TargetStateInfidelityTime(Cost):
             for i in range(self.state_count):
                 self.back_states[i] = self.back_states[i] + self.inner_products[i] * self.target_states[i]
     def update_state_forw(self, A,tol):
-        if len(self.final_states) >= 2:
+        if len(self.final_states) > 2:
             n = 1
             func = partial(s_a_s_multi, A, tol)
             settings.MULTIPROC = "pathos"
@@ -130,7 +130,8 @@ class TargetStateInfidelityTime(Cost):
             self.final_states = krylov(A, tol, self.final_states)
 
     def gradient(self, A, E,tol):
-        if len(self.final_states) >= 2:
+
+        if len(self.final_states) > 2:
             n = 1
             func = partial(block_fre, A, E, tol)
             settings.MULTIPROC = "pathos"
