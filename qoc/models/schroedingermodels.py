@@ -110,25 +110,25 @@ class EvolveSchroedingerDiscreteState(ProgramState):
         #ENDIF
 
 
-class EvolveSchroedingerResult(object):
-    """
-    This class encapsulates the result of the
-    qoc.core.schroedingerdiscrete.evolve_schroedinger_discrete
-    program.
-    
-    Fields:
-    error
-    final_states
-    """
-
-    def __init__(self, error=None,
-                 final_states=None,):
-        """
-        See the class fields for arguments not listed here.
-        """
-        super().__init__()
-        self.error = error
-        self.final_states = final_states
+# class EvolveSchroedingerResult(object):
+#     """
+#     This class encapsulates the result of the
+#     qoc.core.schroedingerdiscrete.evolve_schroedinger_discrete
+#     program.
+#
+#     Fields:
+#     error
+#     final_states
+#     """
+#
+#     def __init__(self, error=None,
+#                  final_states=None,):
+#         """
+#         See the class fields for arguments not listed here.
+#         """
+#         super().__init__()
+#         self.error = error
+#         self.final_states = final_states
 
 
 class GrapeSchroedingerDiscreteState(GrapeState):

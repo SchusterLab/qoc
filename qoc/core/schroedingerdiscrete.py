@@ -24,83 +24,83 @@ from qoc.standard import (Adam, ans_jacobian,
                           expm, matmuls)
 
 ### MAIN METHODS ###
-
-def evolve_schroedinger_discrete(evolution_time, hamiltonian,
-                                 initial_states, system_eval_count,
-                                 controls=None,
-                                 cost_eval_step=1, costs=list(), 
-                                 interpolation_policy=InterpolationPolicy.LINEAR,
-                                 magnus_policy=MagnusPolicy.M2,
-                                 save_file_path=None,
-                                 save_intermediate_states=False,):
-    """
-    Evolve a set of state vectors under the schroedinger equation
-    and compute the optimization error.
-
-    Args:
-    evolution_time :: float - This value specifies the duration of the
-        system's evolution.
-    hamiltonian :: (controls :: ndarray (control_count), time :: float)
-                   -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
-        - This function provides the system's hamiltonian given a set
-        of control parameters and a time value.
-    initial_states :: ndarray (state_count x hilbert_size x 1)
-        - This array specifies the states that should be evolved under the
-        specified system. These are the states at the beginning of the evolution.
-    system_eval_count :: int >= 2 - This value determines how many times
-        during the evolution the system is evaluated, including the
-        initial value of the system. For the schroedinger evolution,
-        this value determines the time step of integration.
-        This value is used as:
-        `system_eval_times` = numpy.linspace(0, `evolution_time`, `system_eval_count`).
-
-    controls :: ndarray (control_step_count x control_count)
-        - This array specifies the control parameter values at each
-          control step. These values will be used to determine the `controls`
-          argument passed to the `hamiltonian` function.
-    cost_eval_step :: int >= 1- This value determines how often step-costs are evaluated.
-         The units of this value are in system_eval steps. E.g. if this value is 2,
-         step-costs will be computed every 2 system_eval steps.
-    costs :: iterable(qoc.models.cost.Cost) - This list specifies all
-        the cost functions that the optimizer should evaluate. This list
-        defines the criteria for an "optimal" control set.
-    interpolation_policy :: qoc.models.interpolationpolicy.InterpolationPolicy
-        - This value specifies how control parameters should be
-        interpreted at points where they are not defined.
-    magnus_policy :: qoc.models.magnuspolicy.MagnusPolicy - This value
-        specifies what method should be used to perform the magnus expansion
-        of the system matrix for ode integration. Choosing a higher order
-        magnus expansion will yield more accuracy, but it will
-        result in a longer compute time.
-    save_file_path :: str - This is the full path to the file where
-        information about program execution will be stored.
-        E.g. "./out/foo.h5"
-    save_intermediate_states :: bool - If this value is set to True,
-        qoc will write the states to the save file after every
-        system_eval step.
-
-    Returns:
-    result :: qoc.models.schroedingermodels.EvolveSchroedingerResult
-    """
-    if controls is not None:
-        control_eval_count = controls.shape[0]
-    else:
-        control_eval_count = 0
-    
-    pstate = EvolveSchroedingerDiscreteState(control_eval_count,
-                                             cost_eval_step,
-                                             costs, evolution_time,
-                                             hamiltonian, initial_states,
-                                             interpolation_policy,
-                                             magnus_policy,
-                                             save_file_path,
-                                             save_intermediate_states,
-                                             system_eval_count,)
-    pstate.save_initial(controls)
-    result = EvolveSchroedingerResult()
-    _ = _evaluate_schroedinger_discrete(controls, pstate, result)
-
-    return result
+#
+# def evolve_schroedinger_discrete(evolution_time, hamiltonian,
+#                                  initial_states, system_eval_count,
+#                                  controls=None,
+#                                  cost_eval_step=1, costs=list(),
+#                                  interpolation_policy=InterpolationPolicy.LINEAR,
+#                                  magnus_policy=MagnusPolicy.M2,
+#                                  save_file_path=None,
+#                                  save_intermediate_states=False,):
+#     """
+#     Evolve a set of state vectors under the schroedinger equation
+#     and compute the optimization error.
+#
+#     Args:
+#     evolution_time :: float - This value specifies the duration of the
+#         system's evolution.
+#     hamiltonian :: (controls :: ndarray (control_count), time :: float)
+#                    -> hamiltonian_matrix :: ndarray (hilbert_size x hilbert_size)
+#         - This function provides the system's hamiltonian given a set
+#         of control parameters and a time value.
+#     initial_states :: ndarray (state_count x hilbert_size x 1)
+#         - This array specifies the states that should be evolved under the
+#         specified system. These are the states at the beginning of the evolution.
+#     system_eval_count :: int >= 2 - This value determines how many times
+#         during the evolution the system is evaluated, including the
+#         initial value of the system. For the schroedinger evolution,
+#         this value determines the time step of integration.
+#         This value is used as:
+#         `system_eval_times` = numpy.linspace(0, `evolution_time`, `system_eval_count`).
+#
+#     controls :: ndarray (control_step_count x control_count)
+#         - This array specifies the control parameter values at each
+#           control step. These values will be used to determine the `controls`
+#           argument passed to the `hamiltonian` function.
+#     cost_eval_step :: int >= 1- This value determines how often step-costs are evaluated.
+#          The units of this value are in system_eval steps. E.g. if this value is 2,
+#          step-costs will be computed every 2 system_eval steps.
+#     costs :: iterable(qoc.models.cost.Cost) - This list specifies all
+#         the cost functions that the optimizer should evaluate. This list
+#         defines the criteria for an "optimal" control set.
+#     interpolation_policy :: qoc.models.interpolationpolicy.InterpolationPolicy
+#         - This value specifies how control parameters should be
+#         interpreted at points where they are not defined.
+#     magnus_policy :: qoc.models.magnuspolicy.MagnusPolicy - This value
+#         specifies what method should be used to perform the magnus expansion
+#         of the system matrix for ode integration. Choosing a higher order
+#         magnus expansion will yield more accuracy, but it will
+#         result in a longer compute time.
+#     save_file_path :: str - This is the full path to the file where
+#         information about program execution will be stored.
+#         E.g. "./out/foo.h5"
+#     save_intermediate_states :: bool - If this value is set to True,
+#         qoc will write the states to the save file after every
+#         system_eval step.
+#
+#     Returns:
+#     result :: qoc.models.schroedingermodels.EvolveSchroedingerResult
+#     """
+#     if controls is not None:
+#         control_eval_count = controls.shape[0]
+#     else:
+#         control_eval_count = 0
+#
+#     pstate = EvolveSchroedingerDiscreteState(control_eval_count,
+#                                              cost_eval_step,
+#                                              costs, evolution_time,
+#                                              hamiltonian, initial_states,
+#                                              interpolation_policy,
+#                                              magnus_policy,
+#                                              save_file_path,
+#                                              save_intermediate_states,
+#                                              system_eval_count,)
+#     pstate.save_initial(controls)
+#     result = EvolveSchroedingerResult()
+#     _ = _evaluate_schroedinger_discrete(controls, pstate, result)
+#
+#     return result
 
 
 def grape_schroedinger_discrete(control_count, control_eval_count,
