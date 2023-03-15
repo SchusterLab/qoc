@@ -107,14 +107,13 @@ def gen_controls_white(complex_controls, control_count, control_eval_count,
     return controls
 
 
-def gen_controls_flat(complex_controls, control_count, control_eval_count,
+def gen_controls_flat( control_count, control_eval_count,
                       evolution_time, max_control_norms, periods=10.):
     """
     Create a discrete control set that is shaped like
     a flat line with small amplitude.
 
     Arguments:
-    complex_controls
     control_count
     control_eval_count
     evolution_time
@@ -125,25 +124,17 @@ def gen_controls_flat(complex_controls, control_count, control_eval_count,
     Returns:
     controls
     """
-    controls = np.zeros((control_eval_count, control_count))
+    controls = np.zeros((control_count,control_eval_count))
 
     # Make each control a flat line for all time.
-    for i in range(control_count):
-        max_norm = max_control_norms[i]
-        small_norm = max_norm * 1e-1
-        control = np.repeat(small_norm, control_eval_count)
-        controls[:, i] = control
+    for i, max_norm in enumerate(max_control_norms):
+        controls[i] = 0.1 * max_norm * np.ones(control_eval_count)
     #ENDFOR
-
-    # Mimic the flat line for the imaginary parts, and normalize.
-    if complex_controls:
-        controls = (controls - 1j * controls) / np.sqrt(2)
-
     return controls
 
 
 _NORM_TOLERANCE = 1e-10
-def initialize_controls(complex_controls,
+def initialize_controls(
                         control_count,
                         control_eval_count, evolution_time,
                         initial_controls, max_control_norms):
@@ -152,7 +143,6 @@ def initialize_controls(complex_controls,
     Generate both if either was not specified.
 
     Arguments:
-    complex_controls
     control_count
     control_eval_count
     evolution_time
@@ -167,23 +157,14 @@ def initialize_controls(complex_controls,
         max_control_norms = np.ones(control_count)
         
     if initial_controls is None:
-        controls = gen_controls_flat(complex_controls, control_count, control_eval_count,
+        controls = gen_controls_flat( control_count, control_eval_count,
                                      evolution_time, max_control_norms)
     else:
-        # Check that the user-specified controls match the specified data type.
-        if complex_controls:
-            if not np.iscomplexobj(initial_controls):
-                raise ValueError("The program expected that the initial_controls specified by "
-                                 "the user conformed to complex_controls, but "
-                                 "the program found that the initial_controls were not complex "
-                                 "and complex_controls was set to True.")
-        else:
-            if np.iscomplexobj(initial_controls):
-                raise ValueError("The program expected that the initial_controls specified by "
-                                 "the user conformed to complex_controls, but "
-                                 "the program found that the initial_controls were complex "
-                                 "and complex_controls was set to False.")
-        
+        # Check that the user-specified controls are real.
+        if np.iscomplexobj(initial_controls):
+            raise ValueError("The program expected that the initial_controls specified by "
+                                 "the user are real numbers "
+                                 )
         # Check that the user-specified controls conform to max_control_norms.
         for control_step, step_controls in enumerate(initial_controls):
             if not (np.less_equal(np.abs(step_controls), max_control_norms + _NORM_TOLERANCE).all()):

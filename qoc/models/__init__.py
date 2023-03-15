@@ -14,8 +14,7 @@ from .operationpolicy import OperationPolicy
 from .performancepolicy import PerformancePolicy
 from .programtype import ProgramType
 from .programstate import ProgramState
-from .schroedingermodels import (EvolveSchroedingerDiscreteState,
-                                 EvolveSchroedingerResult,
+from .schroedingermodels import (
                                  GrapeSchroedingerDiscreteState,
                                  GrapeSchroedingerResult,)
 
@@ -29,8 +28,6 @@ __all__ = [
     "OperationPolicy",
     "PerformancePolicy",
     "ProgramType", "ProgramState",
-    "EvolveSchroedingerDiscreteState",
-    "EvolveSchroedingerResult",
     "GrapeSchroedingerDiscreteState",
     "GrapeSchroedingerResult",
 ]

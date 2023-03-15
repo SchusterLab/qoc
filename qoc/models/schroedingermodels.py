@@ -9,126 +9,7 @@ from filelock import FileLock, Timeout
 import h5py
 import numpy as np
 
-from qoc.models.programtype import ProgramType
-from qoc.models.programstate import (ProgramState, GrapeState,)
-
-class EvolveSchroedingerDiscreteState(ProgramState):
-    """
-    This class encapsulates data fields that are used by the
-    qoc.core.schroedingerdiscrete.evolve_schroedinger_discrete
-    program.
-    
-    Fields:
-    control_eval_count
-    control_eval_times
-    cost_eval_step
-    costs
-    dt
-    evolution_time
-    final_system_eval_step
-    hamiltonian
-    initial_states
-    interpolation_policy
-    magnus_policy
-    method
-    program_type
-    save_file_lock_path
-    save_file_path
-    save_intermediate_states_
-    step_cost_indices
-    step_costs
-    system_eval_count
-    """
-    method = "evolve_schroedinger_discrete"
-    
-    def __init__(self,control_eval_count,
-                 cost_eval_step, costs,
-                 evolution_time, hamiltonian, initial_states,
-                 interpolation_policy,
-                 magnus_policy,
-                 save_file_path,
-                 save_intermediate_states_,
-                 system_eval_count,):
-        """
-        See class definition for arguments not listed here.
-        """
-        super().__init__(control_eval_count,
-                         cost_eval_step, costs,
-                         evolution_time, hamiltonian, interpolation_policy,
-                         ProgramType.EVOLVE,
-                         save_file_path, system_eval_count,)
-        self.initial_states = initial_states
-        self.magnus_policy = magnus_policy
-        self.save_intermediate_states_ = (save_file_path is not None
-                                          and save_intermediate_states_)
-
-
-    def save_initial(self, controls):
-        """
-        Perform the initial save.
-        """
-        if self.save_file_path is not None:
-            print("QOC is saving this evolution to {}."
-                  "".format(self.save_file_path))
-            try:
-                with FileLock(self.save_file_lock_path):
-                    with h5py.File(self.save_file_path, "w") as save_file:
-                        save_file["controls"] = controls
-                        save_file["cost_eval_step"] = self.cost_eval_step
-                        save_file["costs"] = np.array(["{}".format(cost)
-                                                       for cost in self.costs])
-                        save_file["evolution_time"] = self.evolution_time
-                        save_file["initial_states"] = self.initial_states
-                        save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
-                        if self.save_intermediate_states_:
-                            save_file["intermediate_states"] = np.zeros((self.system_eval_count,
-                                                                         *self.initial_states.shape),
-                                                                        dtype=np.complex128)
-                        save_file["magnus_policy"] = "{}".format(self.magnus_policy)
-                        save_file["method"] = self.method
-                        save_file["program_type"] = self.program_type.value
-                        save_file["system_eval_count"] = self.system_eval_count
-                    #ENDWITH
-                #ENDWITH
-            except Timeout:
-                print("Timeout while locking {}."
-                      "".format(self.save_file_lock_path))
-
-    
-    def save_intermediate_states(self, iteration, states, system_eval_step,):
-        """
-        Save intermediate states to the save file.
-        """
-        if self.save_file_path is not None:
-            try:
-                with FileLock(self.save_file_lock_path):
-                    with h5py.File(self.save_file_path, "a") as save_file:
-                        save_file["intermediate_states"][system_eval_step, :, :, :] = states.astype(np.complex128)
-            except Timeout:
-                print("Timeout while locking {} while saving intermediate states on iteration {}."
-                      "".format(self.save_file_lock_path, iteration))
-        #ENDIF
-
-
-# class EvolveSchroedingerResult(object):
-#     """
-#     This class encapsulates the result of the
-#     qoc.core.schroedingerdiscrete.evolve_schroedinger_discrete
-#     program.
-#
-#     Fields:
-#     error
-#     final_states
-#     """
-#
-#     def __init__(self, error=None,
-#                  final_states=None,):
-#         """
-#         See the class fields for arguments not listed here.
-#         """
-#         super().__init__()
-#         self.error = error
-#         self.final_states = final_states
+from qoc.models.programstate import (GrapeState,)
 
 
 class GrapeSchroedingerDiscreteState(GrapeState):
@@ -138,8 +19,6 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     program.
 
     Fields:
-    complex_controls
-    control_count
     control_eval_count
     control_eval_times
     controls_shape
@@ -154,11 +33,9 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     impose_control_conditions
     initial_controls
     initial_states
-    interpolation_policy
     iteration_count
     log_iteration_step
     max_control_norms
-    magnus_policy
     method
     min_error
     optimizer
@@ -171,24 +48,30 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     should_save
     step_cost_indices
     step_costs
-    system_eval_count
     """
     method = "grape_schroedinger_discrete"
 
-    def __init__(self, complex_controls, control_count,
-                 control_eval_count, cost_eval_step, costs,
-                 evolution_time, hamiltonian,
+    def __init__(self, H_s, H_controls,
+                 control_eval_count,  costs,
+                 evolution_time,
                  impose_control_conditions,
                  initial_controls,
-                 initial_states, interpolation_policy, iteration_count,
+                 initial_states, iteration_count,
                  log_iteration_step, max_control_norms,
-                 magnus_policy, min_error, optimizer,
+                  min_error, optimizer,
                  save_file_path, save_intermediate_states_,
-                 save_iteration_step,
-                 system_eval_count,):
+                 save_iteration_step, gradients_method
+                 ):
         """
         See class fields for arguments not listed here.
         """
+        control_count = len(H_controls)
+        self.control_count = control_count
+        complex_controls = False
+        cost_eval_step = 1
+        hamiltonian = None
+        system_eval_count = control_eval_count
+        interpolation_policy = None
         super().__init__(complex_controls, control_count,
                          control_eval_count, cost_eval_step, costs,
                          evolution_time, hamiltonian,
@@ -201,9 +84,11 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                          system_eval_count,)
         self.hilbert_size = initial_states[0].shape[0]
         self.initial_states = initial_states
-        self.magnus_policy = magnus_policy
         self.save_intermediate_states_ = (self.should_save
                                           and save_intermediate_states_)
+        self.H_s = H_s
+        self.H_controls = H_controls
+        self.gradients_method = gradients_method
 
 
     def log_and_save(self, controls, error, final_states, grads, iteration,):
@@ -274,8 +159,9 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             try:
                 with FileLock(self.save_file_lock_path):
                     with h5py.File(self.save_file_path, "w") as save_file:
-                        save_file["complex_controls"] = self.complex_controls
-                        save_file["control_count"] = self.control_count
+                        save_file["H_s"] = self.H_s
+                        save_file["H_controls"] = self.H_controls
+                        save_file["gradients_mode"] = self.gradients_method
                         save_file["control_eval_count"] = self.control_eval_count
                         save_file["controls"] = np.zeros((save_count, self.control_eval_count,
                                                           self.control_count,),
@@ -297,14 +183,11 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                                                                          self.system_eval_count,
                                                                          *self.initial_states.shape),
                                                                         dtype=np.complex128)
-                        save_file["interpolation_policy"] = "{}".format(self.interpolation_policy)
                         save_file["iteration_count"] = self.iteration_count
-                        save_file["magnus_policy"] = "{}".format(self.magnus_policy)
                         save_file["max_control_norms"] = self.max_control_norms
                         save_file["method"] = self.method
                         save_file["optimizer"] = "{}".format(self.optimizer)
                         save_file["program_type"] = self.program_type.value
-                        save_file["system_eval_count"] = self.system_eval_count
                     #ENDWITH
                 #ENDWITH
             except Timeout:
