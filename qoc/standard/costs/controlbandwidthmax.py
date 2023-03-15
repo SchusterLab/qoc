@@ -18,6 +18,7 @@ class ControlBandwidthMax(Cost):
     freqs :: ndarray (CONTROL_EVAL_COUNT) - This array contains the frequencies of each of the controls.
     name
     requires_step_evaluation
+    type
     
     Example Usage:
     dt = 1 # zns
@@ -27,7 +28,7 @@ class ControlBandwidthMax(Cost):
     """
     name = "control_bandwidth_max"
     requires_step_evaluation = False
-
+    type = "control_explicit_related"
     def __init__(self, dt, max_bandwidths,
                  cost_multiplier=1.,):
         """

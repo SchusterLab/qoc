@@ -18,10 +18,11 @@ class ControlVariation(Cost):
     name
     order
     requires_step_evaluation
+    type
     """
     name = "control_variation"
     requires_step_evaluation = False
-
+    type = "control_explicit_related"
     def __init__(self,
                  cost_multiplier=1.,
                  order=1):

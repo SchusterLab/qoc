@@ -17,10 +17,11 @@ class ControlArea(Cost):
     cost_multiplier
     name
     requires_step_evaluation
+    type
     """
     name = "control_area"
     requires_step_evaluation = False
-
+    type = "control_explicit_related"
     def __init__(self, cost_multiplier=1.,):
         """
         See class fields for arguments not listed here.

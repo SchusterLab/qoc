@@ -21,10 +21,11 @@ class ControlNorm(Cost):
     cost_multiplier
     name
     requires_step_evaluation
+    type
     """
     name = "control_norm"
     requires_step_evaluation = False
-
+    type = "control_explicit_related"
     def __init__(self,
                  control_weights=None,
                  cost_multiplier=1.,):
