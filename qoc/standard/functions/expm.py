@@ -4,81 +4,17 @@ expm.py - a module for all things e^M
 
 
 import autograd.numpy as anp
-# from autograd.extend import (defvjp as autograd_defvjp,
-#                              primitive as autograd_primitive)
-# import numpy as np
-# import scipy.linalg as la
-# from numba import jit
-#
-# ### EXPM IMPLEMENTATION VIA SCIPY ###
-#
-# @autograd_primitive
-# def expm_scipy(matrix):
-#     """
-#     Compute the matrix exponential of a matrix.
-#     Args:
-#     matrix :: numpy.ndarray - the matrix to exponentiate
-#     operation_policy :: qoc.OperationPolicy - what data type is
-#         used to perform the operation and with which method
-#     Returns:
-#     exp_matrix :: numpy.ndarray - the exponentiated matrix
-#     """
-#     exp_matrix = la.expm(matrix)
-#
-#     return exp_matrix
-#
-#
-# @jit(nopython=True, parallel=True)
-# def _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size):
-#     dfinal_dmatrix = np.zeros((matrix_size, matrix_size), dtype=np.complex128)
-#
-#     # Compute a first order approximation of the frechet derivative of the matrix
-#     # exponential in every unit direction Eij.
-#     for i in range(matrix_size):
-#         for j in range(matrix_size):
-#             dexpm_dmij_rowi = exp_matrix[j,:]
-#             dfinal_dmatrix[i, j] = np.sum(np.multiply(dfinal_dexpm[i, :], dexpm_dmij_rowi))
-#         #ENDFOR
-#     #ENDFOR
-#     return dfinal_dmatrix
-#
-#
-# def _expm_vjp(exp_matrix, matrix):
-#     """
-#     Construct the left-multiplying vector jacobian product function
-#     for the matrix exponential.
-#
-#     Intuition:
-#     `dfinal_dexpm` is the jacobian of `final` with respect to each element `expmij`
-#     of `exp_matrix`. `final` is the output of the first function in the
-#     backward differentiation series. It is also the output of the last
-#     function evaluated in the chain of functions that is being differentiated,
-#     i.e. the final cost function. The goal of `vjp_function` is to take
-#     `dfinal_dexpm` and yield `dfinal_dmatrix` which is the jacobian of
-#     `final` with respect to each element `mij` of `matrix`.
-#     To compute the frechet derivative of the matrix exponential with respect
-#     to each element `mij`, we use the approximation that
-#     dexpm_dmij = np.matmul(Eij, exp_matrix). Since Eij has a specific
-#     structure we don't need to do the full matrix multiplication and instead
-#     use some indexing tricks.
-#
-#     Args:
-#     exp_matrix :: numpy.ndarray - the matrix exponential of matrix
-#     matrix :: numpy.ndarray - the matrix that was exponentiated
-#     operation_policy :: qoc.OperationPolicy - what data type is
-#         used to perform the operation and with which method
-#
-#     Returns:
-#     vjp_function :: numpy.ndarray -> numpy.ndarray - the function that takes
-#         the jacobian of the final function with respect to `exp_matrix`
-#         to the jacobian of the final function with respect to `matrix`
-#     """
-#     matrix_size = matrix.shape[0]
-#     return lambda dfinal_dexpm: _expm_vjp_(dfinal_dexpm, exp_matrix, matrix_size)
-#
-#
-# autograd_defvjp(expm_scipy, _expm_vjp)
+import scipy.sparse.linalg
+from scipy.sparse import isspmatrix
+import numpy as np
 
+def expm(A, vector, method="pade", tol = 1e-5):
+    if method == "pade":
+        exp_matrix = expm_pade(A)
+        vector = anp.matmul(exp_matrix, vector)
+    if method == "taylor":
+        vector = expmat_vec_mul(A, vector, tol )
+    return vector
 
 ### EXPM IMPLEMENTATION DUE TO HIGHAM 2005 ###
 
@@ -272,5 +208,181 @@ def expm_eigh(h):
 
 
 ### EXPORT ###
+def _exact_inf_norm(A):
+    if scipy.sparse.isspmatrix(A):
+        return max(abs(A).sum(axis=1).flat)
+    else:
+        return np.linalg.norm(A, np.inf)
 
-expm = expm_pade
+def trace(A):
+    """
+    Args:
+    A :: numpy.ndarray - matrix
+    Returns:
+    trace of A
+    """
+    if scipy.sparse.isspmatrix(A):
+        return A.diagonal().sum()
+    else:
+        return np.trace(A)
+
+def ident_like(A):
+    """
+    Args:
+    A :: numpy.ndarray - matrix
+    Returns:
+    Identity matrix which has same dimension as A
+    """
+    if scipy.sparse.isspmatrix(A):
+        return scipy.sparse.construct.eye(A.shape[0], A.shape[1],
+                                          dtype=A.dtype, format=A.format)
+    else:
+        return np.eye(A.shape[0], A.shape[1], dtype=A.dtype)
+
+def get_s(A, tol):
+    s = 1
+    a = _exact_inf_norm(A)
+    while (1):
+        norm_A = a / s
+        max_term_notation = np.floor(norm_A)
+        max_term = 1
+        for i in range(1, np.int(max_term_notation)):
+            max_term = max_term * norm_A / i
+            if max_term >= 10 ** 16:
+                break
+        if 10 ** -16 * max_term <= tol:
+            break
+        s = s + 1
+    return s
+
+def get_s(A, tol):
+    """
+
+    Parameters
+    ----------
+    A :
+    tol :
+
+    Returns
+    -------
+
+    """
+    s = 1
+    a = _exact_inf_norm(A)
+    while (1):
+        norm_A = a / s
+        max_term_notation = np.floor(norm_A)
+        max_term = 1
+        for i in range(1, np.int(max_term_notation)):
+            max_term = max_term * norm_A / i
+            if max_term >= 10 ** 16:
+                break
+        if 10 ** -16 * max_term <= tol:
+            break
+        s = s + 1
+    return s
+
+def expmat_vec_mul(A, B, tol=None):
+    """
+    Compute the exponential matrix and vector multiplication e^(A) B.
+    Args:
+    A :: numpy.ndarray - matrix
+    b :: numpy.ndarray - vector or a set of basis vectors
+    tol :: numpy.float64 - expected error
+    Returns:
+    f :: numpy.ndarray - Approximation of e^(A) b
+    """
+    ident = ident_like(A)
+    n = A.shape[0]
+    mu = trace(A) / float(n)
+    # Why mu? http://eprints.ma.man.ac.uk/1591/, section 3.1
+    A = A - mu * ident
+    if tol == None:
+        tol = 1e-16
+    s = get_s(A, tol)
+    F = B
+    c1 = _exact_inf_norm(B)
+    j = 0
+    while (1):
+        coeff = s * (j + 1)
+        B = A.dot(B) / coeff
+        c2 = _exact_inf_norm(B)
+        F = F + B
+        if (c1 + c2) < tol:
+            m = j + 1
+            break
+        c1 = c2
+        j = j + 1
+    B = F
+    for i in range(1, int(s)):
+        for j in range(m):
+            coeff = s * (j + 1)
+            B = A.dot(B) / coeff
+            F = F + B
+        B = F
+    return F
+
+
+
+
+def expmat_der_vec_mul(A, E, tol, state):
+    """
+        Calculate the action of propagator derivative.
+        First we construct auxiliary matrix and vector. Then use expm_multiply function.
+        Arg:
+        A :: numpy.ndarray - Total Hamiltonian
+        E :: numpy.ndarray - Control Hamiltonian
+        state :: numpy.ndarray
+        Returns:
+        numpy.ndarray,numpy.ndarray - vector for gradient calculation, updated state
+        """
+    state=np.complex128(state)
+    d = len(state[0])
+    if tol==None:
+        tol=2**-53
+    control_number = len(E)
+    final_matrix = []
+    for i in range(control_number+1):
+        final_matrix.append([])
+    if isspmatrix(A) == False:
+        for i in range(control_number + 1):
+            raw_matrix = []
+            if i == 0:
+                raw_matrix = raw_matrix + [A]
+            else:
+                raw_matrix = raw_matrix + [np.zeros_like(A)]
+            for j in range(1, control_number + 1):
+                if j == i and i != 0:
+                    raw_matrix = raw_matrix + [A]
+                elif j == control_number and j != i:
+                    raw_matrix = raw_matrix + [E[i]]
+                else:
+                    raw_matrix = raw_matrix + [np.zeros_like(A)]
+            final_matrix[i] = raw_matrix
+        final_matrix = np.block(final_matrix)
+    else:
+        for i in range(control_number+1):
+            raw_matrix = []
+            if i == 0:
+                raw_matrix=raw_matrix+[A]
+            else:
+                raw_matrix = raw_matrix+[None]
+            for j in range(1,control_number+1):
+                if j == i and i != 0:
+                    raw_matrix = raw_matrix+[A]
+                elif j == control_number  and j!=i:
+                    raw_matrix = raw_matrix+[E[i]]
+                else:
+                    raw_matrix = raw_matrix+[None]
+            final_matrix[i] = raw_matrix
+        final_matrix=scipy.sparse.bmat(final_matrix)
+    state0 = np.zeros_like(state)
+    for i in range(control_number):
+        state = np.block([state0, state])
+    state = state.transpose()
+    state = expm(final_matrix, state , )
+    states = []
+    for i in range(control_number):
+        states.append(state[d*i:d*(i+1)].transpose())
+    a = state[control_number*d:d*(control_number+1)]
+    return np.array(states), state[control_number*d:d*(control_number+1)].transpose()

@@ -10,7 +10,7 @@ import numpy as np
 
 from qoc.core.common import (clip_control_norms,
                              initialize_controls,
-                             slap_controls, strip_controls,)
+                              strip_controls,)
 from qoc.core.mathmethods import (integrate_rkdp5,
                                   interpolate_linear_set,
                                   get_lindbladian,)

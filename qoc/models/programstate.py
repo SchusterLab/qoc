@@ -41,7 +41,7 @@ class ProgramState(object):
         self.control_eval_times = np.linspace(0, evolution_time, control_eval_count)
         self.cost_eval_step = cost_eval_step
         self.costs = costs
-        self.dt = evolution_time / (system_eval_count - 1)
+        self.dt = evolution_time / (system_eval_count )
         self.evolution_time = evolution_time
         self.final_system_eval_step = system_eval_count - 1
         self.hamiltonian = hamiltonian

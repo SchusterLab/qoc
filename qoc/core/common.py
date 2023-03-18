@@ -179,30 +179,6 @@ def initialize_controls(
     return controls, max_control_norms
 
 
-def slap_controls(complex_controls, controls, controls_shape,):
-    """
-    Reshape and transform controls in optimizer format
-    to controls in cost function format.
-
-    Arguments:
-    complex_controls :: bool - whether or not the controls in cost function
-         format are complex
-    controls :: ndarray (2 * controls_size if COMPLEX else controls_size)
-        - the controls in optimizer format
-    controls_shape :: tuple(int) - 
-    
-    Returns:
-    controls :: ndarray (controls_shape)- the controls in cost function format
-    """
-    # Transform the controls to C if they are complex.
-    if complex_controls:
-        real, imag = np.split(controls, 2)
-        controls = real + 1j * imag
-    # Reshape the controls.
-    controls = np.reshape(controls, controls_shape)
-    
-    return controls
-
 
 def strip_controls(complex_controls, controls):
     """

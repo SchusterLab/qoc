@@ -7,21 +7,21 @@ from autograd.extend import Box
 import numpy as np
 import autograd.numpy as anp
 from qoc.core.common import (initialize_controls,
-                             slap_controls, strip_controls,
+                             strip_controls,
                              clip_control_norms)
 from qoc.models import (Dummy,
                         GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerResult,
-                        ProgramType,)
+                        ProgramType, )
 from qoc.standard import (Adam, ans_jacobian,
-                          expm_pade)
+                          expm, expm, expmat_der_vec_mul)
 
 def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                 costs, evolution_time,
                                 initial_states,
                                 impose_control_conditions=None,
                                 initial_controls=None,
-                                iteration_count=1000, 
+                                iteration_count=1000,
                                 log_iteration_step=10,
                                 max_control_norms=None,
                                 min_error=0,
@@ -95,11 +95,11 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     # Initialize the controls.
     control_count = len(H_controls)
     initial_controls, max_control_norms = initialize_controls(
-                                                              control_count,
-                                                              control_eval_count,
-                                                              evolution_time,
-                                                              initial_controls,
-                                                              max_control_norms)
+        control_count,
+        control_eval_count,
+        evolution_time,
+        initial_controls,
+        max_control_norms)
     # Construct the program state.
     pstate = GrapeSchroedingerDiscreteState(H_s, H_controls,
                                             control_eval_count,
@@ -200,14 +200,19 @@ def _esdj_wrap(controls, pstate, reporter, result):
         controls = pstate.impose_control_conditions(controls)
 
     # Evaluate the jacobian.
-    error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
-                          (controls, pstate, reporter))
+    if pstate.gradients_method == "AD":
+        error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
+                        (controls, pstate, reporter))
+
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
-    if pstate.complex_controls:
-        grads = np.conjugate(grads)
-
+    else:
+        error_control, grads_control = (ans_jacobian(control_cost, 0)(controls, pstate))
+        error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
+        grads_state = H_gradient(controls, pstate, reporter)
+        grads = grads_state + grads_control
+    print(grads)
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_states, Box):
         final_states = reporter.final_states._value
@@ -220,7 +225,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
         result.best_error = error
         result.best_final_states = final_states
         result.best_iteration = reporter.iteration
-    
+
     # Save and log optimization progress.
     pstate.log_and_save(controls, error, final_states,
                         grads, reporter.iteration)
@@ -234,8 +239,21 @@ def _esdj_wrap(controls, pstate, reporter, result):
         terminate = True
     else:
         terminate = False
-    
+
     return grads, terminate
+
+
+# This function computes control explicitly related cost only.
+def control_cost(controls, pstate, ):
+    error = 0.
+    costs = pstate.costs
+    states = None
+    for i, cost in enumerate(costs):
+        if cost.type == "":
+            # variable "states" is not used in these cost.cost function
+            cost_error = cost.cost(controls, states, 0)
+            error = error + cost_error
+    return error
 
 
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):
@@ -243,7 +261,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     Compute the value of the total cost function for one evolution.
 
     Arguments:
-    controls :: ndarray (control_eval_count x control_count)
+    controls :: ndarray (control_count x control_eval_count)
         - the control parameters
     pstate :: qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
         - static objects
@@ -281,24 +299,22 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
                 intermediate_states = states
             pstate.save_intermediate_states(iteration,
                                             intermediate_states,
-                                            system_eval_step,)
-        
+                                            system_eval_step, )
+
         # Determine where we are in the mesh.
         cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
         is_cost_step = cost_step_remainder == 0
 
+        # Evolve the states to the next time step.
+        H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
+        states = expm(-1j * dt * H_total, states)
         # Compute step costs every `cost_step`.
         if is_cost_step:
             for i, step_cost in enumerate(step_costs):
                 cost_error = step_cost.cost(controls, states, system_eval_step)
                 error = error + cost_error
-            #ENDFOR
-
-        # Evolve the states to the next time step.
-        H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
-        propagator=expm_pade(-1j * dt * H_total)
-        states = anp.matmul(propagator, states)
-    #ENDFOR
+            # ENDFOR
+    # ENDFOR
 
     # Compute non-step-costs.
     for i, cost in enumerate(costs):
@@ -309,8 +325,50 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     # Report reults.
     reporter.error = error
     reporter.final_states = states
-    
     return error
+
+
+def H_gradient(controls, pstate, reporter):
+    """
+    Compute hard-coded gradients of states-related cost contributions.
+    Parameters
+    ----------
+    controls : ndarray (control_count x control_eval_count)
+        - the control parameters
+    pstate : qoc.GrapeSchroedingerDiscreteState or qoc.EvolveSchroedingerDiscreteState
+        - static objects
+    reporter : any - a reporter for mutable objects
+    Returns
+    -------
+    grads : ndarray gradients.
+    """
+    H_s = pstate.H_s
+    H_controls = pstate.H_controls
+    system_eval_count = pstate.control_eval_count
+    dt = pstate.evolution_time / system_eval_count
+    costs = pstate.costs
+    grads = np.zeros_like(controls)
+    states = reporter.final_states
+    control_count = len(H_controls)
+    tol = 1e-5
+    for l in range(len(costs)):
+        if costs[l].type == "control_implicit_related":
+            #initialize the backward-propagated states which relate to phi in the paper
+            back_states = costs[l].gradient_initialize()
+    for system_eval_step in range(system_eval_count):
+        # Backward propagation. Consider time step N, N-1, ..., 1 sequentially
+        H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
+        states = expm(1j*dt*H_total, states)
+        back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, 1j * dt * np.array(H_controls) , tol, back_states)
+        for k in range(control_count):
+            M = np.matmul(np.conjugate(back_states_der[k]),states)
+            grads[k][system_eval_count-system_eval_step-1] = 2 * np.real(np.sum(M))
+        for l in range(len((costs))):
+            if costs[l].type == "control_implicit_related":
+                back_states += costs[l].update_state_back(states)
+
+    return grads
+
 
 def get_H_total(controls: np.ndarray, H_controls: np.ndarray,
                 H0: np.ndarray, time_step: float) -> np.ndarray:
@@ -333,6 +391,5 @@ def get_H_total(controls: np.ndarray, H_controls: np.ndarray,
     """
     H_total = H0
     for control, H_control in zip(controls, H_controls):
-        H_total = H_total + control[time_step ] * H_control
+        H_total = H_total + control[time_step] * H_control
     return H_total
-
