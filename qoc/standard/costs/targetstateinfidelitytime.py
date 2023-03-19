@@ -4,11 +4,10 @@ penalizes the infidelity of evolved states and their respective target states
 at each cost evaluation step.
 """
 
-import autograd.numpy as anp
+
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions import conjugate_transpose
 
 class TargetStateInfidelityTime(Cost):
     """
@@ -25,6 +24,9 @@ class TargetStateInfidelityTime(Cost):
     requires_step_evaluation
     state_count
     target_states_dagger
+    target_states
+    inner_products_sum
+    grads_factor
     """
     name = "target_state_infidelity_time"
     requires_step_evaluation = True
@@ -44,7 +46,7 @@ class TargetStateInfidelityTime(Cost):
         self.target_states_dagger = np.conjugate(target_states)
         self.neglect_relative_phase = neglect_relative_phase
 
-    def cost(self, controls, states, system_eval_step):
+    def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
 
@@ -57,15 +59,19 @@ class TargetStateInfidelityTime(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
+        if gradients_method == "AD":
+            import autograd.numpy as np
+        else:
+            import numpy as np
         control_eval_count = len(controls[0])
         self.grads_factor = -self.cost_multiplier/(self.state_count ** 2 * control_eval_count)
-        inner_products = anp.matmul(self.target_states_dagger, states)
+        inner_products = np.matmul(self.target_states_dagger, states)
         if self.neglect_relative_phase == False:
-            self.inner_products_sum = anp.trace(inner_products)
-            fidelity = anp.real(self.inner_products_sum * anp.conjugate(self.inner_products_sum)) / (
+            self.inner_products_sum = np.trace(inner_products)
+            fidelity = np.real(self.inner_products_sum * np.conjugate(self.inner_products_sum)) / (
                         self.state_count ** 2)
         else:
-            fidelity = anp.trace(anp.abs(inner_products)**2)
+            fidelity = np.trace(np.abs(inner_products)**2)
             fidelity = fidelity / (self.state_count ** 2)
         infidelity = 1 - fidelity
         return self.cost_multiplier * infidelity /control_eval_count
@@ -77,8 +83,8 @@ class TargetStateInfidelityTime(Cost):
         -------
 
         """
-        self.back_states = self.target_states * self.inner_products_sum * self.grads_factor
-        return self.back_states
+
+        return self.target_states * self.inner_products_sum * self.grads_factor
 
     def update_state_back(self, states):
         """

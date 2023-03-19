@@ -31,14 +31,14 @@ class ControlArea(Cost):
         """
         super().__init__(cost_multiplier=cost_multiplier)
 
-    def cost(self, controls, states, system_eval_step):
+    def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
 
         Arguments:
         controls
         states
-        system_eval_step
+        gradients_method
         
         Returns:
         cost

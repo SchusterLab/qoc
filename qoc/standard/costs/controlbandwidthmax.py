@@ -15,7 +15,7 @@ class ControlBandwidthMax(Cost):
     Fields:
     max_bandwidths :: ndarray (CONTROL_COUNT, 2) - This array contains the minimum and maximum allowed bandwidth of each control.
     control_count
-    freqs :: ndarray (CONTROL_EVAL_COUNT) - This array contains the frequencies of each of the controls.
+    dt
     name
     requires_step_evaluation
     type
@@ -35,23 +35,23 @@ class ControlBandwidthMax(Cost):
         See class fields for arguments not listed here.
 
         Arguments:
-        control_count
-        control_eval_count
-        evolution_time
+        dt
+        max_bandwidths
+        cost_multiplier
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.max_bandwidths = max_bandwidths
         self.dt = dt
 
         
-    def cost(self, controls, states, system_eval_step):
+    def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
 
         Arguments:
         controls
         states
-        system_eval_step
+        gradients_method
 
         Returns:
         cost

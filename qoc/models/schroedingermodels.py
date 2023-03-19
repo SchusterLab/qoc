@@ -48,6 +48,8 @@ class GrapeSchroedingerDiscreteState(GrapeState):
     should_save
     step_cost_indices
     step_costs
+    gradients_method
+    expm_method
     """
     method = "grape_schroedinger_discrete"
 
@@ -60,7 +62,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                  log_iteration_step, max_control_norms,
                   min_error, optimizer,
                  save_file_path, save_intermediate_states_,
-                 save_iteration_step, gradients_method
+                 save_iteration_step, gradients_method, expm_method
                  ):
         """
         See class fields for arguments not listed here.
@@ -89,7 +91,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         self.H_s = H_s
         self.H_controls = H_controls
         self.gradients_method = gradients_method
-
+        self.expm_method = expm_method
 
     def log_and_save(self, controls, error, final_states, grads, iteration,):
         """

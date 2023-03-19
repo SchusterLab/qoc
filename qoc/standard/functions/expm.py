@@ -2,18 +2,20 @@
 expm.py - a module for all things e^M
 """
 
-
-import autograd.numpy as anp
 import scipy.sparse.linalg
 from scipy.sparse import isspmatrix
-import numpy as np
+import importlib
 
-def expm(A, vector, method="pade", tol = 1e-5):
+def expm(A, vector, method="pade", gradients_method="AD" ):
+    if gradients_method == "AD":
+        globals()["np"] = importlib.import_module("autograd.numpy")
+    else:
+        globals()["np"] = importlib.import_module("numpy")
     if method == "pade":
         exp_matrix = expm_pade(A)
-        vector = anp.matmul(exp_matrix, vector)
+        vector = np.matmul(exp_matrix, vector)
     if method == "taylor":
-        vector = expmat_vec_mul(A, vector, tol )
+        vector = expm_taylor(A, vector, )
     return vector
 
 ### EXPM IMPLEMENTATION DUE TO HIGHAM 2005 ###
@@ -49,49 +51,49 @@ def one_norm(a):
     Returns:
     one_norm_a :: float - The one norm of a.
     """
-    return anp.max(anp.sum(anp.abs(a), axis=0))
+    return np.max(np.sum(np.abs(a), axis=0))
     
 
 def pade3(a, i):
-    a2 = anp.matmul(a, a)
-    u = anp.matmul(a, B[2] * a2) + B[1] * a
+    a2 = np.matmul(a, a)
+    u = np.matmul(a, B[2] * a2) + B[1] * a
     v = B[2] * a2 + B[0] * i
     return u, v
 
 
 def pade5(a, i):
-    a2 = anp.matmul(a, a)
-    a4 = anp.matmul(a2, a2)
-    u = anp.matmul(a, B[5] * a4 + B[3] * a2) + B[1] * a
+    a2 = np.matmul(a, a)
+    a4 = np.matmul(a2, a2)
+    u = np.matmul(a, B[5] * a4 + B[3] * a2) + B[1] * a
     v = B[4] * a4 + B[2] * a2 + B[0] * i
     return u, v
 
 
 def pade7(a, i):
-    a2 = anp.matmul(a, a)
-    a4 = anp.matmul(a2, a2)
-    a6 = anp.matmul(a2, a4)
-    u = anp.matmul(a, B[7] * a6 + B[5] * a4 + B[3] * a2) + B[1] * a
+    a2 = np.matmul(a, a)
+    a4 = np.matmul(a2, a2)
+    a6 = np.matmul(a2, a4)
+    u = np.matmul(a, B[7] * a6 + B[5] * a4 + B[3] * a2) + B[1] * a
     v = B[6] * a6 + B[4] * a4 + B[2] * a2 + B[0] * i
     return u, v
 
 
 def pade9(a, i):
-    a2 = anp.matmul(a, a)
-    a4 = anp.matmul(a2, a2)
-    a6 = anp.matmul(a2, a4)
-    a8 = anp.mtamul(a2, a6)
-    u = anp.matmul(a, B[9] * a8 + B[7] * a6 + B[5] * a4 + B[3] * a2) + B[1] * a
+    a2 = np.matmul(a, a)
+    a4 = np.matmul(a2, a2)
+    a6 = np.matmul(a2, a4)
+    a8 = np.mtamul(a2, a6)
+    u = np.matmul(a, B[9] * a8 + B[7] * a6 + B[5] * a4 + B[3] * a2) + B[1] * a
     v = B[8] * a8 + B[6] * a6 + B[4] * a4 + B[2] * a2 + B[0] * i
     return u, v
 
 
 def pade13(a, i):
-    a2 = anp.matmul(a, a)
-    a4 = anp.matmul(a2, a2)
-    a6 = anp.matmul(a2, a4)
-    u = anp.matmul(a, anp.matmul(a6, B[13] * a6 + B[11] * a4 + B[9] * a2) + B[7] * a6 + B[5] * a4 + B[3] * a2) + B[1] * a
-    v = anp.matmul(a6, B[12] * a6 + B[10] * a4 + B[8] * a2) + B[6] * a6 + B[4] * a4 + B[2] * a2 + B[0] * i
+    a2 = np.matmul(a, a)
+    a4 = np.matmul(a2, a2)
+    a6 = np.matmul(a2, a4)
+    u = np.matmul(a, np.matmul(a6, B[13] * a6 + B[11] * a4 + B[9] * a2) + B[7] * a6 + B[5] * a4 + B[3] * a2) + B[1] * a
+    v = np.matmul(a6, B[12] * a6 + B[10] * a4 + B[8] * a2) + B[6] * a6 + B[4] * a4 + B[2] * a2 + B[0] * i
     return u, v
 
 
@@ -173,17 +175,17 @@ def expm_pade(a):
     # is required.
     if pade_order is None:
         pade_order = 13
-        scale = max(0, int(anp.ceil(anp.log2(one_norm_ / THETA[13]))))
+        scale = max(0, int(np.ceil(np.log2(one_norm_ / THETA[13]))))
         a = a * (2 ** -scale)
 
     # Execute pade approximant.
-    i = anp.eye(size)
+    i = np.eye(size)
     u, v = PADE[pade_order](a, i)
-    r = anp.linalg.solve(-u + v, u + v)
+    r = np.linalg.solve(-u + v, u + v)
 
     # Do squaring if necessary.
     for _ in range(scale):
-        r = anp.matmul(r, r)
+        r = np.matmul(r, r)
 
     return r
 
@@ -201,10 +203,10 @@ def expm_eigh(h):
     Returns:
     expm_h :: ndarray(N x N) - The unitary operator of a.
     """
-    eigvals, p = anp.linalg.eigh(h)
-    p_dagger = anp.conjugate(anp.swapaxes(p, -1, -2))
-    d = anp.exp(-1j * eigvals)
-    return anp.matmul(p *d, p_dagger)
+    eigvals, p = np.linalg.eigh(h)
+    p_dagger = np.conjugate(np.swapaxes(p, -1, -2))
+    d = np.exp(-1j * eigvals)
+    return np.matmul(p *d, p_dagger)
 
 
 ### EXPORT ###
@@ -238,86 +240,108 @@ def ident_like(A):
                                           dtype=A.dtype, format=A.format)
     else:
         return np.eye(A.shape[0], A.shape[1], dtype=A.dtype)
+def gamma_fa(n):
+    u = 1.11e-16
+    u=np.sqrt(2)*2*u/(1-2*u)
+    return n*u/(1-n*u)
+def beta(norm,m,n,tol):
+    beta=gamma_fa(m+1)
+    r = 1
+    for i in range(1,m):
+        r=r*norm/i
+        g = gamma_fa(i*(n+2)+m+2)
+        beta = beta+g*r
+        if beta>tol:
+            return 0,0
+    return beta,r
 
-def get_s(A, tol):
-    s = 1
-    a = _exact_inf_norm(A)
-    while (1):
-        norm_A = a / s
-        max_term_notation = np.floor(norm_A)
-        max_term = 1
-        for i in range(1, np.int(max_term_notation)):
-            max_term = max_term * norm_A / i
-            if max_term >= 10 ** 16:
-                break
-        if 10 ** -16 * max_term <= tol:
+def taylor_term(i,norm,term):
+    return term*norm/i
+def error(norm_B,m,s,n,R_m,tol):
+    tr = R_m
+    rd=beta(norm_B,m,n,tol)[0]
+    rd=np.power((1+rd+tr),s)-np.power((1+tr),s)
+    tr=tr*s
+    tr=tr*((1-np.power(tr,s))/(1-tr))
+    return tr+rd
+def weaker_error(beta,R_m,s):
+    tr = R_m
+    rd=beta
+    rd = np.power((1 + rd + tr), s) - np.power((1 + tr), s)
+    tr = tr * s
+    tr = tr * ((1 - np.power(tr, s)) / (1 - tr))
+    return tr+rd
+def residue_norm(m,norm_B,term):
+    R_m=term
+    for i in range(m+2,1000):
+        term=term*norm_B/i
+        R_m=R_m+term
+        if term<1e-15:
             break
-        s = s + 1
-    return s
+    return R_m
 
-def get_s(A, tol):
-    """
-
-    Parameters
-    ----------
-    A :
-    tol :
-
-    Returns
-    -------
-
-    """
-    s = 1
-    a = _exact_inf_norm(A)
-    while (1):
-        norm_A = a / s
-        max_term_notation = np.floor(norm_A)
-        max_term = 1
-        for i in range(1, np.int(max_term_notation)):
-            max_term = max_term * norm_A / i
-            if max_term >= 10 ** 16:
-                break
-        if 10 ** -16 * max_term <= tol:
+def choose_ms(norm_A,d,tol):
+    no_solution=True
+    for i in range(1,int(np.ceil(norm_A))+1):
+        if no_solution == False:
             break
-        s = s + 1
-    return s
+        norm_B = norm_A / i
+        l=int(np.floor(norm_B))
+        beta_factor,last_term=beta(norm_B,l,d,tol)
+        if beta_factor==0:
+            continue
+        lower_bound = i*(beta_factor)
+        if lower_bound>tol:
+            continue
+        tr_first_term=norm_B
+        m_pass_lowbound=False
+        for j in range(1,100):
+            if j>l:
+                last_term=last_term*norm_B/j
+                if last_term<1e-15:
+                    break
+                beta_factor=beta_factor+gamma_fa(j*(d+2)+2)*last_term
+            if m_pass_lowbound == False:
+                tr_first_term = tr_first_term * (norm_B / (j + 1))
+                if i *tr_first_term + lower_bound > tol:
+                    continue
+                else:
+                    R_m = residue_norm(j, norm_B, tr_first_term)
+                    m_pass_lowbound = True
+            if m_pass_lowbound == True:
+                if weaker_error(beta_factor,R_m,i)>tol:
+                    R_m = R_m - tr_first_term
+                    tr_first_term = tr_first_term * norm_B / (j + 1)
 
-def expmat_vec_mul(A, B, tol=None):
+                    continue
+                else:
+                    total_error=error(norm_B,j,i,d,R_m,tol)
+                    R_m = R_m - tr_first_term
+                    tr_first_term = tr_first_term * norm_B / (j + 1)
+                    if total_error<tol:
+                        no_solution = False
+                        s=i
+                        m=j
+                        break
+
+    if no_solution==False:
+        return s,m
+    if no_solution == True:
+        raise ValueError("please lower the error tolerance ")
+
+def expm_taylor(A, B, d=5, tol=1e-5):
     """
-    Compute the exponential matrix and vector multiplication e^(A) B.
-    Args:
-    A :: numpy.ndarray - matrix
-    b :: numpy.ndarray - vector or a set of basis vectors
-    tol :: numpy.float64 - expected error
-    Returns:
-    f :: numpy.ndarray - Approximation of e^(A) b
+    A helper function.
     """
-    ident = ident_like(A)
-    n = A.shape[0]
-    mu = trace(A) / float(n)
-    # Why mu? http://eprints.ma.man.ac.uk/1591/, section 3.1
-    A = A - mu * ident
-    if tol == None:
-        tol = 1e-16
-    s = get_s(A, tol)
-    F = B
-    c1 = _exact_inf_norm(B)
-    j = 0
-    while (1):
-        coeff = s * (j + 1)
-        B = A.dot(B) / coeff
-        c2 = _exact_inf_norm(B)
-        F = F + B
-        if (c1 + c2) < tol:
-            m = j + 1
-            break
-        c1 = c2
-        j = j + 1
-    B = F
-    for i in range(1, int(s)):
+    if tol is None:
+        tol =1e-5
+    norm_A = _exact_inf_norm(A)
+    s,m=choose_ms(norm_A,d,tol)
+    F=B
+    for i in range(int(s)):
         for j in range(m):
-            coeff = s * (j + 1)
-            B = A.dot(B) / coeff
+            coeff = s*(j+1)
+            B =  np.dot(A,B)/coeff
             F = F + B
         B = F
     return F
@@ -325,7 +349,7 @@ def expmat_vec_mul(A, B, tol=None):
 
 
 
-def expmat_der_vec_mul(A, E, tol, state):
+def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     """
         Calculate the action of propagator derivative.
         First we construct auxiliary matrix and vector. Then use expm_multiply function.
@@ -380,7 +404,7 @@ def expmat_der_vec_mul(A, E, tol, state):
     for i in range(control_number):
         state = np.block([state0, state])
     state = state.transpose()
-    state = expm(final_matrix, state , )
+    state = expm(final_matrix, state , expm_method, gradients_method )
     states = []
     for i in range(control_number):
         states.append(state[d*i:d*(i+1)].transpose())

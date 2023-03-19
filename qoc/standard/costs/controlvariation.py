@@ -30,21 +30,20 @@ class ControlVariation(Cost):
         See class fields for arguments not listed here.
 
         Arguments:
-        control_count
-        control_eval_count
+
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.order = order
 
 
-    def cost(self, controls, states, system_eval_step):
+    def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
 
         Arguments:
         controls
         states
-        system_eval_step
+        gradients_method
 
         Returns:
         cost

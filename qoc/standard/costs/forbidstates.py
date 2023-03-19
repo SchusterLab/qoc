@@ -3,11 +3,10 @@ forbidstates.py - This module defines a cost function that penalizes
 the occupation of a set of forbidden states.
 """
 
-import autograd.numpy as anp
+
 import numpy as np
 
 from qoc.models import Cost
-from qoc.standard.functions.convenience import conjugate_transpose
 
 class ForbidStates(Cost):
     """
@@ -16,7 +15,9 @@ class ForbidStates(Cost):
     Fields:
     cost_multiplier
     cost_normalization_constant
-    forbidden_states_count
+    forbidden_states
+    inner_products
+    grads_factor
     forbidden_states_dagger
     name
     type
@@ -41,26 +42,29 @@ class ForbidStates(Cost):
         self.forbidden_states = forbidden_states
         self.state_count = forbidden_states.shape[0]
 
-    def cost(self, controls, states, system_eval_step):
+    def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
 
         Arguments:
         controls
         states
-        system_eval_step
+        gradients_method
 
         Returns:
         cost
         """
         # The cost is the overlap (fidelity) of the evolved state and each
         # forbidden state.
-        cost = 0
+        if gradients_method == "AD":
+            import autograd.numpy as np
+        else:
+            import numpy as np
         control_eval_count = len(controls[0])
         state_count = len(states)
         self.grads_factor = self.cost_multiplier/ (state_count * control_eval_count)
-        self.inner_products = anp.matmul(self.forbidden_states_dagger, states)
-        fidelity = anp.trace(anp.abs(self.inner_products)**2)
+        self.inner_products = np.matmul(self.forbidden_states_dagger, states)
+        fidelity = np.trace(np.abs(self.inner_products)**2)
         return self.grads_factor * fidelity
 
     def gradient_initialize(self,):

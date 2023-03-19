@@ -39,14 +39,14 @@ class ControlNorm(Cost):
         self.control_weights = control_weights
 
     
-    def cost(self, controls, states, system_eval_step):
+    def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
 
         Arguments:
         controls
         states
-        system_eval_step
+        gradients_method
 
         Returns:
         cost
