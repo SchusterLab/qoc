@@ -19,7 +19,7 @@ def clip_control_norms(controls, max_control_norms):
     Returns: None
     """
     for i, max_control_norm in enumerate(max_control_norms):
-        control = controls[:, i]
+        control = controls[i, :]
         control_norm = np.abs(control)
         offending_indices = np.nonzero(np.less(max_control_norm, control_norm))
         offending_control_points = control[offending_indices]

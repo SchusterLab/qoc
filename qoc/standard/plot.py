@@ -12,13 +12,8 @@ if not "DISPLAY" in os.environ:
     matplotlib.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
-from scipy import linalg as la
 from qutip import *
-from IPython import display
-import pandas as pd
-
 from qoc.models import ProgramType
 from qoc.standard.functions.convenience import conjugate_transpose
 

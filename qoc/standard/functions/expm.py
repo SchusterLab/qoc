@@ -170,7 +170,6 @@ def expm_pade(a):
             pade_order = pade_order_
         #ENDIF
     #ENDFOR
-
     # If the one norm is large, scaling and squaring
     # is required.
     if pade_order is None:
@@ -214,6 +213,7 @@ def _exact_inf_norm(A):
     if scipy.sparse.isspmatrix(A):
         return max(abs(A).sum(axis=1).flat)
     else:
+        import numpy as np
         return np.linalg.norm(A, np.inf)
 
 def trace(A):
@@ -361,6 +361,7 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
         numpy.ndarray,numpy.ndarray - vector for gradient calculation, updated state
         """
     state=np.complex128(state)
+
     d = len(state[0])
     if tol==None:
         tol=2**-53
