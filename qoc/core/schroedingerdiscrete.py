@@ -221,6 +221,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
             error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
             grads_state = H_gradient(controls, pstate, reporter)
             grads = grads_state
+    print(grads)
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_states, Box):
         final_states = reporter.final_states._value
@@ -379,12 +380,12 @@ def H_gradient(controls, pstate, reporter):
             back_states = costs[l].gradient_initialize()
     for system_eval_step in range(system_eval_count):
         # Backward propagation. Consider time step N, N-1, ..., 1 sequentially
-        H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
+        H_total = get_H_total(controls, H_controls, H_s, system_eval_count-system_eval_step-1)
         states = expm(1j*dt*H_total, states, pstate.expm_method, gradients_method)
         back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, 1j * dt * np.array(H_controls) , tol, back_states, pstate.expm_method, gradients_method)
         for k in range(control_count):
             M = np.matmul(np.conjugate(back_states_der[k]),states)
-            grads[k][system_eval_count-system_eval_step-1] = 2 * np.real(np.sum(M))
+            grads[k][system_eval_count-system_eval_step-1] = 2 * np.real(np.trace(M))
         for l in range(len((costs))):
             if costs[l].type == "control_implicit_related":
                 back_states += costs[l].update_state_back(states)
