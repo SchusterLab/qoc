@@ -4,6 +4,7 @@ optimization algorithm
 """
 
 from autograd.extend import Box
+from autograd import grad
 import numpy as np
 from qoc.core.common import (initialize_controls,
                              strip_controls,
@@ -17,9 +18,8 @@ from qoc.standard import (Adam, ans_jacobian,
 
 def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                 costs, evolution_time,
-                                initial_states,
+                                initial_states,initial_controls,control_func,
                                 impose_control_conditions=None,
-                                initial_controls=None,
                                 iteration_count=1000,
                                 log_iteration_step=10,
                                 max_control_norms=None,
@@ -27,7 +27,7 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                 optimizer=Adam(),
                                 save_file_path=None,
                                 save_intermediate_states=False,
-                                save_iteration_step=0, gradients_method="AD", expm_method="pade"):
+                                save_iteration_step=0, gradients_method="AD", expm_method="pade",robust_set=None):
     """
     This method optimizes the evolution of a set of states under the schroedinger
     equation for time-discrete control parameters.
@@ -93,13 +93,15 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     """
     # Initialize the controls.
     control_count = len(H_controls)
-    initial_controls, max_control_norms = initialize_controls(
-        control_count,
-        control_eval_count,
-        evolution_time,
-        initial_controls,
-        max_control_norms)
+    # initial_controls, max_control_norms = initialize_controls(
+    #     control_count,
+    #     control_eval_count,
+    #     evolution_time,
+    #     initial_controls,
+    #     max_control_norms)
     # Construct the program state.
+    if max_control_norms is None:
+        max_control_norms = np.ones(control_count)
     pstate = GrapeSchroedingerDiscreteState(H_s, H_controls,
                                             control_eval_count,
                                             costs, evolution_time,
@@ -113,7 +115,7 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step, gradients_method,
-                                            expm_method
+                                            expm_method, control_func, robust_set
                                             )
     pstate.log_and_save_initial()
 
@@ -154,16 +156,19 @@ def _esd_wrap(controls, pstate, reporter, result):
     # Convert the controls from optimizer format to cost function format.
     control_count = pstate.control_count
     control_eval_count = pstate.control_eval_count
-    controls = np.reshape(controls, (control_count, control_eval_count))
-    # Rescale the controls to their maximum norm.
-    clip_control_norms(controls,
-                       pstate.max_control_norms)
+    evolution_time = pstate.evolution_time
+    control_func = pstate.control_func
+    # Convert the controls from optimizer format to cost function format.
+    controls = controls.reshape((control_count, int(len(controls) / control_count)))
     # Impose user boundary conditions.
-    if pstate.impose_control_conditions:
+    if pstate.impose_control_conditions is not None:
         controls = pstate.impose_control_conditions(controls)
-
+    # descretize time axis
+    times = np.linspace(0, evolution_time, control_eval_count + 1)
+    # convert control into piece-wise format
+    pwcontrols = np.zeros((control_count, control_eval_count))
     # Evaluate the cost function.
-    error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
+    error = _evaluate_schroedinger_discrete(pwcontrols, pstate, reporter)
 
     # Determine if optimization should terminate.
     if error <= pstate.min_error:
@@ -188,38 +193,62 @@ def _esdj_wrap(controls, pstate, reporter, result):
     Returns:
     grads
     """
-    # Convert the controls from optimizer format to cost function format.
+
     control_count = pstate.control_count
     control_eval_count = pstate.control_eval_count
-    controls = np.reshape(controls, (control_count, control_eval_count))
-    # Rescale the controls to their maximum norm.
-    clip_control_norms(controls,
-                       pstate.max_control_norms)
+    evolution_time = pstate.evolution_time
+    control_func = pstate.control_func
+    # Convert the controls from optimizer format to cost function format.
+    para_num = int(len(controls)/control_count)
+    controls = controls.reshape((control_count,para_num))
     # Impose user boundary conditions.
     if pstate.impose_control_conditions is not None:
         controls = pstate.impose_control_conditions(controls)
+    #descretize time axis
+    times = np.linspace(0, evolution_time, control_eval_count + 1)
+    #convert control into piece-wise format
+    pwcontrols = np.zeros((control_count,control_eval_count))
+    for k in range(control_count):
+        for i in range(control_eval_count):
+            pwcontrols[k][i] = control_func[k](controls[k],times[i],i)
+    #partial derivative of piece-wise control with respect to control parameters
+    grads_control_para = []
+    for k in range(control_count):
+        grads_control_para.append([])
+        for i in range(control_eval_count):
+            grads_control_para[k].append(grad(control_func[k])(controls[k], times[i],i))
+        grads_control_para[k] = np.array(grads_control_para[k]).transpose()
+    grads_control_para = np.array(grads_control_para)
+
+    # Rescale the controls to their maximum norm.
+    # clip_control_norms(controls,
+    #                    pstate.max_control_norms)
+
+
 
     # Evaluate the jacobian.
     if pstate.gradients_method == "AD":
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
-                        (controls, pstate, reporter))
+                        (pwcontrols, pstate, reporter))
 
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
     # For optimization, we care about df_dz = du_dx + i * du_dy.
     else:
+        #we first calculated hard-coded gradients for fidelity-related cost functions
+        #we then calculate control-related cost functions by autograd
         consider_error_control = False
         for cost in pstate.costs:
             if cost.type == "control_explicit_related":
                 consider_error_control = True
         if consider_error_control:
-            error_control, grads_control = (ans_jacobian(control_cost, 0)(controls, pstate))
-            error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
-            grads_state = H_gradient(controls, pstate, reporter)
+            error_control, grads_control = (ans_jacobian(control_cost, 0)(pwcontrols, pstate))
+            error = _evaluate_schroedinger_discrete(pwcontrols, pstate, reporter)
+            grads_state = H_gradient(pwcontrols, pstate, reporter)
             grads = grads_state + grads_control
         else:
-            error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
-            grads_state = H_gradient(controls, pstate, reporter)
+            error = _evaluate_schroedinger_discrete(pwcontrols, pstate, reporter)
+            grads_state = H_gradient(pwcontrols, pstate, reporter)
             grads = grads_state
 
     # The states need to be unwrapped from their autograd box.
@@ -244,9 +273,12 @@ def _esdj_wrap(controls, pstate, reporter, result):
     pstate.log_and_save(controls, error, final_states,
                         grads, reporter.iteration, error_set)
     reporter.iteration += 1
-
+    grads_optimizer = np.zeros((control_count,para_num))
+    #calculate overall gradients
+    for k in range(control_count):
+        grads_optimizer[k] = np.sum(grads[k] * grads_control_para[k], axis=1)
     # Convert the gradients from cost function to optimizer format.
-    grads = strip_controls(pstate.complex_controls, grads)
+    grads = strip_controls(pstate.complex_controls, grads_optimizer)
 
     # Determine if optimization should terminate.
     if error <= pstate.min_error:
@@ -276,7 +308,7 @@ def control_cost(controls, pstate, ):
     costs = pstate.costs
     states = None
     for i, cost in enumerate(costs):
-        if cost.type == "":
+        if cost.type == "control_explicit_related":
             # variable "states" is not used in these cost.cost function
             cost_error = cost.cost(controls, states, 0)
             error = error + cost_error
@@ -309,8 +341,16 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     states = np.transpose(pstate.initial_states)
     step_costs = pstate.step_costs
     system_eval_count = pstate.control_eval_count
+    if pstate.robust_set != None:
+        fluc_para=[]
+        for i in range(len(pstate.robust_set[0])):
+            fluc_para.append(np.random.choice(pstate.robust_set[0][i], 1)[0])
+        fluc_oper = pstate.robust_set[1]
+        print(fluc_para[0]/(2*np.pi))
     dt = pstate.evolution_time / system_eval_count
     H_s = pstate.H_s
+    if pstate.robust_set != None:
+        H_s = pstate.H_s + fluc_oper(fluc_para)
     H_controls = pstate.H_controls
     error = 0
     gradients_method = pstate.gradients_method
