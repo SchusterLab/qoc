@@ -53,7 +53,7 @@ class TargetStateInfidelityTime(Cost):
         Arguments:
         controls
         states
-        system_eval_step
+        gradients_method
 
         Returns:
         cost

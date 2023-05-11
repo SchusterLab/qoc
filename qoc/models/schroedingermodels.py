@@ -93,7 +93,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         self.gradients_method = gradients_method
         self.expm_method = expm_method
 
-    def log_and_save(self, controls, error, final_states, grads, iteration,):
+    def log_and_save(self, controls, error, final_states, grads, iteration, error_set):
         """
         If necessary, log to stdout and save to the save file.
 
@@ -120,9 +120,12 @@ class GrapeSchroedingerDiscreteState(GrapeState):
             and ((np.mod(iteration, self.log_iteration_step) == 0)
                  or is_final_iteration)):
             grads_norm = np.linalg.norm(grads)
-            print("{:^6d} | {:^1.8e} | {:^1.8e}"
-                  "".format(iteration, error,
-                            grads_norm))
+            output = "{:^6d} | {:^1.8e} |".format(iteration, error, )
+            cost_len = len(self.costs)
+            for i in range(cost_len):
+                output += "  {:^1.8e}  |".format(error_set[i])
+            output += "  {:^1.8e}  ".format(grads_norm)
+            print(output)
 
         if (self.should_save
             and ((np.mod(iteration, self.save_iteration_step) == 0)
@@ -196,10 +199,17 @@ class GrapeSchroedingerDiscreteState(GrapeState):
                 print("Timeout while locking {}, could not perform initial save."
                       "".format(self.save_file_lock_path))
         #ENDIF
-
+        cost_len = len(self.costs)
         if self.should_log:
-            print("iter   |   total error  |    grads_l2   \n"
-                  "=========================================")
+            output = "iter   |   total error  |"
+            dash = "========================="
+            for i in range(cost_len):
+                output += ("       cost" + str(i) + "      |")
+                dash += "================="
+            output += ("   grads_l2  ")
+            dash += "======================="
+            print(output)
+            print(dash)
 
     
     def save_intermediate_states(self, iteration,

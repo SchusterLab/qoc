@@ -221,7 +221,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
             error = _evaluate_schroedinger_discrete(controls, pstate, reporter)
             grads_state = H_gradient(controls, pstate, reporter)
             grads = grads_state
-    print(grads)
+
     # The states need to be unwrapped from their autograd box.
     if isinstance(reporter.final_states, Box):
         final_states = reporter.final_states._value
@@ -234,10 +234,15 @@ def _esdj_wrap(controls, pstate, reporter, result):
         result.best_error = error
         result.best_final_states = final_states
         result.best_iteration = reporter.iteration
-
+    error_set = []
+    for cost in (pstate.costs):
+        if isinstance(cost.cost_value, Box):
+            error_set.append(cost.cost_value._value)
+        else:
+            error_set.append(cost.cost_value)
     # Save and log optimization progress.
     pstate.log_and_save(controls, error, final_states,
-                        grads, reporter.iteration)
+                        grads, reporter.iteration, error_set)
     reporter.iteration += 1
 
     # Convert the gradients from cost function to optimizer format.
@@ -309,7 +314,9 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     H_controls = pstate.H_controls
     error = 0
     gradients_method = pstate.gradients_method
-
+    #initialize the cost value of each time-dependent cost functions
+    for i, step_cost in enumerate(step_costs):
+        step_cost.cost_value = 0
     # Evolve the states to `evolution_time`.
     # Compute step-costs along the way.
     for system_eval_step in range(system_eval_count):
@@ -334,7 +341,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
         if is_cost_step:
             for i, step_cost in enumerate(step_costs):
                 cost_error = step_cost.cost(controls, states, gradients_method)
-                error = error + cost_error
+                step_cost.cost_value += cost_error
+                error += cost_error
             # ENDFOR
     # ENDFOR
 

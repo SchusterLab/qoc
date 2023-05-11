@@ -50,4 +50,5 @@ class ControlArea(Cost):
         control_count = len(controls)
         for i in range(control_count):
             cost = cost + anp.abs(anp.sum(controls[i]))
-        return cost * self.cost_multiplier
+        self.cost_value = cost * self.cost_multiplier
+        return self.cost_value

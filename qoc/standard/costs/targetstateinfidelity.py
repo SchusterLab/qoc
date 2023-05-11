@@ -66,7 +66,8 @@ class TargetStateInfidelity(Cost):
             fidelity = np.trace(np.abs(inner_products)**2)
             fidelity = fidelity / self.state_count ** 2
         infidelity = 1 - fidelity
-        return infidelity * self.cost_multiplier
+        self.cost_value = infidelity * self.cost_multiplier
+        return self.cost_value
 
     def gradient_initialize(self,):
         """

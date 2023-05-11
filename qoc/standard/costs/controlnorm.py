@@ -53,9 +53,10 @@ class ControlNorm(Cost):
         """
         # Weight the controls.
         if self.control_weights is not None:
-            controls = controls[:,] * self.control_weights
+            controls = controls * self.control_weights
 
         # The cost is the sum of the square of the modulus of the normalized,
         # weighted, controls.
         cost = anp.sum(anp.real(controls * anp.conjugate(controls)))
-        return cost * self.cost_multiplier
+        self.cost_value = cost * self.cost_multiplier
+        return self.cost_value

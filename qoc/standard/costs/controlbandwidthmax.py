@@ -40,7 +40,7 @@ class ControlBandwidthMax(Cost):
         cost_multiplier
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.max_bandwidths = max_bandwidths
+        self.bandwidths = max_bandwidths
         self.dt = dt
 
         
@@ -73,4 +73,5 @@ class ControlBandwidthMax(Cost):
             penalized_ffts = control_fft_sq[penalty_freq_indices_min]
             penalty = penalty + anp.sum(penalized_ffts)
             cost = cost + penalty
-        return cost * self.cost_multiplier
+        self.cost_value = cost * self.cost_multiplier
+        return self.cost_value

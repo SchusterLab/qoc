@@ -51,7 +51,9 @@ class ControlVariation(Cost):
 
         # Penalize the square of the absolute value of the difference
         # in value of the control parameters from one step to the next.
-        diffs = anp.diff(controls, axis=0, n=self.order)
-        cost = anp.sum(anp.real(diffs * anp.conjugate(diffs)))
-
-        return cost * self.cost_multiplier
+        cost = 0
+        for control in controls:
+            diffs = anp.diff(control, n=self.order)
+            cost += anp.sum(anp.real(diffs * anp.conjugate(diffs)))
+        self.cost_value = cost * self.cost_multiplier
+        return self.cost_value
