@@ -340,22 +340,24 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     else:
         iteration = 0
     save_intermediate_states = pstate.save_intermediate_states_
-    states = np.transpose(pstate.initial_states)
+
     step_costs = pstate.step_costs
     system_eval_count = pstate.control_eval_count
-    if pstate.robust_set != None:
-        fluc_para=[]
-        for i in range(len(pstate.robust_set[0])):
-            fluc_para.append(np.random.choice(pstate.robust_set[0][i], 1)[0])
-        fluc_oper = pstate.robust_set[1]
-        print(fluc_para[0]/(2*np.pi))
+    # if pstate.robust_set != None:
+    #     fluc_para=[]
+    #     for i in range(len(pstate.robust_set[0])):
+    #         fluc_para.append(np.random.choice(pstate.robust_set[0][i], 1)[0])
+    #     fluc_oper = pstate.robust_set[1]
+    #     print(fluc_para[0]/(2*np.pi))
     dt = pstate.evolution_time / system_eval_count
     H_s = pstate.H_s
+    fluc_oper = pstate.robust_set[1]
+    fluc_para=pstate.robust_set[0]
     error = 0
     for i in range(len(fluc_para)):
         H_s = pstate.H_s + fluc_oper(fluc_para[i])
         H_controls = pstate.H_controls
-
+        states = np.transpose(pstate.initial_states)
         gradients_method = pstate.gradients_method
         # initialize the cost value of each time-dependent cost functions
         for i, step_cost in enumerate(step_costs):
