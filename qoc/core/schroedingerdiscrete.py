@@ -269,16 +269,18 @@ def _esdj_wrap(controls, pstate, reporter, result):
             error_set.append(cost.cost_value._value)
         else:
             error_set.append(cost.cost_value)
-    # Save and log optimization progress.
-    pstate.log_and_save(controls, error, final_states,
-                        grads, reporter.iteration, error_set)
-    reporter.iteration += 1
+
     grads_optimizer = np.zeros((control_count,para_num))
     #calculate overall gradients
     for k in range(control_count):
         grads_optimizer[k] = np.sum(grads[k] * grads_control_para[k], axis=1)
     # Convert the gradients from cost function to optimizer format.
-    grads = strip_controls(pstate.complex_controls, grads_optimizer)
+        # Save and log optimization progress.
+    grads = grads_optimizer
+    pstate.log_and_save(controls, error, final_states,
+                            grads, reporter.iteration, error_set)
+    reporter.iteration += 1
+    grads = strip_controls(pstate.complex_controls, grads)
 
     # Determine if optimization should terminate.
     if error <= pstate.min_error:
@@ -329,7 +331,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     Returns:
     error :: float - total error of the evolution
     """
-    # Initialize local variables (heap -> stack).
+
     cost_eval_step = 1
     costs = pstate.costs
     program_type = pstate.program_type
