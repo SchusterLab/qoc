@@ -364,6 +364,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     fluc_oper = pstate.robust_set[1]
     fluc_para = pstate.robust_set[0]
     error = 0
+    print_infidelity=[]
     for i in range(len(fluc_para)):
         H_s = pstate.H_s + fluc_oper(fluc_para[i])
         H_controls = pstate.H_controls
@@ -406,7 +407,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
             if not cost.requires_step_evaluation:
                 cost_error = cost.cost(controls, states, gradients_method)
                 error = error + cost_error
+                print_infidelity.append(cost_error._value)
     # Report reults.
+    with np.printoptions(formatter={'float_kind': '{:0.1e}'.format}):
+        print(np.array(print_infidelity))
     reporter.error = error
     reporter.final_states = states
     return error
