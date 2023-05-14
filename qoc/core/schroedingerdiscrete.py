@@ -228,8 +228,17 @@ def _esdj_wrap(controls, pstate, reporter, result):
 
     # Evaluate the jacobian.
     if pstate.gradients_method == "AD":
+        consider_error_control = False
+        for cost in pstate.costs:
+            if cost.type == "control_explicit_related":
+                consider_error_control = True
         error, grads = (ans_jacobian(_evaluate_schroedinger_discrete, 0)
                         (pwcontrols, pstate, reporter))
+        if consider_error_control:
+            error_control, grads_control = (ans_jacobian(control_cost, 0)(pwcontrols, pstate))
+            error += error_control
+            grads += grads
+
 
     # Autograd defines the derivative of a function of complex inputs as
     # df_dz = du_dx - i * du_dy for z = x + iy, f(z) = u(x, y) + iv(x, y).
@@ -246,6 +255,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
             error = _evaluate_schroedinger_discrete(pwcontrols, pstate, reporter)
             grads_state = H_gradient(pwcontrols, pstate, reporter)
             grads = grads_state + grads_control
+            error += error_control
         else:
             error = _evaluate_schroedinger_discrete(pwcontrols, pstate, reporter)
             grads_state = H_gradient(pwcontrols, pstate, reporter)
@@ -344,57 +354,58 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     step_costs = pstate.step_costs
     system_eval_count = pstate.control_eval_count
     states = pstate.initial_states
-    if pstate.robust_set != None:
-        fluc_para=[]
-        for i in range(len(pstate.robust_set[0])):
-            fluc_para.append(np.random.choice(pstate.robust_set[0][i], 1)[0])
-        fluc_oper = pstate.robust_set[1]
-        print(fluc_para[0]/(2*np.pi))
+    # if pstate.robust_set != None:
+    #     fluc_para=[]
+    #     for i in range(len(pstate.robust_set[0])):
+    #         fluc_para.append(np.random.choice(pstate.robust_set[0][i], 1)[0])
+    #     fluc_oper = pstate.robust_set[1]
+    #     print(fluc_para[0]/(2*np.pi))
     dt = pstate.evolution_time / system_eval_count
-    H_s = pstate.H_s
-    if pstate.robust_set != None:
-        H_s = pstate.H_s + fluc_oper(fluc_para)
-    H_controls = pstate.H_controls
+    fluc_oper = pstate.robust_set[1]
+    fluc_para = pstate.robust_set[0]
     error = 0
-    gradients_method = pstate.gradients_method
-    #initialize the cost value of each time-dependent cost functions
-    for i, step_cost in enumerate(step_costs):
-        step_cost.cost_value = 0
-    # Evolve the states to `evolution_time`.
-    # Compute step-costs along the way.
-    for system_eval_step in range(system_eval_count):
-        # If applicable, save the current states.
-        if save_intermediate_states:
-            if isinstance(states, Box):
-                intermediate_states = states._value
-            else:
-                intermediate_states = states
-            pstate.save_intermediate_states(iteration,
-                                            intermediate_states,
-                                            system_eval_step, )
+    for i in range(len(fluc_para)):
+        H_s = pstate.H_s + fluc_oper(fluc_para[i])
+        H_controls = pstate.H_controls
+        states = np.transpose(pstate.initial_states)
+        gradients_method = pstate.gradients_method
+        # initialize the cost value of each time-dependent cost functions
+        for i, step_cost in enumerate(step_costs):
+            step_cost.cost_value = 0
+        # Evolve the states to `evolution_time`.
+        # Compute step-costs along the way.
+        for system_eval_step in range(system_eval_count):
+            # If applicable, save the current states.
+            if save_intermediate_states:
+                if isinstance(states, Box):
+                    intermediate_states = states._value
+                else:
+                    intermediate_states = states
+                pstate.save_intermediate_states(iteration,
+                                                intermediate_states,
+                                                system_eval_step, )
 
-        # Determine where we are in the mesh.
-        cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
-        is_cost_step = cost_step_remainder == 0
+            # Determine where we are in the mesh.
+            cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
+            is_cost_step = cost_step_remainder == 0
 
-        # Evolve the states to the next time step.
-        H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
-        states = expm(-1j * dt * H_total, states, pstate.expm_method, gradients_method)
-        # Compute step costs every `cost_step`.
-        if is_cost_step:
-            for i, step_cost in enumerate(step_costs):
-                cost_error = step_cost.cost(controls, states, gradients_method)
-                step_cost.cost_value += cost_error
-                error += cost_error
-            # ENDFOR
-    # ENDFOR
+            # Evolve the states to the next time step.
+            H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
+            states = expm(-1j * dt * H_total, states, pstate.expm_method, gradients_method)
+            # Compute step costs every `cost_step`.
+            if is_cost_step:
+                for i, step_cost in enumerate(step_costs):
+                    cost_error = step_cost.cost(controls, states, gradients_method)
+                    step_cost.cost_value += cost_error
+                    error += cost_error
+                # ENDFOR
+        # ENDFOR
 
-    # Compute non-step-costs.
-    for i, cost in enumerate(costs):
-        if not cost.requires_step_evaluation:
-            cost_error = cost.cost(controls, states, gradients_method)
-            error = error + cost_error
-
+        # Compute non-step-costs.
+        for i, cost in enumerate(costs):
+            if not cost.requires_step_evaluation:
+                cost_error = cost.cost(controls, states, gradients_method)
+                error = error + cost_error
     # Report reults.
     reporter.error = error
     reporter.final_states = states
