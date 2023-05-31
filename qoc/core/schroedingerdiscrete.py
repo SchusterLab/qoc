@@ -293,11 +293,11 @@ def _esdj_wrap(controls, pstate, reporter, result):
     grads = strip_controls(pstate.complex_controls, grads)
 
     # Determine if optimization should terminate.
-    if error <= pstate.min_error:
+    if abs(error - pstate.last_error) <= pstate.min_error:
         terminate = True
     else:
         terminate = False
-
+    pstate.last_error = error
     return grads, terminate
 
 
@@ -407,7 +407,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
             if not cost.requires_step_evaluation:
                 cost_error = cost.cost(controls, states, gradients_method)
                 error = error + cost_error
-                print_infidelity.append(cost_error._value)
+                if isinstance(cost_error, Box):
+                    print_infidelity.append(cost_error._value)
+                else:
+                    print_infidelity.append(cost_error)
     # Report reults.
     with np.printoptions(formatter={'float_kind': '{:0.1e}'.format}):
         print(np.array(print_infidelity))
