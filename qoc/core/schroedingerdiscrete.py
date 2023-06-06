@@ -404,7 +404,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
 
         # Compute non-step-costs.
         for i, cost in enumerate(costs):
-            if not cost.requires_step_evaluation:
+            if cost.requires_step_evaluation == False and cost.type == "control_implicit_related":
                 cost_error = cost.cost(controls, states, gradients_method)
                 error = error + cost_error
                 if isinstance(cost_error, Box):
