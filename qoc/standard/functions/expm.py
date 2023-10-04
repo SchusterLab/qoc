@@ -364,7 +364,7 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
 
     d = len(state[0])
     if tol==None:
-        tol=2**-53
+        tol=1e-5
     control_number = len(E)
     final_matrix = []
     for i in range(control_number+1):

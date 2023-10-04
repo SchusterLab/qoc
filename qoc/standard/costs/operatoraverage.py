@@ -5,7 +5,7 @@ penalizes the average value of an operator.
 
 import numpy as np
 from qoc.models import Cost
-
+import autograd as ad
 
 class OperatorAverage(Cost):
     """
@@ -25,7 +25,7 @@ class OperatorAverage(Cost):
     type
     """
     name = "operatoraverage"
-    requires_step_evaluation = False
+    requires_step_evaluation = True
     type = "control_implicit_related"
 
     def __init__(self, operator,  cost_multiplier=1., ):
@@ -37,6 +37,7 @@ class OperatorAverage(Cost):
         """
         super().__init__(cost_multiplier=cost_multiplier)
         self.operator = operator
+        self.SAD_bps = []
 
     def cost(self, controls, states, gradients_method):
         """
@@ -51,18 +52,26 @@ class OperatorAverage(Cost):
         cost
         """
         # The cost is the infidelity of each evolved state and its target state.
-        if len(states) > 1:
+        if states.shape[1] > 1:
             raise Exception("This cost contribution is only for single state transfer")
         control_eval_count = len(controls[0])
         self.grads_factor = self.cost_multiplier / ( control_eval_count )
-        if gradients_method == "AD":
+        if gradients_method == "AD" or gradients_method == "SAD":
             import autograd.numpy as np
         else:
             import numpy as np
         state_dagger = np.conjugate(np.transpose(states))
-        self.operator_states = self.operator.dot(states)
-        cost = np.real(np.matmul(state_dagger, self.operator.dot(states)))
-
+        self.operator_states = (self.operator.dot(states).transpose())
+        cost = np.trace(np.real(np.matmul(state_dagger, np.matmul(self.operator,states))))
+        self.cost_value = cost * self.grads_factor
+        if gradients_method == "SAD":
+            def cost_function(states):
+                state_dagger = np.conjugate(np.transpose(states))
+                cost = np.trace(np.real(np.matmul(state_dagger, np.matmul(self.operator,states))))
+                cost_value = cost * self.grads_factor
+                return cost_value
+            self.cost_value, SAD_bps = ad.value_and_grad(cost_function)(states)
+            self.SAD_bps.append(1 / 2 * SAD_bps.conjugate().transpose())
         return cost * self.grads_factor
 
     def gradient_initialize(self, ):
@@ -72,7 +81,12 @@ class OperatorAverage(Cost):
         -------
 
         """
-        return self.operator_states
+        if len(self.SAD_bps) == 0:
+            return self.operator_states* self.grads_factor
+        else:
+            return_state = self.SAD_bps[-1]
+            del self.SAD_bps[-1]
+            return return_state
 
     def update_state_back(self, states):
         """
@@ -85,5 +99,10 @@ class OperatorAverage(Cost):
         -------
 
         """
-        return self.operator.dot(states)
+        if len(self.SAD_bps) == 0:
+            return self.operator.dot(states).transpose()* self.grads_factor
+        else:
+            return_state = self.SAD_bps[-1]
+            del self.SAD_bps[-1]
+            return return_state
 

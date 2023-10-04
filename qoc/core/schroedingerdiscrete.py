@@ -18,7 +18,7 @@ from qoc.standard import (Adam, ans_jacobian,
 
 def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                 costs, evolution_time,
-                                initial_states,initial_controls,control_func,
+                                initial_states,initial_controls = None,control_func = None,
                                 impose_control_conditions=None,
                                 iteration_count=1000,
                                 log_iteration_step=10,
@@ -93,12 +93,21 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     """
     # Initialize the controls.
     control_count = len(H_controls)
-    # initial_controls, max_control_norms = initialize_controls(
-    #     control_count,
-    #     control_eval_count,
-    #     evolution_time,
-    #     initial_controls,
-    #     max_control_norms)
+    if control_func == None:
+        control_func = []
+        for k in range(control_count):
+            control_func.append(PWC)
+    if initial_controls == None:
+        initial_controls, max_control_norms = initialize_controls(
+        control_count,
+        control_eval_count,
+        evolution_time,
+        initial_controls,
+        max_control_norms)
+    if robust_set==None:
+        def robust_operator(para):
+            return para*np.identity(len(H_s))
+        robust_set = [np.array([0]),robust_operator]
     # Construct the program state.
     if max_control_norms is None:
         max_control_norms = np.ones(control_count)
@@ -136,6 +145,8 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
 
     return result
 
+def PWC(controls,time,i):
+    return controls[i]
 
 ### HELPER METHODS ###
 
@@ -354,6 +365,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     step_costs = pstate.step_costs
     system_eval_count = pstate.control_eval_count
     states = pstate.initial_states
+    pstate.forward_states = [pstate.initial_states.transpose()]
     # if pstate.robust_set != None:
     #     fluc_para=[]
     #     for i in range(len(pstate.robust_set[0])):
@@ -393,6 +405,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
             # Evolve the states to the next time step.
             H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
             states = expm(-1j * dt * H_total, states, pstate.expm_method, gradients_method)
+            if gradients_method == "SAD":
+                pstate.forward_states.append(states)
             # Compute step costs every `cost_step`.
             if is_cost_step:
                 for i, step_cost in enumerate(step_costs):
@@ -412,8 +426,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
                 else:
                     print_infidelity.append(cost_error)
     # Report reults.
-    with np.printoptions(formatter={'float_kind': '{:0.1e}'.format}):
-        print(np.array(print_infidelity))
+    # with np.printoptions(formatter={'float_kind': '{:0.1e}'.format}):
+    #     print(np.array(print_infidelity))
     reporter.error = error
     reporter.final_states = states
     return error
@@ -443,14 +457,19 @@ def H_gradient(controls, pstate, reporter):
     control_count = len(H_controls)
     tol = 1e-5
     gradients_method = pstate.gradients_method
+    back_states = 0*states.transpose()
     for l in range(len(costs)):
         if costs[l].type == "control_implicit_related":
             #initialize the backward-propagated states which relate to phi in the paper
-            back_states = costs[l].gradient_initialize()
+            s = costs[l].gradient_initialize()
+            back_states = back_states+s
     for system_eval_step in range(system_eval_count):
         # Backward propagation. Consider time step N, N-1, ..., 1 sequentially
         H_total = get_H_total(controls, H_controls, H_s, system_eval_count-system_eval_step-1)
-        states = expm(1j*dt*H_total, states, pstate.expm_method, gradients_method)
+        if pstate.gradients_method=="HG":
+            states = expm(1j*dt*H_total, states, pstate.expm_method, gradients_method)
+        else:
+            states = pstate.forward_states[system_eval_count-system_eval_step-1]
         back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, 1j * dt * np.array(H_controls) , tol, back_states, pstate.expm_method, gradients_method)
         for k in range(control_count):
             M = np.matmul(np.conjugate(back_states_der[k]),states)

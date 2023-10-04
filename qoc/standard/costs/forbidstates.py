@@ -5,7 +5,7 @@ the occupation of a set of forbidden states.
 
 
 import numpy as np
-
+import autograd as ad
 from qoc.models import Cost
 
 class ForbidStates(Cost):
@@ -41,6 +41,7 @@ class ForbidStates(Cost):
         self.forbidden_states_dagger = np.conjugate(forbidden_states)
         self.forbidden_states = forbidden_states
         self.state_count = forbidden_states.shape[0]
+        self.SAD_bps = []
 
     def cost(self, controls, states, gradients_method):
         """
@@ -56,7 +57,7 @@ class ForbidStates(Cost):
         """
         # The cost is the overlap (fidelity) of the evolved state and each
         # forbidden state.
-        if gradients_method == "AD":
+        if gradients_method == "AD" or gradients_method == "SAD":
             import autograd.numpy as np
         else:
             import numpy as np
@@ -65,6 +66,13 @@ class ForbidStates(Cost):
         self.grads_factor = self.cost_multiplier/ (state_count * control_eval_count)
         self.inner_products = np.matmul(self.forbidden_states_dagger, states)
         fidelity = np.trace(np.abs(self.inner_products)**2)
+        if gradients_method == "SAD":
+            def cost_function(states):
+                self.inner_products = np.matmul(self.forbidden_states_dagger, states)
+                fidelity = np.trace(np.abs(self.inner_products) ** 2)
+                return self.grads_factor * fidelity
+            self.cost_value, self.SAD_bps = ad.value_and_grad(cost_function)(states)
+            self.SAD_bps.append(1 / 2 * np.transpose(self.SAD_bps.conjugate()))
         return self.grads_factor * fidelity
 
     def gradient_initialize(self,):
@@ -74,10 +82,15 @@ class ForbidStates(Cost):
         -------
 
         """
-        states_return = np.zeros_like(self.forbidden_states, dtype=np.complex128)
-        for i in range(len(self.inner_products)):
-            states_return[i] = self.inner_products[i][i] * self.forbidden_states[i] * self.grads_factor
-        return states_return
+        if len(self.SAD_bps) == 0:
+            states_return = np.zeros_like(self.forbidden_states, dtype=np.complex128)
+            for i in range(len(self.inner_products)):
+                states_return[i] = self.inner_products[i][i] * self.forbidden_states[i] * self.grads_factor
+            return states_return
+        else:
+            return_state = self.SAD_bps[-1]
+            del self.SAD_bps[-1]
+            return return_state
 
     def update_state_back(self, states):
         """
@@ -90,8 +103,13 @@ class ForbidStates(Cost):
         -------
 
         """
-        states_return = np.zeros_like(self.forbidden_states, dtype=np.complex128)
-        inner_products = np.matmul(self.forbidden_states_dagger, states)
-        for i in range(len(inner_products)):
-            states_return[i] = inner_products[i][i] * self.forbidden_states[i] * self.grads_factor
-        return states_return
+        if len(self.SAD_bps) == 0:
+            states_return = np.zeros_like(self.forbidden_states, dtype=np.complex128)
+            inner_products = np.matmul(self.forbidden_states_dagger, states)
+            for i in range(len(inner_products)):
+                states_return[i] = inner_products[i][i] * self.forbidden_states[i] * self.grads_factor
+            return states_return
+        else:
+            return_state = self.SAD_bps[-1]
+            del self.SAD_bps[-1]
+            return return_state

@@ -95,6 +95,7 @@ class GrapeSchroedingerDiscreteState(GrapeState):
         self.control_func = control_func
         self.robust_set = robust_set
         self.last_error = 0
+        self.forward_states = []
 
     def log_and_save(self, controls, error, final_states, grads, iteration, error_set):
         """
