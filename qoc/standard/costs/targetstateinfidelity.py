@@ -43,7 +43,6 @@ class TargetStateInfidelity(Cost):
         self.grads_factor = -self.cost_multiplier / self.state_count ** 2
         self.SAD_bps = None
 
-
     def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.

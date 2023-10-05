@@ -37,6 +37,7 @@ def total_cost(dim_trans,dim_c,mode,costs):
     costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-2,mode), cost_multiplier=1/3))
     costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-3,mode), cost_multiplier=1/3))
     return costs
+
 def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
     asd, b_dag, b = transmon(w_01=w_t, anharmonicity=anharmonicity, H_size=dim_trans)
     delta = w_t-w_c

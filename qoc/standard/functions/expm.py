@@ -5,6 +5,7 @@ expm.py - a module for all things e^M
 import scipy.sparse.linalg
 from scipy.sparse import isspmatrix
 import importlib
+from autograd.extend import Box
 
 def expm(A, vector, method="pade", gradients_method="AD" ):
     if gradients_method == "AD":
@@ -214,7 +215,10 @@ def _exact_inf_norm(A):
         return max(abs(A).sum(axis=1).flat)
     else:
         import numpy as np
-        return np.linalg.norm(A, np.inf)
+        if isinstance(A, Box):
+            return np.linalg.norm(A._value, np.inf)
+        else:
+            return np.linalg.norm(A, np.inf)
 
 def trace(A):
     """

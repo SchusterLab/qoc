@@ -15,7 +15,6 @@ from qoc.models import (Dummy,
                         ProgramType, )
 from qoc.standard import (Adam, ans_jacobian,
                           expm, expmat_der_vec_mul)
-
 def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                 costs, evolution_time,
                                 initial_states,initial_controls = None,control_func = None,
@@ -337,7 +336,11 @@ def control_cost(controls, pstate, ):
             error = error + cost_error
     return error
 
-
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
