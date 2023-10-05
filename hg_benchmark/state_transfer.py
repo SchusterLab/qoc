@@ -63,7 +63,7 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     ITERATION_COUNT = 1
 
     COSTS = [TargetStateInfidelity(target_states=Target,cost_multiplier=0.99),]
-    # COSTS = total_cost(dim_trans,dim_c,mode,COSTS)
+    COSTS = total_cost(dim_trans,dim_c,mode,COSTS)
 
     H_0 = H_0.toarray()
     for i in range(len(H_control)):
