@@ -62,6 +62,7 @@ class OperatorAverage(Cost):
             import numpy as np
         state_dagger = np.conjugate(np.transpose(states))
         self.operator_states = (self.operator.dot(states).transpose())
+        s=np.real(np.matmul(state_dagger, np.matmul(self.operator,states)))
         cost = np.trace(np.real(np.matmul(state_dagger, np.matmul(self.operator,states))))
         self.cost_value = cost * self.grads_factor
         if gradients_method == "SAD":

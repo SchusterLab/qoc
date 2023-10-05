@@ -31,10 +31,7 @@ def projector_tran(dim_trans,dim_c,i,mode):
     tran0[i]=1
     tran0=dia_matrix(([tran0],[0]),shape=(dim_trans, dim_trans)).tocsc()
     tran0=kron(tran0,I_c)
-    if mode=="AD" or mode=="SAD":
-        return tran0.toarray()
-    else:
-        return tran0
+    return tran0.toarray()
 def total_cost(dim_trans,dim_c,mode,costs):
     costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-1,mode), cost_multiplier=1/3))
     costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-2,mode), cost_multiplier=1/3))
@@ -66,7 +63,7 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     ITERATION_COUNT = 1
 
     COSTS = [TargetStateInfidelity(target_states=Target,cost_multiplier=0.99),]
-    COSTS = total_cost(dim_trans,dim_c,mode,COSTS)
+    # COSTS = total_cost(dim_trans,dim_c,mode,COSTS)
 
     H_0 = H_0.toarray()
     for i in range(len(H_control)):
@@ -74,7 +71,5 @@ def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_ti
     result = grape_schroedinger_discrete(H_0, H_control, CONTROL_EVAL_COUNT,
                                          COSTS, evolution_time,
                                          initial_states=Initial_state,
-                                         iteration_count=ITERATION_COUNT, gradients_method=mode, expm_method="Taylor")
+                                         iteration_count=ITERATION_COUNT, gradients_method=mode, expm_method="taylor")
     return result
-pre = 2*np.pi
-result = simulation(1, 4, 6, 6 * pre, 3 * pre, -0.225 * pre, 0.1 * pre, 10, 40,"SAD")

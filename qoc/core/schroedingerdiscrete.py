@@ -455,7 +455,7 @@ def H_gradient(controls, pstate, reporter):
     grads = np.zeros_like(controls)
     states = reporter.final_states
     control_count = len(H_controls)
-    tol = 1e-5
+    tol = 1e-8
     gradients_method = pstate.gradients_method
     back_states = 0*states.transpose()
     for l in range(len(costs)):
