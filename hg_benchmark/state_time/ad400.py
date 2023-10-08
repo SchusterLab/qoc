@@ -1,7 +1,7 @@
 from hg_benchmark.state_transfer import simulation
 import numpy as np
 pre=2*np.pi
-dim=1000
+dim=500
 
 
 def main():
