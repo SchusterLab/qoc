@@ -1,6 +1,9 @@
 from scipy.sparse import kron
 import os
 os.environ['OMP_NUM_THREADS'] = '1' # set number of OpenMP threads to run in parallel
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+
 from qoc import grape_schroedinger_discrete
 from qoc.standard import (TargetStateInfidelity, OperatorAverage)
 from scipy.sparse import dia_matrix,identity
@@ -33,9 +36,8 @@ def projector_tran(dim_trans,dim_c,i,mode):
     tran0=kron(tran0,I_c)
     return tran0.toarray()
 def total_cost(dim_trans,dim_c,mode,costs):
-    costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-1,mode), cost_multiplier=1/3))
-    costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-2,mode), cost_multiplier=1/3))
-    costs.append(OperatorAverage(projector_tran(dim_trans,dim_c,dim_trans-3,mode), cost_multiplier=1/3))
+    proj = projector_tran(dim_trans, dim_c, dim_trans - 1, mode)+projector_tran(dim_trans,dim_c,dim_trans-2,mode)+projector_tran(dim_trans,dim_c,dim_trans-3,mode)
+    costs.append(proj, cost_multiplier=1)
     return costs
 
 def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
