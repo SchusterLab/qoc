@@ -37,7 +37,7 @@ def projector_tran(dim_trans,dim_c,i,mode):
     return tran0.toarray()
 def total_cost(dim_trans,dim_c,mode,costs):
     proj = projector_tran(dim_trans, dim_c, dim_trans - 1, mode)+projector_tran(dim_trans,dim_c,dim_trans-2,mode)+projector_tran(dim_trans,dim_c,dim_trans-3,mode)
-    costs.append(proj, cost_multiplier=1)
+    costs.append(OperatorAverage(proj, cost_multiplier=1/3))
     return costs
 
 def simulation(fock, dim_c , dim_trans, w_c, w_t, anharmonicity, g, evolution_time, step, mode):
