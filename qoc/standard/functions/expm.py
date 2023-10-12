@@ -334,7 +334,7 @@ def choose_ms(norm_A,d,tol):
         raise ValueError("please lower the error tolerance ")
 
 
-def expm_taylor(A, B, d=5, tol=1e-5):
+def expm_taylor(A, B, d=5, tol=1e-8):
     """
     A helper function.
     """
