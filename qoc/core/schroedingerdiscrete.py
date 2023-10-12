@@ -481,7 +481,11 @@ def H_gradient(controls, pstate, reporter):
                 back_states += costs[l].update_state_back(states)
 
     return grads
-
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def get_H_total(controls: np.ndarray, H_controls: np.ndarray,
                 H0: np.ndarray, time_step: float) -> np.ndarray:
     """
