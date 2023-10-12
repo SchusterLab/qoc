@@ -39,6 +39,12 @@ class OperatorAverage(Cost):
         self.operator = operator
         self.SAD_bps = []
 
+    import line_profiler
+    import atexit
+    profile = line_profiler.LineProfiler()
+    atexit.register(profile.print_stats)
+
+    @profile
     def cost(self, controls, states, gradients_method):
         """
         Compute the penalty.
