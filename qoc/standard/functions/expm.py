@@ -339,7 +339,7 @@ def expm_taylor(A, B, d=5, tol=1e-5):
     A helper function.
     """
     if tol is None:
-        tol =1e-5
+        tol =1e-8
     norm_A = _exact_inf_norm(A)
     s,m=choose_ms(norm_A,d,tol)
     F=B
@@ -369,7 +369,7 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
 
     d = len(state[0])
     if tol==None:
-        tol=1e-5
+        tol=1e-8
     control_number = len(E)
     final_matrix = []
     for i in range(control_number+1):
