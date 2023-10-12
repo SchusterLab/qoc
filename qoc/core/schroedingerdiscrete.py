@@ -5,7 +5,7 @@ optimization algorithm
 
 from autograd.extend import Box
 from autograd import grad
-import numpy as np
+import autograd.numpy as np
 from qoc.core.common import (initialize_controls,
                              strip_controls,
                              clip_control_norms)
@@ -13,8 +13,8 @@ from qoc.models import (Dummy,
                         GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerResult,
                         ProgramType, )
-from qoc.standard import (Adam, ans_jacobian,
-                          expm, expmat_der_vec_mul)
+from qoc.standard import (Adam, expm,ans_jacobian,
+                           expmat_der_vec_mul)
 def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                 costs, evolution_time,
                                 initial_states,initial_controls = None,control_func = None,
@@ -381,7 +381,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     error = 0
     print_infidelity=[]
     for i in range(len(fluc_para)):
-        H_s = pstate.H_s + fluc_oper(fluc_para[i])
+        H_s = pstate.H_s
         H_controls = pstate.H_controls
         states = np.transpose(pstate.initial_states)
         gradients_method = pstate.gradients_method
@@ -404,7 +404,6 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
             # Determine where we are in the mesh.
             cost_step, cost_step_remainder = divmod(system_eval_step, cost_eval_step)
             is_cost_step = cost_step_remainder == 0
-
             # Evolve the states to the next time step.
             H_total = get_H_total(controls, H_controls, H_s, system_eval_step)
             states = expm(-1j * dt * H_total, states, pstate.expm_method, gradients_method)
@@ -482,7 +481,6 @@ def H_gradient(controls, pstate, reporter):
                 back_states += costs[l].update_state_back(states)
 
     return grads
-
 
 def get_H_total(controls: np.ndarray, H_controls: np.ndarray,
                 H0: np.ndarray, time_step: float) -> np.ndarray:
