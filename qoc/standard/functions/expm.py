@@ -345,7 +345,7 @@ def expm_taylor(A, B, d=5, tol=1e-5):
     for i in range(int(s)):
         for j in range(m):
             coeff = s*(j+1)
-            B =  np.dot(A,B)/coeff
+            B = np.matmul(A,B)/coeff
             F = F + B
         B = F
     return F
@@ -413,5 +413,4 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     states = []
     for i in range(control_number):
         states.append(state[d*i:d*(i+1)].transpose())
-    a = state[control_number*d:d*(control_number+1)]
     return np.array(states), state[control_number*d:d*(control_number+1)].transpose()
