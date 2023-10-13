@@ -432,7 +432,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     #     print(np.array(print_infidelity))
     reporter.error = error
     reporter.final_states = states
-    return error
+    return 0.0
 
 
 def H_gradient(controls, pstate, reporter):
