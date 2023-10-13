@@ -333,7 +333,11 @@ def choose_ms(norm_A,d,tol):
     if no_solution == True:
         raise ValueError("please lower the error tolerance ")
 
-
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def expm_taylor(A, B, d=5, tol=1e-8):
     """
     A helper function.
