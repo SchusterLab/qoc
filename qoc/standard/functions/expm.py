@@ -346,7 +346,6 @@ def expm_taylor(A, B, d=5, tol=1e-8):
         tol =1e-8
     norm_A = _exact_inf_norm(A)
     s,m=choose_ms(norm_A,d,tol)
-    print(s*m)
     F=B
     for i in range(int(s)):
         for j in range(m):
