@@ -434,7 +434,11 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     reporter.final_states = states
     return error
 
-
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def H_gradient(controls, pstate, reporter):
     """
     Compute hard-coded gradients of states-related cost contributions.

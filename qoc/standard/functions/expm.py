@@ -7,7 +7,7 @@ from scipy.sparse import isspmatrix
 import importlib
 from autograd.extend import Box
 
-def expm(A, vector, method="pade", gradients_method="AD" ):
+def expm(A, vector, method="pade", gradients_method="AD", norm_A = None ):
     if gradients_method == "AD":
         globals()["np"] = importlib.import_module("autograd.numpy")
     else:
@@ -16,7 +16,7 @@ def expm(A, vector, method="pade", gradients_method="AD" ):
         exp_matrix = expm_pade(A)
         vector = np.matmul(exp_matrix, vector)
     if method == "taylor":
-        vector = expm_taylor(A, vector, )
+        vector = expm_taylor(A, vector, norm_A = norm_A )
     return vector
 
 ### EXPM IMPLEMENTATION DUE TO HIGHAM 2005 ###
@@ -333,18 +333,19 @@ def choose_ms(norm_A,d,tol):
     if no_solution == True:
         raise ValueError("please lower the error tolerance ")
 
-import line_profiler
-import atexit
-profile = line_profiler.LineProfiler()
-atexit.register(profile.print_stats)
-@profile
-def expm_taylor(A, B, d=5, tol=1e-8):
+# import line_profiler
+# import atexit
+# profile = line_profiler.LineProfiler()
+# atexit.register(profile.print_stats)
+# @profile
+def expm_taylor(A, B, d=5, tol=1e-8, norm_A = None):
     """
     A helper function.
     """
     if tol is None:
         tol =1e-8
-    norm_A = _exact_inf_norm(A)
+    if norm_A is None:
+        norm_A = _exact_inf_norm(A)
     s,m=choose_ms(norm_A,d,tol)
     F=B
     for i in range(int(s)):
@@ -356,8 +357,11 @@ def expm_taylor(A, B, d=5, tol=1e-8):
     return F
 
 
-
-
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     """
         Calculate the action of propagator derivative.
@@ -370,7 +374,7 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
         numpy.ndarray,numpy.ndarray - vector for gradient calculation, updated state
         """
     state=np.complex128(state)
-
+    norm_A = _exact_inf_norm(A)
     d = len(state[0])
     if tol==None:
         tol=1e-8
@@ -414,7 +418,7 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     for i in range(control_number):
         state = np.block([state0, state])
     state = state.transpose()
-    state = expm(final_matrix, state , expm_method, gradients_method )
+    state = expm(final_matrix, state , expm_method, gradients_method, norm_A )
     states = []
     for i in range(control_number):
         states.append(state[d*i:d*(i+1)].transpose())
