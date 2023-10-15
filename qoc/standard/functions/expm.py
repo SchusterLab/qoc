@@ -333,11 +333,6 @@ def choose_ms(norm_A,d,tol):
     if no_solution == True:
         raise ValueError("please lower the error tolerance ")
 
-# import line_profiler
-# import atexit
-# profile = line_profiler.LineProfiler()
-# atexit.register(profile.print_stats)
-# @profile
 def expm_taylor(A, B, d=5, tol=1e-8, norm_A = None):
     """
     A helper function.
@@ -347,21 +342,49 @@ def expm_taylor(A, B, d=5, tol=1e-8, norm_A = None):
     if norm_A is None:
         norm_A = _exact_inf_norm(A)
     s,m=choose_ms(norm_A,d,tol)
-    F=B
+
+    if type(A) is list:
+        dim = len(A[0])
+        control_number = len(A[1])
+        states = []
+        F = []
+        for i in range(control_number+1):
+            states.append(B[dim * i:dim * (i + 1)])
+            F.append(B[dim * i:dim * (i + 1)])
+    else:
+        F = B
     for i in range(int(s)):
         for j in range(m):
             coeff = s*(j+1)
-            B = np.matmul(A,B)/coeff
-            F = F + B
-        B = F
+            if type(A) is list:
+                states = block_matmul(A,states)
+                for k in range(len(states)):
+                    states[k] = states[k]/coeff
+            else:
+                B = np.matmul(A,B)/coeff
+            if type(A) is list:
+                for k in range(len(F)):
+                    F[k] = F[k]+states[k]
+            else:
+                F = F + B
+
+        if type(A) is list:
+            for k in range(len(F)):
+                states[k] = F[k]
+        else:
+            B = F
     return F
 
+def block_matmul(A,B):
+    H_control = A[1]
+    H_n = A[0]
+    for i in range(len(H_control)):
+        B[i] = H_n.dot(B[i]) + H_control[i].dot(B[len(H_control)])
+    B[len(H_control)] = H_n.dot(B[len(H_control)])
+    return B
 
-import line_profiler
-import atexit
-profile = line_profiler.LineProfiler()
-atexit.register(profile.print_stats)
-@profile
+
+
 def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     """
         Calculate the action of propagator derivative.
@@ -383,21 +406,22 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     for i in range(control_number+1):
         final_matrix.append([])
     if isspmatrix(A) == False:
-        for i in range(control_number + 1):
-            raw_matrix = []
-            if i == 0:
-                raw_matrix = raw_matrix + [A]
-            else:
-                raw_matrix = raw_matrix + [np.zeros_like(A)]
-            for j in range(1, control_number + 1):
-                if j == i and i != 0:
-                    raw_matrix = raw_matrix + [A]
-                elif j == control_number and j != i:
-                    raw_matrix = raw_matrix + [E[i]]
-                else:
-                    raw_matrix = raw_matrix + [np.zeros_like(A)]
-            final_matrix[i] = raw_matrix
-        final_matrix = np.block(final_matrix)
+        # for i in range(control_number + 1):
+        #     raw_matrix = []
+        #     if i == 0:
+        #         raw_matrix = raw_matrix + [A]
+        #     else:
+        #         raw_matrix = raw_matrix + [np.zeros_like(A)]
+        #     for j in range(1, control_number + 1):
+        #         if j == i and i != 0:
+        #             raw_matrix = raw_matrix + [A]
+        #         elif j == control_number and j != i:
+        #             raw_matrix = raw_matrix + [E[i]]
+        #         else:
+        #             raw_matrix = raw_matrix + [np.zeros_like(A)]
+        #     final_matrix[i] = raw_matrix
+        # final_matrix = np.block(final_matrix)
+        final_matrix = [A,E]
     else:
         for i in range(control_number+1):
             raw_matrix = []
@@ -421,5 +445,11 @@ def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     state = expm(final_matrix, state , expm_method, gradients_method, norm_A )
     states = []
     for i in range(control_number):
-        states.append(state[d*i:d*(i+1)].transpose())
-    return np.array(states), state[control_number*d:d*(control_number+1)].transpose()
+        if type(state) is list:
+            states.append(state[i].transpose())
+        else:
+            states.append(state[d*i:d*(i+1)].transpose())
+    if type(state) is list:
+        return np.array(states), state[-1].transpose()
+    else:
+        return np.array(states), state[control_number*d:d*(control_number+1)].transpose()
