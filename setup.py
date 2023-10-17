@@ -20,11 +20,12 @@ DEPENDENCIES = [
 DESCRIPTION = "a package for performing quantum optimal control"
 AUTHOR = "Thomas Propson"
 AUTHOR_EMAIL = "tcpropson@uchicago.edu"
-
+PY_MODULE = []
 setup(author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       description=DESCRIPTION,
       install_requires=DEPENDENCIES,
       name=NAME,
       version=VERSION,
+        py_modules=PY_MODULE
 )
