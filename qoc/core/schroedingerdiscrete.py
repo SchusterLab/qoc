@@ -5,7 +5,7 @@ optimization algorithm
 
 from autograd.extend import Box
 from autograd import grad
-import autograd.numpy as np
+import importlib
 from qoc.core.common import (initialize_controls,
                              strip_controls,
                              clip_control_norms)
@@ -133,6 +133,10 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     # functions that they evaluate on their own schedule.
     # The best solution to track mutable objects, that I can think of,
     # is to use a reporter object.
+    if gradients_method == "AD":
+        globals()["np"] = importlib.import_module("autograd.numpy")
+    else:
+        globals()["np"] = importlib.import_module("numpy")
     reporter = Dummy()
     reporter.iteration = 0
     result = GrapeSchroedingerResult()
@@ -188,7 +192,11 @@ def _esd_wrap(controls, pstate, reporter, result):
 
     return error, terminate
 
-
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def _esdj_wrap(controls, pstate, reporter, result):
     """
     Do intermediary work between the optimizer feeding controls to 
@@ -433,12 +441,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     reporter.error = error
     reporter.final_states = states
     return error
-#
-# import line_profiler
-# import atexit
-# profile = line_profiler.LineProfiler()
-# atexit.register(profile.print_stats)
-# @profile
+
+
 def H_gradient(controls, pstate, reporter):
     """
     Compute hard-coded gradients of states-related cost contributions.
