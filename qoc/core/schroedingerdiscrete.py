@@ -6,6 +6,7 @@ optimization algorithm
 from autograd.extend import Box
 from autograd import grad
 import importlib
+import numpy as np
 from qoc.core.common import (initialize_controls,
                              strip_controls,
                              clip_control_norms)
@@ -133,10 +134,6 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     # functions that they evaluate on their own schedule.
     # The best solution to track mutable objects, that I can think of,
     # is to use a reporter object.
-    if gradients_method == "AD":
-        globals()["np"] = importlib.import_module("autograd.numpy")
-    else:
-        globals()["np"] = importlib.import_module("numpy")
     reporter = Dummy()
     reporter.iteration = 0
     result = GrapeSchroedingerResult()
