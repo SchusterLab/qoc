@@ -189,11 +189,7 @@ def _esd_wrap(controls, pstate, reporter, result):
 
     return error, terminate
 
-import line_profiler
-import atexit
-profile = line_profiler.LineProfiler()
-atexit.register(profile.print_stats)
-@profile
+
 def _esdj_wrap(controls, pstate, reporter, result):
     """
     Do intermediary work between the optimizer feeding controls to 
@@ -340,12 +336,11 @@ def control_cost(controls, pstate, ):
             cost_error = cost.cost(controls, states, 0)
             error = error + cost_error
     return error
-
-# import line_profiler
-# import atexit
-# profile = line_profiler.LineProfiler()
-# atexit.register(profile.print_stats)
-# @profile
+import line_profiler
+import atexit
+profile = line_profiler.LineProfiler()
+atexit.register(profile.print_stats)
+@profile
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
@@ -360,7 +355,10 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     Returns:
     error :: float - total error of the evolution
     """
-
+    if pstate.gradients_method == "AD":
+        globals()["np"] = importlib.import_module("autograd.numpy")
+    else:
+        globals()["np"] = importlib.import_module("numpy")
     cost_eval_step = 1
     costs = pstate.costs
     program_type = pstate.program_type
@@ -439,7 +437,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     reporter.final_states = states
     return error
 
-
+@profile
 def H_gradient(controls, pstate, reporter):
     """
     Compute hard-coded gradients of states-related cost contributions.
@@ -476,7 +474,8 @@ def H_gradient(controls, pstate, reporter):
         if pstate.gradients_method=="HG":
             states = expm(1j*dt*H_total, states, pstate.expm_method, gradients_method)
         else:
-            states = pstate.forward_states[system_eval_count-system_eval_step-1]
+            if system_eval_count-system_eval_step-1 == -1:
+                states = pstate.forward_states[system_eval_count-system_eval_step-1]
         back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, 1j * dt * np.array(H_controls) , tol, back_states, pstate.expm_method, gradients_method)
         for k in range(control_count):
             M = np.matmul(np.conjugate(back_states_der[k]),states)
