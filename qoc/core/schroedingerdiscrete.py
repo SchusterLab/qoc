@@ -223,13 +223,13 @@ def _esdj_wrap(controls, pstate, reporter, result):
         for i in range(control_eval_count):
             pwcontrols[k][i] = control_func[k](controls[k],times[i],i)
     #partial derivative of piece-wise control with respect to control parameters
-    grads_control_para = []
-    for k in range(control_count):
-        grads_control_para.append([])
-        for i in range(control_eval_count):
-            grads_control_para[k].append(grad(control_func[k])(controls[k], times[i],i))
-        grads_control_para[k] = np.array(grads_control_para[k]).transpose()
-    grads_control_para = np.array(grads_control_para)
+    # grads_control_para = []
+    # for k in range(control_count):
+    #     grads_control_para.append([])
+    #     for i in range(control_eval_count):
+    #         grads_control_para[k].append(grad(control_func[k])(controls[k], times[i],i))
+    #     grads_control_para[k] = np.array(grads_control_para[k]).transpose()
+    # grads_control_para = np.array(grads_control_para)
 
     # Rescale the controls to their maximum norm.
     # clip_control_norms(controls,
@@ -291,13 +291,14 @@ def _esdj_wrap(controls, pstate, reporter, result):
         else:
             error_set.append(cost.cost_value)
 
-    grads_optimizer = np.zeros((control_count,para_num))
-    #calculate overall gradients
-    for k in range(control_count):
-        grads_optimizer[k] = np.sum(grads[k] * grads_control_para[k], axis=1)
+    # grads_optimizer = np.zeros((control_count,para_num))
+    # #calculate overall gradients
+    # for k in range(control_count):
+    #     grads_optimizer[k] = np.sum(grads[k] * grads_control_para[k], axis=1)
     # Convert the gradients from cost function to optimizer format.
         # Save and log optimization progress.
-    grads = grads_optimizer
+    # grads = grads_optimizer
+
     pstate.log_and_save(controls, error, final_states,
                             grads, reporter.iteration, error_set)
     reporter.iteration += 1
@@ -336,11 +337,11 @@ def control_cost(controls, pstate, ):
             cost_error = cost.cost(controls, states, 0)
             error = error + cost_error
     return error
-import line_profiler
-import atexit
-profile = line_profiler.LineProfiler()
-atexit.register(profile.print_stats)
-@profile
+# import line_profiler
+# import atexit
+# profile = line_profiler.LineProfiler()
+# atexit.register(profile.print_stats)
+# @profile
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.
@@ -371,7 +372,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     step_costs = pstate.step_costs
     system_eval_count = pstate.control_eval_count
     states = pstate.initial_states
-    pstate.forward_states = [pstate.initial_states.transpose()]
+    if pstate.gradients_method == "SAD":
+        pstate.forward_states = [pstate.initial_states.transpose()]
     # if pstate.robust_set != None:
     #     fluc_para=[]
     #     for i in range(len(pstate.robust_set[0])):
@@ -437,7 +439,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     reporter.final_states = states
     return error
 
-@profile
+# @profile
 def H_gradient(controls, pstate, reporter):
     """
     Compute hard-coded gradients of states-related cost contributions.
@@ -507,5 +509,5 @@ def get_H_total(controls: np.ndarray, H_controls: np.ndarray,
     """
     H_total = H0
     for control, H_control in zip(controls, H_controls):
-        H_total = H_total + control[time_step] * H_control
+        H_total += control[time_step] * H_control
     return H_total
