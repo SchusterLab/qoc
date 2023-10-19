@@ -72,7 +72,7 @@ def get_initial(N):
 def simulation(q_number, mode):
     H_0=csc_matrix(get_int(q_number))
     H_control=get_control(q_number)
-    CONTROL_EVAL_COUNT = 3
+    CONTROL_EVAL_COUNT = 4
     evolution_time=0.25*CONTROL_EVAL_COUNT
 
     ITERATION_COUNT = 1
