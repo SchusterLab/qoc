@@ -357,7 +357,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     error :: float - total error of the evolution
     """
     dt = pstate.evolution_time / pstate.system_eval_count
-    # pstate.control_arrays = 1j * dt * np.array(pstate.H_controls)
+    pstate.control_arrays = 1j * dt * np.array(pstate.H_controls)
     if pstate.gradients_method == "AD":
         globals()["np"] = importlib.import_module("autograd.numpy")
     else:
