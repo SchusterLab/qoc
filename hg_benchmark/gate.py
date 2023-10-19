@@ -74,7 +74,7 @@ def simulation(q_number, mode):
     H_control=get_control(q_number)
 
     evolution_time=0.25
-    CONTROL_EVAL_COUNT = 1
+    CONTROL_EVAL_COUNT = 3
     ITERATION_COUNT = 1
 
     Initial_state = get_initial(q_number).reshape((q_number ** 3, q_number ** 3))
