@@ -356,6 +356,8 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     Returns:
     error :: float - total error of the evolution
     """
+    dt = pstate.evolution_time / pstate.system_eval_count
+    pstate.control_arrays = 1j * dt * np.array(pstate.H_controls)
     if pstate.gradients_method == "AD":
         globals()["np"] = importlib.import_module("autograd.numpy")
     else:
@@ -439,7 +441,6 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     reporter.final_states = states
     return error
 
-# @profile
 def H_gradient(controls, pstate, reporter):
     """
     Compute hard-coded gradients of states-related cost contributions.
@@ -472,13 +473,13 @@ def H_gradient(controls, pstate, reporter):
             back_states = back_states+s
     for system_eval_step in range(system_eval_count):
         # Backward propagation. Consider time step N, N-1, ..., 1 sequentially
-        H_total = get_H_total(controls, H_controls, H_s, system_eval_count-system_eval_step-1)
+        H_total = 1j*dt*get_H_total(controls, H_controls, H_s, system_eval_count-system_eval_step-1)
         if pstate.gradients_method=="HG":
             states = expm(1j*dt*H_total, states, pstate.expm_method, gradients_method)
         else:
             if system_eval_count-system_eval_step-1 == -1:
                 states = pstate.forward_states[system_eval_count-system_eval_step-1]
-        back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, 1j * dt * np.array(H_controls) , tol, back_states, pstate.expm_method, gradients_method)
+        back_states_der, back_states = expmat_der_vec_mul(H_total, pstate.control_arrays , tol, back_states, pstate.expm_method, gradients_method)
         for k in range(control_count):
             M = np.matmul(np.conjugate(back_states_der[k]),states)
             grads[k][system_eval_count-system_eval_step-1] = 2 * np.real(np.trace(M))
