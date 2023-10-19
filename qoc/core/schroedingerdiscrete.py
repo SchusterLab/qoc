@@ -480,7 +480,7 @@ def H_gradient(controls, pstate, reporter):
         else:
             if system_eval_count-system_eval_step-1 == -1:
                 states = pstate.forward_states[system_eval_count-system_eval_step-1]
-        back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, 1j * dt * np.array(pstate.H_controls) , tol, back_states, pstate.expm_method, gradients_method)
+        back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, pstate.control_arrays, tol, back_states, pstate.expm_method, gradients_method)
         for k in range(control_count):
             M = np.matmul(np.conjugate(back_states_der[k]),states)
             grads[k][system_eval_count-system_eval_step-1] = 2 * np.real(np.trace(M))
