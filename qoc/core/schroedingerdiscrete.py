@@ -235,8 +235,8 @@ def _esdj_wrap(controls, pstate, reporter, result):
     # clip_control_norms(controls,
     #                    pstate.max_control_norms)
 
-
-
+    dt = pstate.evolution_time / pstate.system_eval_count
+    pstate.control_arrays = 1j * dt * np.array(pstate.H_controls)
     # Evaluate the jacobian.
     if pstate.gradients_method == "AD":
         consider_error_control = False
@@ -356,8 +356,6 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     Returns:
     error :: float - total error of the evolution
     """
-    dt = pstate.evolution_time / pstate.system_eval_count
-    pstate.control_arrays = 1j * dt * np.array(pstate.H_controls)
     if pstate.gradients_method == "AD":
         globals()["np"] = importlib.import_module("autograd.numpy")
     else:
@@ -478,8 +476,7 @@ def H_gradient(controls, pstate, reporter):
         if pstate.gradients_method=="HG":
             states = expm(1j*dt*H_total, states, pstate.expm_method, gradients_method)
         else:
-            if system_eval_count-system_eval_step-1 == -1:
-                states = pstate.forward_states[system_eval_count-system_eval_step-1]
+            states = pstate.forward_states[system_eval_count-system_eval_step-1]
         back_states_der, back_states = expmat_der_vec_mul(1j*dt*H_total, pstate.control_arrays, tol, back_states, pstate.expm_method, gradients_method)
         for k in range(control_count):
             M = np.matmul(np.conjugate(back_states_der[k]),states)

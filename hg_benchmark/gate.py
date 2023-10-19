@@ -69,11 +69,11 @@ def get_initial(N):
         state.append(s)
     return np.array(state)
 
-def simulation(q_number, mode):
+def simulation(q_number, mode,N,dt):
     H_0=csc_matrix(get_int(q_number))
     H_control=get_control(q_number)
-    CONTROL_EVAL_COUNT = 2
-    evolution_time=0.25*CONTROL_EVAL_COUNT
+    CONTROL_EVAL_COUNT = N
+    evolution_time=dt*CONTROL_EVAL_COUNT
 
     ITERATION_COUNT = 1
 
