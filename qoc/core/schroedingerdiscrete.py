@@ -97,7 +97,7 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
         control_func = []
         for k in range(control_count):
             control_func.append(PWC)
-    if initial_controls == None:
+    if type(initial_controls) == type(None):
         initial_controls, max_control_norms = initialize_controls(
         control_count,
         control_eval_count,
@@ -124,8 +124,7 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
                                             save_file_path,
                                             save_intermediate_states,
                                             save_iteration_step, gradients_method,
-                                            expm_method, control_func, robust_set
-                                            )
+                                            expm_method, control_func, robust_set)
     pstate.log_and_save_initial()
 
     # Autograd does not allow multiple return values from
@@ -337,11 +336,7 @@ def control_cost(controls, pstate, ):
             cost_error = cost.cost(controls, states, 0)
             error = error + cost_error
     return error
-# import line_profiler
-# import atexit
-# profile = line_profiler.LineProfiler()
-# atexit.register(profile.print_stats)
-# @profile
+
 def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     """
     Compute the value of the total cost function for one evolution.

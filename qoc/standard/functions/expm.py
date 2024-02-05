@@ -342,7 +342,6 @@ def expm_taylor(A, B, d=5, tol=1e-8, norm_A = None):
     if norm_A is None:
         norm_A = _exact_inf_norm(A)
     s,m=choose_ms(norm_A,d,tol)
-
     if type(A) is list:
         dim = len(A[0])
         control_number = len(A[1])
@@ -382,8 +381,6 @@ def block_matmul(A,B):
         B[i] = H_n.dot(B[i]) + H_control[i].dot(B[len(H_control)])
     B[len(H_control)] = H_n.dot(B[len(H_control)])
     return B
-
-
 
 def expmat_der_vec_mul(A, E, tol, state, expm_method, gradients_method):
     """

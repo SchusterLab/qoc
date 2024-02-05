@@ -38,9 +38,9 @@ class ForbidStates(Cost):
         system_eval_count
         """
         super().__init__(cost_multiplier=cost_multiplier)
-        self.forbidden_states_dagger = np.conjugate(forbidden_states)
+        self.forbidden_states_dagger = np.conjugate(forbidden_states.transpose())
         self.forbidden_states = forbidden_states
-        self.state_count = forbidden_states.shape[0]
+        self.state_count = np.count_nonzero(forbidden_states)
         self.SAD_bps = []
 
     def cost(self, controls, states, gradients_method):
@@ -64,8 +64,8 @@ class ForbidStates(Cost):
         control_eval_count = len(controls[0])
         state_count = len(states)
         self.grads_factor = self.cost_multiplier/ (state_count * control_eval_count)
-        self.inner_products = np.matmul(self.forbidden_states_dagger, states)
-        fidelity = np.trace(np.abs(self.inner_products)**2)
+        self.inner_products = np.sum(np.abs(np.multiply(self.forbidden_states_dagger, states))**2)
+        fidelity = self.inner_products
         if gradients_method == "SAD":
             def cost_function(states):
                 self.inner_products = np.matmul(self.forbidden_states_dagger, states)
