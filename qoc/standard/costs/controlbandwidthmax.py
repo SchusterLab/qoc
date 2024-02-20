@@ -66,10 +66,10 @@ class ControlBandwidthMax(Cost):
             max_bandwidths = bandwidth[1]
             control_fft = anp.fft.fft(controls[i])
             control_fft_sq = anp.abs(control_fft)
-            penalty_freq_indices_max = anp.nonzero(anp.abs(freqs) >= max_bandwidths)[0]
+            penalty_freq_indices_max = anp.nonzero(np.round(anp.abs(freqs),10) > max_bandwidths)[0]
             penalized_ffts = control_fft_sq[penalty_freq_indices_max]
             penalty = anp.sum(penalized_ffts)
-            penalty_freq_indices_min = anp.nonzero(anp.abs(freqs) <= min_bandwidths)[0]
+            penalty_freq_indices_min = anp.nonzero(np.round(anp.abs(freqs),10)  < min_bandwidths)[0]
             penalized_ffts = control_fft_sq[penalty_freq_indices_min]
             penalty = penalty + anp.sum(penalized_ffts)
             cost = cost + penalty

@@ -14,6 +14,7 @@ from qoc.models import (Dummy,
                         GrapeSchroedingerDiscreteState,
                         GrapeSchroedingerResult,
                         ProgramType, )
+
 from qoc.standard import (Adam, expm,ans_jacobian,
                            expmat_der_vec_mul)
 def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
@@ -222,13 +223,13 @@ def _esdj_wrap(controls, pstate, reporter, result):
         for i in range(control_eval_count):
             pwcontrols[k][i] = control_func[k](controls[k],times[i],i)
     #partial derivative of piece-wise control with respect to control parameters
-    # grads_control_para = []
-    # for k in range(control_count):
-    #     grads_control_para.append([])
-    #     for i in range(control_eval_count):
-    #         grads_control_para[k].append(grad(control_func[k])(controls[k], times[i],i))
-    #     grads_control_para[k] = np.array(grads_control_para[k]).transpose()
-    # grads_control_para = np.array(grads_control_para)
+    grads_control_para = []
+    for k in range(control_count):
+        grads_control_para.append([])
+        for i in range(control_eval_count):
+            grads_control_para[k].append(grad(control_func[k])(controls[k], times[i],i))
+        grads_control_para[k] = np.array(grads_control_para[k]).transpose()
+    grads_control_para = np.array(grads_control_para)
 
     # Rescale the controls to their maximum norm.
     # clip_control_norms(controls,
@@ -290,13 +291,13 @@ def _esdj_wrap(controls, pstate, reporter, result):
         else:
             error_set.append(cost.cost_value)
 
-    # grads_optimizer = np.zeros((control_count,para_num))
+    grads_optimizer = np.zeros((control_count,para_num))
     # #calculate overall gradients
-    # for k in range(control_count):
-    #     grads_optimizer[k] = np.sum(grads[k] * grads_control_para[k], axis=1)
+    for k in range(control_count):
+        grads_optimizer[k] = np.sum(grads[k] * grads_control_para[k], axis=1)
     # Convert the gradients from cost function to optimizer format.
         # Save and log optimization progress.
-    # grads = grads_optimizer
+    grads = grads_optimizer
 
     pstate.log_and_save(controls, error, final_states,
                             grads, reporter.iteration, error_set)
