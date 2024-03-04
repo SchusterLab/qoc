@@ -142,7 +142,6 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     # Run the optimization.
     pstate.optimizer.run(_esd_wrap, pstate.iteration_count, initial_controls,
                          _esdj_wrap, args=(pstate, reporter, result))
-
     return result
 
 def PWC(controls,time,i):
