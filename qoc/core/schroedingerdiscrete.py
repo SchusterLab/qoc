@@ -136,6 +136,7 @@ def grape_schroedinger_discrete(H_s, H_controls, control_eval_count,
     # is to use a reporter object.
     reporter = Dummy()
     reporter.iteration = 0
+    reporter.print_infidelity = 0
     result = GrapeSchroedingerResult()
     # Convert the controls from cost function format to optimizer format.
     initial_controls = strip_controls(pstate.complex_controls, pstate.initial_controls)
@@ -277,19 +278,21 @@ def _esdj_wrap(controls, pstate, reporter, result):
     else:
         final_states = reporter.final_states
 
+
+    error_set = []
+    for cost in (pstate.costs):
+        if isinstance(cost.cost_value, Box):
+            error_set.append(cost.cost_value._value/cost.cost_multiplier)
+        else:
+            error_set.append(cost.cost_value/cost.cost_multiplier)
+
     # Update best configuration.
     if error < result.best_error:
         result.best_controls = controls
         result.best_error = error
         result.best_final_states = final_states
         result.best_iteration = reporter.iteration
-    error_set = []
-    for cost in (pstate.costs):
-        if isinstance(cost.cost_value, Box):
-            error_set.append(cost.cost_value._value)
-        else:
-            error_set.append(cost.cost_value)
-
+        result.errors = error_set
     grads_optimizer = np.zeros((control_count,para_num))
     # #calculate overall gradients
     for k in range(control_count):
@@ -431,6 +434,7 @@ def _evaluate_schroedinger_discrete(controls, pstate, reporter):
     # with np.printoptions(formatter={'float_kind': '{:0.1e}'.format}):
     #     print(np.array(print_infidelity))
     reporter.error = error
+    reporter.errors = print_infidelity
     reporter.final_states = states
     return error
 
