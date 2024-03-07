@@ -282,9 +282,9 @@ def _esdj_wrap(controls, pstate, reporter, result):
     error_set = []
     for cost in (pstate.costs):
         if isinstance(cost.cost_value, Box):
-            error_set.append(cost.cost_value._value/cost.cost_multiplier)
+            error_set.append(cost.cost_value._value)
         else:
-            error_set.append(cost.cost_value/cost.cost_multiplier)
+            error_set.append(cost.cost_value)
 
     # Update best configuration.
     if error < result.best_error:
