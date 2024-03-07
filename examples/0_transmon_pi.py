@@ -76,7 +76,7 @@ Hcy=-a_q*1j+1j*a_q.dag()
 Hcy=Hcy.data.toarray()
 H_controls=[Hcx,Hcy]
 total_time=5
-total_time_steps=3
+total_time_steps=100
 #Toltal number of descretized time pieces
 target_states=np.zeros([N_q,N_q],dtype=complex)
 angle= np.pi
@@ -93,7 +93,6 @@ initial_state0[0] = 1
 initial_state1 = np.zeros(N_q)
 initial_state1[1] = 1
 initial_states = np.array([initial_state0])
-fluc_para = 2*np.pi*1e-3*np.array([-10,-7,-4,-1,1,4,7,10])
 cost1=TargetStateInfidelity(target_states=target_states, cost_multiplier= 1)
 def projector_tran(dim_trans,mode,i=0):
     tran0 = np.zeros(dim_trans)
@@ -105,14 +104,9 @@ def projector_tran(dim_trans,mode,i=0):
         return tran0
 # cost3=ControlBandwidthMax(control_num=1,total_time_steps=total_time_steps,
 #                           evolution_time=total_time,bandwidths=np.array([[-1,3/total_time],[-1,11/total_time]]),cost_multiplier=5e-3)
-cost = [OperatorAverage(projector_tran(4,"SAD"), cost_multiplier=1/3)]
-
-def robust_operator(para):
-    return para*n_q.data.toarray()
+cost = [cost1,cost1,cost1]
 
 
-
-robustness_set = [fluc_para, robust_operator]
 initial_control = np.array([[1. ]])
 def control_funcx(controls,time,i):
     return controls[i]
@@ -127,4 +121,5 @@ initial_control=[initial_controlx,initial_controly]
 result = grape_schroedinger_discrete(H0, H_controls, total_time_steps,
                                          cost, total_time,
                                          initial_states, initial_controls = initial_control,control_func= control_func ,log_iteration_step = 1, min_error=1e-1,
-                                         iteration_count=1, gradients_method="SAD", expm_method="taylor",impose_control_conditions=impose_bc, )
+                                         iteration_count=1000, gradients_method="AD", impose_control_conditions=impose_bc, )
+print(result.errors)
