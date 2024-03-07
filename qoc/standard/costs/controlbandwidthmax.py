@@ -73,5 +73,5 @@ class ControlBandwidthMax(Cost):
             penalized_ffts = control_fft_sq[penalty_freq_indices_min]
             penalty = penalty + anp.sum(penalized_ffts)
             cost = cost + penalty
-        self.cost_value = cost * self.cost_multiplier
+        self.cost_value = cost * self.cost_multiplier/(len(penalty_freq_indices_max)+len(penalty_freq_indices_min))
         return self.cost_value
