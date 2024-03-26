@@ -248,7 +248,7 @@ def _esdj_wrap(controls, pstate, reporter, result):
         if consider_error_control:
             error_control, grads_control = (ans_jacobian(control_cost, 0)(pwcontrols, pstate))
             error += error_control
-            grads += grads
+            grads += grads_control
 
 
     # Autograd defines the derivative of a function of complex inputs as
